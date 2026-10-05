@@ -1,0 +1,37 @@
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### Mac / Windows ###
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+### Logs ###
+*.log
+hs_err_pid*
+replay_pid*
+
+### Build files ###
+build/
+out/
+!**/src/**/out/
+
+### Gradle / Kotlin ###
+.gradle/
+.kotlin/
+!gradle/wrapper/gradle-wrapper.jar
+
+### Environment ###
+.env
+.env.*
+!.env.example
+
+### Claude Code (개인 설정) ###
+.claude/settings.local.json
+CLAUDE.local.md
