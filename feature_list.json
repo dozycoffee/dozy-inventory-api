@@ -9,8 +9,8 @@
   {
     "id": "F-002",
     "name": "GitHub 저장소 설정",
-    "description": "이슈 라벨(feature, bug, refactor, chore) 생성, main 브랜치 보호(PR·CI 필수, force push·삭제 금지, 선형 이력, 승인 0), Rebase만 허용, 머지 후 브랜치 삭제. 원격 설정이므로 적용 전 사용자 확인이 필요하다.",
-    "status": "pending",
+    "description": "이슈 라벨(feature, bug, refactor, chore) 생성, main 브랜치 보호(PR·CI 필수, force push·삭제 금지, 선형 이력, 승인 0), Rebase만 허용, 머지 후 브랜치 삭제. 원격 설정으로 적용을 마쳤다.",
+    "status": "completed",
     "dependencies": ["F-001"]
   },
   {
