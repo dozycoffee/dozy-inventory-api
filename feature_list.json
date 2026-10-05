@@ -1,0 +1,149 @@
+[
+  {
+    "id": "F-001",
+    "name": "프로젝트 골격",
+    "description": "Gradle(Kotlin DSL) 프로젝트, 컨텍스트 로드 테스트, 로컬 환경(docker-compose, .env), verify.sh, CI, 이슈·PR 템플릿, Dependabot, AGENTS.md와 docs/. 첫 push 후 CI 통과를 확인하면 완료한다.",
+    "status": "in_progress",
+    "dependencies": []
+  },
+  {
+    "id": "F-002",
+    "name": "GitHub 저장소 설정",
+    "description": "이슈 라벨(feature, bug, refactor, chore) 생성, main 브랜치 보호(PR·CI 필수, force push·삭제 금지, 선형 이력, 승인 0), Rebase만 허용, 머지 후 브랜치 삭제. 원격 설정이므로 적용 전 사용자 확인이 필요하다.",
+    "status": "pending",
+    "dependencies": ["F-001"]
+  },
+  {
+    "id": "F-003",
+    "name": "Flyway V1 스키마",
+    "description": "docs/erd.md를 Flyway 마이그레이션(V1__create_schema.sql)으로 옮기고 enum CHECK와 마이그레이션 일치를 검증하는 테스트를 둔다.",
+    "status": "pending",
+    "dependencies": ["F-001"]
+  },
+  {
+    "id": "F-004",
+    "name": "전역 공통 모듈",
+    "description": "global 패키지: BaseEntity와 감사(Actor), 도메인 예외·오류 코드·오류 응답 규약(dozy-auth Problem Details), 중복 키 위반 변환.",
+    "status": "pending",
+    "dependencies": ["F-003"]
+  },
+  {
+    "id": "F-005",
+    "name": "상품 마스터",
+    "description": "product 도메인(등록·조회·상태 변경)과 상품 이벤트 발행 포트. 첫 도메인 PR이므로 패키지 구조를 확정하고 docs/architecture.md를 갱신한다.",
+    "status": "pending",
+    "dependencies": ["F-004"]
+  },
+  {
+    "id": "F-006",
+    "name": "Konsist 아키텍처 테스트 도입",
+    "description": "헥사고날 레이어 규칙(domain은 application·adapter에 의존하지 않음)과 Kotlin 컨벤션(Entity는 data class 금지, 타입 명시 등)을 테스트로 강제한다.",
+    "status": "pending",
+    "dependencies": ["F-005"]
+  },
+  {
+    "id": "F-007",
+    "name": "재고 모델 (Lot, 재고, 재고 이력)",
+    "description": "lot, inventory, inventory_history 도메인 모델. 수량 불변식, 조건부 갱신 쿼리, quantity_after 기록, 0 수량 행 유지.",
+    "status": "pending",
+    "dependencies": ["F-005"]
+  },
+  {
+    "id": "F-008",
+    "name": "입고 확정 반영",
+    "description": "WMS의 입고 확정 요청을 재고에 반영한다(시나리오 3.1). Lot 최초 수신 시 등록, inventory upsert, INBOUND 이력, 멱등 키 처리.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-009",
+    "name": "재고 조회",
+    "description": "가용 재고 조회(채널용)와 재고 현황·상세·Lot·이력 조회(관리자용). 시나리오 4장.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-010",
+    "name": "예약 생성과 Lot 할당",
+    "description": "주문 단위 전체 성공·전체 실패 예약, 유통기한 오름차순 Lot 할당, 조건부 UPDATE와 행 ID 순서 갱신, 멱등 키, 채널별 TTL 상한. 시나리오 5.1. reservation.channel 값 확정 필요.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-011",
+    "name": "예약 확정·해제·연장·만료",
+    "description": "예약 확정(WMS 출고 지시 이벤트), 명시적 해제, 총 수명 상한 내 연장, 만료 스케줄러, 예약 이벤트 이력. 시나리오 5.2~5.3.",
+    "status": "pending",
+    "dependencies": ["F-010"]
+  },
+  {
+    "id": "F-012",
+    "name": "출고 확정",
+    "description": "WMS의 출고 확정을 Lot별 총 수량·예약 수량 차감으로 반영하고 예약을 FULFILLED로 바꾼다. 결품 처리 포함. 시나리오 6.1.",
+    "status": "pending",
+    "dependencies": ["F-011"]
+  },
+  {
+    "id": "F-013",
+    "name": "반품 복귀",
+    "description": "반품 검수 결과를 RETURN 이력으로 재고에 반영한다. 불량 판정은 DEFECTIVE 행에 반영. 시나리오 7.1.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-014",
+    "name": "폐기 확정",
+    "description": "DEFECTIVE·DISPOSAL_SCHEDULED 재고를 DISPOSAL 이력으로 차감한다. NORMAL 재고 폐기 요청은 반려. 시나리오 9.2.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-015",
+    "name": "실사 조정",
+    "description": "WMS의 조정 변동량(+/−)을 승인 임계치 검증 후 반영한다. stock_adjustment(AUDIT)와 ADJUSTMENT 이력, 보류 해제. 시나리오 8.1.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-016",
+    "name": "Lot 재할당과 할당 보류",
+    "description": "피킹 불가 Lot의 재할당(확정 예약 한정)과 inventory 할당 보류, 실사·대사 반영 시 자동 해제. 시나리오 6.2.",
+    "status": "pending",
+    "dependencies": ["F-012", "F-015"]
+  },
+  {
+    "id": "F-017",
+    "name": "유통기한 스캔",
+    "description": "Lot 임박·경과 판정, 경과 Lot의 품질 전환(QUALITY_TRANSFER 이력), 확정 전 예약 강제 해제, Lot 경과 이벤트. 시나리오 9.1.",
+    "status": "pending",
+    "dependencies": ["F-011", "F-007"]
+  },
+  {
+    "id": "F-018",
+    "name": "Outbox와 Kafka 발행",
+    "description": "outbox_event 저장, 파티션 키 순서 발행기, 발행 정리 배치. Kafka 의존성과 compose 서비스를 추가한다. 이벤트 발행 포트 구현.",
+    "status": "pending",
+    "dependencies": ["F-007"]
+  },
+  {
+    "id": "F-019",
+    "name": "대사 보정",
+    "description": "일 1회 대사 배치(reconciliation_run), 보정안 생성, 항목별 승인 후 RECONCILIATION 이력 반영. WMS 합계 조회 포트가 필요하다. 시나리오 8.3, 10.3.",
+    "status": "pending",
+    "dependencies": ["F-015", "F-018"]
+  },
+  {
+    "id": "F-020",
+    "name": "dozy-auth 인증 연동",
+    "description": "auth-spring-boot-starter 연동(GitHub Packages 읽기 토큰 필요), system client·직원 토큰 인가, ims:service·ims:admin role. dozy-auth 프로젝트에서 ims audience와 role, system client를 먼저 등록해야 한다.",
+    "status": "pending",
+    "dependencies": ["F-004"]
+  },
+  {
+    "id": "F-021",
+    "name": "창고 접근 제어",
+    "description": "warehouse_access 사본, WMS 소속 변경 이벤트 수신, 사본이 없을 때 거부와 로그·알림. 모든 API에 창고별 리소스 인가를 적용한다.",
+    "status": "pending",
+    "dependencies": ["F-020", "F-018"]
+  }
+]
