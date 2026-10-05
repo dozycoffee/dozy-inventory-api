@@ -9,13 +9,17 @@ updates:
         update-types:
           - minor
           - patch
-    # Kotlin과 Spring Boot는 WMS와 버전을 맞추기 위해 수동으로 올린다 (ADR-0001)
+    # Kotlin, Spring Boot, Gradle은 WMS와 버전을 맞추기 위해 수동으로 올린다 (ADR-0001)
     ignore:
       - dependency-name: "org.jetbrains.kotlin*"
         update-types:
           - "version-update:semver-minor"
           - "version-update:semver-major"
       - dependency-name: "org.springframework.boot*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+      - dependency-name: "gradle-wrapper"
         update-types:
           - "version-update:semver-minor"
           - "version-update:semver-major"
