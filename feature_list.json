@@ -16,8 +16,8 @@
   {
     "id": "F-003",
     "name": "Flyway V1 스키마",
-    "description": "docs/erd.md를 Flyway 마이그레이션(V1__create_schema.sql)으로 옮기고 enum CHECK와 마이그레이션 일치를 검증하는 테스트를 둔다.",
-    "status": "pending",
+    "description": "docs/erd.md를 Flyway 마이그레이션으로 옮겼다(V1 테이블·유니크·CHECK·인덱스, V2 외래키). 핵심 제약을 검증하는 SchemaConstraintTest를 둔다. enum CHECK와 enum 클래스의 일치 검증은 enum이 생기는 F-005, F-007에서 추가한다.",
+    "status": "completed",
     "dependencies": ["F-001"]
   },
   {
@@ -30,7 +30,7 @@
   {
     "id": "F-005",
     "name": "상품 마스터",
-    "description": "product 도메인(등록·조회·상태 변경)과 상품 이벤트 발행 포트. 첫 도메인 PR이므로 패키지 구조를 확정하고 docs/architecture.md를 갱신한다.",
+    "description": "product 도메인(등록·조회·상태 변경)과 상품 이벤트 발행 포트. 첫 도메인 PR이므로 패키지 구조를 확정하고 docs/architecture.md를 갱신한다. category·status enum과 CHECK 제약의 일치 검증 테스트를 함께 둔다.",
     "status": "pending",
     "dependencies": ["F-004"]
   },
@@ -44,7 +44,7 @@
   {
     "id": "F-007",
     "name": "재고 모델 (Lot, 재고, 재고 이력)",
-    "description": "lot, inventory, inventory_history 도메인 모델. 수량 불변식, 조건부 갱신 쿼리, quantity_after 기록, 0 수량 행 유지.",
+    "description": "lot, inventory, inventory_history 도메인 모델. 수량 불변식, 조건부 갱신 쿼리, quantity_after 기록, 0 수량 행 유지. 품질 상태·Lot 상태·이력 유형 enum과 CHECK 제약의 일치 검증 테스트를 함께 둔다.",
     "status": "pending",
     "dependencies": ["F-005"]
   },
