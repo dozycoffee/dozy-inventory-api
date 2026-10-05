@@ -1,7 +1,7 @@
 # ERD
 
 IMS 데이터 모델이다. 공통 규칙과 컬럼 표기는 WMS(`dozy-wms-api`)의 DDL을 따른다.
-이 문서가 Flyway 마이그레이션 작성의 기준이다. DDL이 확정되면 마이그레이션이 원본이 되고 이 문서는 설명을 맡는다.
+DDL 원본은 `src/main/resources/db/migration`이다(`V1__create_schema.sql`은 테이블·유니크·CHECK·인덱스, `V2__add_foreign_keys.sql`은 외래키). 이 문서는 설명과 설계 결정을 맡는다.
 
 ## 1. 설계 규칙
 
@@ -16,6 +16,7 @@ IMS 데이터 모델이다. 공통 규칙과 컬럼 표기는 WMS(`dozy-wms-api`
 | 설정값 | 예약 TTL 상한(채널별), 조정 승인 임계치는 테이블이 아니라 애플리케이션 설정으로 둔다. |
 | 수량 검증 | 수량 불변식은 엔티티가 지키고 DB `CHECK`가 마지막 안전망이다. |
 | DB | MySQL 8.0, 스키마 `dozy_inventory` |
+| 마이그레이션 | 적용된 파일은 수정하지 않고 새 버전 파일을 추가한다. 테이블은 V1, 외래키는 V2에 둔다. |
 
 ## 2. ERD 다이어그램
 
@@ -173,7 +174,7 @@ erDiagram
 |------|------|------|------|
 | lot_id | BIGINT PK | N | |
 | product_id | BIGINT FK | N | `product` |
-| lot_number | VARCHAR(50) | N | 공급사가 부여한 번호. IMS는 생성하지 않음 |
+| lot_number | VARCHAR(50) `utf8mb4_bin` | N | 공급사가 부여한 번호. IMS는 생성하지 않음. 대소문자를 구분한다 (ERD-08) |
 | manufacture_date | DATE | Y | |
 | expiration_date | DATE | Y | |
 | lot_status | VARCHAR(50) | N | `NORMAL`, `EXPIRING_SOON`, `EXPIRED` |
@@ -216,7 +217,7 @@ erDiagram
 | quantity_after | INT | N | 변경 후 총 수량(예약 수량 제외, ERD-02) |
 | reference_type | VARCHAR(50) | N | 원인 문서 유형 (`INBOUND_ITEM`, `RETURN_ITEM`, `RESERVATION`, `DISPOSAL_ITEM`, `STOCK_ADJUSTMENT_ITEM`, `LOT_EXPIRATION`) |
 | reference_id | BIGINT | N | 원인 문서 ID (WMS 문서 또는 IMS 문서) |
-| idempotency_key | VARCHAR(150) | N | 요청의 멱등 키 |
+| idempotency_key | VARCHAR(100) `ascii_bin` | N | 요청의 멱등 키 (ERD-07) |
 | requester_service | VARCHAR(50) | N | 요청 서비스(`svc-wms`, `scheduler` 등) |
 | created_at, created_by | DATETIME(6), VARCHAR(100) | N | 변경 불가. `created_by`는 요청자 principal 또는 `system` |
 
@@ -238,7 +239,7 @@ erDiagram
 | expires_at | DATETIME(6) | Y | 확정 전 만료 시각. 확정 후에는 NULL |
 | max_expires_at | DATETIME(6) | N | 생성 시각 + 채널 상한. 연장해도 넘을 수 없음 |
 | confirmed_at | DATETIME(6) | Y | |
-| idempotency_key | VARCHAR(150) | N | 유니크 |
+| idempotency_key | VARCHAR(100) `ascii_bin` | N | 유니크 (ERD-07) |
 | requester_service | VARCHAR(50) | N | |
 | (감사 컬럼 4개) | | N | |
 
@@ -298,7 +299,7 @@ erDiagram
 | reconciliation_run_id | BIGINT FK | Y | `RECONCILIATION`: 대사 실행 |
 | requested_by | VARCHAR(100) | N | 요청자 또는 `system` |
 | approved_by, approved_at | VARCHAR(100), DATETIME(6) | Y | 승인자·승인 시각 |
-| idempotency_key | VARCHAR(150) | N | 유니크. 대사 보정은 실행·항목에서 생성한 키 |
+| idempotency_key | VARCHAR(100) `ascii_bin` | N | 유니크 (ERD-07). 대사 보정은 실행·항목에서 생성한 키 |
 | (감사 컬럼 4개) | | N | |
 
 - 제약: `uq_adjustment_idempotency (idempotency_key)`, `chk_adjustment_approval (adjustment_type = 'AUDIT' OR status NOT IN ('APPROVED','APPLIED') OR approved_by IS NOT NULL)` — 대사 보정은 임계치와 무관하게 항상 승인자 필요
@@ -430,3 +431,15 @@ SELECT product_id, SUM(quantity - reserved_quantity) AS available
 - **결정**: 품질 상태 전환(예: 정상 → 폐기 예정)은 `QUALITY_TRANSFER` 이력으로 전환 전 행에 −N, 전환 후 행에 +N을 각각 기록한다. 재고 증감 이벤트는 발행하지 않고 `Lot 경과` 이벤트만 발행한다.
 - **이유**: IMS는 품질 상태가 재고 행 키의 일부라서 전환 시 수량이 행 사이로 옮겨간다. 이력을 남기지 않으면 행별 이력 합계가 현재 수량과 어긋나고 `quantity_after`의 연속성이 깨진다.
 - **감수하는 것**: 이력 유형이 하나 늘고, 이력 조회에서 전환과 실제 수량 변동을 구분해 표시해야 한다.
+
+### ERD-07. 멱등 키는 `VARCHAR(100)` ASCII, 대소문자 구분
+
+- **결정**: 멱등 키 컬럼은 `VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin`이다. 호출자는 키를 ASCII 문자열(UUID 또는 `서비스-문서-ID` 형태)로 만든다.
+- **이유**: DB 기본 collation(`utf8mb4_unicode_ci`)은 대소문자를 구분하지 않아 `abc-1`과 `ABC-1`이 같은 키로 취급되고, 서로 다른 요청이 중복으로 오인된다. `ascii`는 문자당 1바이트라 계속 쌓이는 `inventory_history`의 유니크 인덱스가 작다(최대 100바이트).
+- **감수하는 것**: 호출 서비스가 ASCII 키 규칙을 지켜야 한다. 100자를 넘는 키는 거부된다.
+
+### ERD-08. 공급사 Lot 번호는 대소문자를 구분
+
+- **결정**: `lot.lot_number`는 `utf8mb4_bin`으로 대소문자를 구분한다. `(product_id, lot_number)` 유니크도 이 비교를 따른다.
+- **이유**: IMS는 공급사 번호를 변형하지 않는다. 대소문자만 다른 서로 다른 Lot이 합쳐지면 유통기한이 섞이는 조용한 오류가 생긴다.
+- **감수하는 것**: 입력 실수(대소문자)가 다른 Lot으로 중복 등록될 수 있다. 눈에 보이는 오류라 수정할 수 있다.
