@@ -2,8 +2,8 @@
   {
     "id": "F-001",
     "name": "프로젝트 골격",
-    "description": "Gradle(Kotlin DSL) 프로젝트, 컨텍스트 로드 테스트, 로컬 환경(docker-compose, .env), verify.sh, CI, 이슈·PR 템플릿, Dependabot, AGENTS.md와 docs/. 첫 push 후 CI 통과를 확인하면 완료한다.",
-    "status": "in_progress",
+    "description": "Gradle(Kotlin DSL) 프로젝트, 컨텍스트 로드 테스트, 로컬 환경(docker-compose, .env), verify.sh, CI, 이슈·PR 템플릿, Dependabot, AGENTS.md와 docs/. 첫 push 후 CI 통과를 확인했다.",
+    "status": "completed",
     "dependencies": []
   },
   {
