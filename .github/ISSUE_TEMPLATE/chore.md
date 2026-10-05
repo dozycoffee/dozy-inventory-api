@@ -2,7 +2,7 @@
 name: Chore
 about: 빌드, 설정, 인프라 등 기타 작업 이슈
 title: "[CHORE] "
-labels: [ "chore" ]
+labels: [ "🔧 chore" ]
 assignees: [ ]
 ---
 
