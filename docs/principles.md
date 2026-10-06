@@ -55,4 +55,4 @@ IMS는 DOZY COFFEE 원부자재 재고의 단일 진실 공급원(SSOT)이다.
 
 - 🔶 캐시 도입 시점(가용 재고 조회 부하를 실측한 뒤 결정)
 - 🔶 `reservation.channel`의 채널 종류와 값(`OMS`, `STORE`는 가정). 확정되면 채널별 TTL 상한 설정과 제약을 함께 정한다
-- 🔶 `dozy-auth` 프로젝트 작업: `ims` audience 추가, `ims:service`·`ims:admin` role 등록, system client(`svc-wms`, `svc-oms`, `svc-store`) 등록
+- 🔶 `dozy-auth` 프로젝트 작업: `ims` audience 추가, `ims:service`·`ims:warehouse_manager`·`ims:admin` role 등록(ADR-0011), system client(`svc-wms`, `svc-oms`, `svc-store`) 등록

@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-05)
+Accepted (2026-10-05). role 구성(`ims:service`·`ims:admin` 2개)은 [ADR-0011](0011-auth-integration.md)에서 3개로 대체했다.
 
 ## 배경 (Context)
 

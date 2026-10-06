@@ -42,7 +42,7 @@ IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고,
 | DB Access | Spring Data R2DBC |
 | DB / Migration | MySQL 8.0 / Flyway |
 | Messaging | Kafka + Outbox (구현 예정) |
-| Auth | dozy-auth (구현 예정) |
+| Auth | dozy-auth 스타터 0.2.1 |
 | Build | Gradle (Kotlin DSL) |
 | Lint | Spotless (ktlint) |
 | Test | JUnit 5, Mockito-Kotlin, Testcontainers |
@@ -85,7 +85,7 @@ IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고,
 ```bash
 cp .env.example .env        # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
 docker compose up -d        # MySQL (호스트 포트 3307)
-./gradlew bootRun           # 애플리케이션 (포트 8082). 인증 연동 전이라 local 프로필로만 기동한다
+./gradlew bootRun           # 애플리케이션 (포트 8082). local 프로필은 토큰 없이 개발 사용자로 동작한다
 ```
 
 ### 검증
