@@ -23,8 +23,8 @@
   {
     "id": "F-004",
     "name": "전역 공통 모듈",
-    "description": "global 패키지: BaseEntity와 감사(Actor), 도메인 예외·오류 코드·오류 응답 규약(dozy-auth Problem Details), 중복 키 위반 변환.",
-    "status": "pending",
+    "description": "global 패키지: BaseEntity와 감사(Clock, Actor, ActorContext), 오류 타입·IMS_ 코드·오류 응답(dozy-auth Problem Details, X-Trace-Id), 중복 키 위반 변환. 결정은 ADR-0009. Spring Security와 401/403 처리는 F-020에서 추가한다.",
+    "status": "completed",
     "dependencies": ["F-003"]
   },
   {
@@ -53,21 +53,21 @@
     "name": "입고 확정 반영",
     "description": "WMS의 입고 확정 요청을 재고에 반영한다(시나리오 3.1). Lot 최초 수신 시 등록, inventory upsert, INBOUND 이력, 멱등 키 처리.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-009",
     "name": "재고 조회",
     "description": "가용 재고 조회(채널용)와 재고 현황·상세·Lot·이력 조회(관리자용). 시나리오 4장.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-010",
     "name": "예약 생성과 Lot 할당",
     "description": "주문 단위 전체 성공·전체 실패 예약, 유통기한 오름차순 Lot 할당, 조건부 UPDATE와 행 ID 순서 갱신, 멱등 키, 채널별 TTL 상한. 시나리오 5.1. reservation.channel 값 확정 필요.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-011",
@@ -88,21 +88,21 @@
     "name": "반품 복귀",
     "description": "반품 검수 결과를 RETURN 이력으로 재고에 반영한다. 불량 판정은 DEFECTIVE 행에 반영. 시나리오 7.1.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-014",
     "name": "폐기 확정",
     "description": "DEFECTIVE·DISPOSAL_SCHEDULED 재고를 DISPOSAL 이력으로 차감한다. NORMAL 재고 폐기 요청은 반려. 시나리오 9.2.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-015",
     "name": "실사 조정",
     "description": "WMS의 조정 변동량(+/−)을 승인 임계치 검증 후 반영한다. stock_adjustment(AUDIT)와 ADJUSTMENT 이력, 보류 해제. 시나리오 8.1.",
     "status": "pending",
-    "dependencies": ["F-007"]
+    "dependencies": ["F-007", "F-020"]
   },
   {
     "id": "F-016",
@@ -134,8 +134,8 @@
   },
   {
     "id": "F-020",
-    "name": "dozy-auth 인증 연동",
-    "description": "auth-spring-boot-starter 연동(GitHub Packages 읽기 토큰 필요), system client·직원 토큰 인가, ims:service·ims:admin role. dozy-auth 프로젝트에서 ims audience와 role, system client를 먼저 등록해야 한다.",
+    "name": "dozy-auth 인증 연동 (첫 API 전에 수행)",
+    "description": "auth-spring-boot-starter(0.2.1 이상, WebFlux) 연동, system client·직원 토큰 인가, ims:service·ims:admin role, 보안 예외 401/403 처리, 토큰 기반 CurrentActorProvider(local 프로필 우회 유지). 선행 운영 작업: dozy-auth 서버에서 ims audience, role, system client를 등록한다(관리자 API). 결정 필요: system 토큰에는 클라이언트 이름이 없고 principalId(UUID)만 있으므로 inventory_history.requester_service를 어떻게 채울지(UUID 저장 또는 설정으로 이름 매핑). 서비스 간 호출용 dozySystemWebClient도 이때 구성한다.",
     "status": "pending",
     "dependencies": ["F-004"]
   },
