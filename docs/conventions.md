@@ -8,11 +8,14 @@ WMS(`dozy-wms-api`)의 Kotlin 컨벤션을 이어받는다. 전체 코드베이�
 - 클래스 프로퍼티, 함수 파라미터, 함수 반환 타입은 타입 추론에 맡기지 않고 항상 명시한다.
 - 함수/메서드 **본문 내부**의 지역 변수(`val`/`var`)는 타입 추론을 허용한다.
 
-## Entity
+## 도메인 모델과 영속성 엔티티
 
-- Entity는 `data class`로 선언하지 않는다. `copy()`가 `create()` 팩토리의 불변식 검증을 우회하기 때문이다.
-- Entity는 일반 `class` + `companion object`의 `fun create(...)` 팩토리로 만들고, `equals`/`hashCode`는 식별자(`id`) 기준으로 직접 오버라이드한다.
-- 비즈니스 로직과 불변식은 Entity 안에 둔다. setter를 노출하지 않고 의미 있는 도메인 메서드로 상태를 바꾼다.
+구조는 [architecture.md](architecture.md)의 "도메인 모델과 영속성 엔티티"를 따른다.
+
+- 도메인 모델(`domain/model`)은 `data class`로 선언하지 않는다. `copy()`가 `create()` 팩토리의 불변식 검증을 우회하기 때문이다.
+- 도메인 모델은 일반 `class` + `companion object`의 `fun create(...)`(검증해 생성)와 `fun reconstitute(...)`(저장소에서 복원) 팩토리로 만들고, `equals`/`hashCode`는 식별자(`id`) 기준으로 직접 오버라이드한다.
+- 비즈니스 로직과 불변식은 도메인 모델 안에 둔다. setter를 노출하지 않고 의미 있는 도메인 메서드로 상태를 바꾼다. 도메인 모델은 Spring·R2DBC에 의존하지 않고 감사 필드를 모른다.
+- 영속성 엔티티(`XxxEntity`)는 `BaseEntity`를 상속하고 비즈니스 로직을 두지 않는다. `from(model)`과 `toDomain()`으로 도메인 모델과 변환한다.
 - DTO는 `data class`를 사용한다(불변, 식별자 없음, 불변식 검증 불필요).
 - 상태·분류 값은 Kotlin enum으로 정의하고 DB에는 상수 이름(`name`)을 저장한다. enum을 바꾸면 해당 CHECK 제약 마이그레이션이 필요하며, enum과 CHECK의 일치를 검증하는 테스트를 둔다.
 
@@ -64,7 +67,7 @@ WMS(`dozy-wms-api`)의 Kotlin 컨벤션을 이어받는다. 전체 코드베이�
 ## 시간과 감사
 
 - 시간은 `Clock` 빈을 주입받아 쓴다. 코드에서 `LocalDateTime.now()` 등을 직접 호출하지 않는다.
-- Entity는 `BaseEntity`를 상속해 Spring Data Auditing이 감사 컬럼을 채우게 한다. `DatabaseClient`로 직접 쓰는 SQL은 Auditing이 동작하지 않으므로 `updated_at`/`updated_by`를 SQL에 직접 넣는다.
+- 영속성 엔티티(`XxxEntity`)는 `BaseEntity`를 상속해 Spring Data Auditing이 감사 컬럼을 채우게 한다. `DatabaseClient`로 직접 쓰는 SQL은 Auditing이 동작하지 않으므로 `updated_at`/`updated_by`를 SQL에 직접 넣는다.
 - 요청 밖 작업(스케줄러)은 `ActorContext.with(SystemActor) { ... }`로 감싸 실행해 감사 이름이 `system`이 되게 한다.
 
 ## 테스트 이름

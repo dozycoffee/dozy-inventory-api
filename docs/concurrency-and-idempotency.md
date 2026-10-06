@@ -30,7 +30,7 @@ UPDATE inventory
 - Lot 할당은 후보 Lot 조회(락 없음)와 조건부 UPDATE를 섞는 하이브리드다. 후보를 유통기한 오름차순으로 조회하고, 갱신이 0건이면(그 사이 다른 요청이 가져감) 다음 후보로 넘어간다. 모두 모아도 모자라면 전체 롤백한다.
 - 갱신 뒤에는 같은 트랜잭션에서 새 `quantity`를 SELECT해 `inventory_history.quantity_after`와 응답에 사용한다(MySQL에는 `RETURNING`이 없다).
 - 영향 행이 0이면 원인(재고 부족, 품질 상태, 행 없음, 할당 보류)을 알 수 없으므로 그 행을 한 번 더 조회해 판별한다.
-- 가용 규칙은 엔티티가 불변식으로 지키고, DB `CHECK (reserved_quantity <= quantity)`가 마지막 안전망이다. SQL 조건과 엔티티 규칙이 같은지 검증하는 테스트를 둔다.
+- 가용 규칙은 도메인 모델이 불변식으로 지키고, DB `CHECK (reserved_quantity <= quantity)`가 마지막 안전망이다. SQL 조건과 도메인 모델 규칙이 같은지 검증하는 테스트를 둔다.
 - 낙관적 락·비관적 락·Redis 락은 쓰지 않는다. 근거는 ADR-0003.
 
 ## 2. 멱등성
