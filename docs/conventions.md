@@ -53,6 +53,20 @@ WMS(`dozy-wms-api`)의 Kotlin 컨벤션을 이어받는다. 전체 코드베이�
 - 코드가 하는 일을 되풀이하는 주석을 쓰지 않는다.
 - 시점이나 계획을 가리키는 주석("나중에 추가한다", "Step 2에서 이동")을 쓰지 않는다. 이전 계획은 ADR이나 PR에 둔다.
 
+## 오류
+
+- 비즈니스 오류는 `BusinessException` 계층(`DomainException`, `ApplicationException`)으로 던진다. 응답 변환은 `GlobalExceptionHandler`가 맡고 Controller에서 오류 응답을 직접 만들지 않는다.
+- 필드 값의 단순 검증(null, 빈 값, 범위)은 `ErrorCode`만 등록하고 `InvalidDomainValueException`으로 던진다. 호출부나 테스트가 타입으로 구분할 규칙 위반(상태 전이, 수량 부족, NotFound, Duplicate 등)은 전용 예외 클래스를 만든다.
+- `ErrorCode.code`는 범용 코드는 `dozy-auth` 에러 코드 표의 이름을, 도메인 코드는 `IMS_` 접두사를 붙인다(`IMS_PRODUCT_NOT_FOUND`). 새 코드를 추가할 때 다른 서비스와 겹치지 않는지 확인한다.
+- 500 응답에는 내부 정보(스택, SQL, 클래스명)를 싣지 않는다.
+- 유니크 제약이 있는 저장은 `translatingDuplicateKey`로 감싸 중복 키 위반(MySQL 1062)만 도메인 예외로 바꾼다. FK·CHECK 위반은 그대로 둔다. 멱등 키 중복은 오류가 아니라 이전 결과를 반환하는 흐름이다.
+
+## 시간과 감사
+
+- 시간은 `Clock` 빈을 주입받아 쓴다. 코드에서 `LocalDateTime.now()` 등을 직접 호출하지 않는다.
+- Entity는 `BaseEntity`를 상속해 Spring Data Auditing이 감사 컬럼을 채우게 한다. `DatabaseClient`로 직접 쓰는 SQL은 Auditing이 동작하지 않으므로 `updated_at`/`updated_by`를 SQL에 직접 넣는다.
+- 요청 밖 작업(스케줄러)은 `ActorContext.with(SystemActor) { ... }`로 감싸 실행해 감사 이름이 `system`이 되게 한다.
+
 ## 테스트 이름
 
 - 테스트 메서드명은 백틱으로 한글 문장형 이름을 쓴다(`` `상품 등록 성공`() ``). 자세한 내용은 [testing.md](testing.md)를 따른다.

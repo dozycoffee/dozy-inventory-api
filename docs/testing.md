@@ -17,6 +17,9 @@
 - 동시 요청 시나리오(같은 재고 행에 여러 예약, 같은 멱등 키 동시 요청)는 코루틴으로 병렬 실행해 한쪽만 성공하는지 확인한다.
 - 스키마 제약(수량 CHECK, 유니크, 복합 FK 등)은 `SchemaConstraintTest`가 실제 MySQL에서 위반이 거부되는지 검증한다. 마이그레이션에 제약을 추가·변경하면 이 테스트도 함께 고친다.
 
+- 전체 컨텍스트를 올리는 테스트는 `@ImsIntegrationTest`를 쓴다. 인증 연동 전이라 `CurrentActorProvider`가 `local` 프로필에만 있어 이 어노테이션이 `local` 프로필을 켠다.
+- 오류 응답 형식은 `@WebFluxTest`와 테스트 전용 Controller로 검증한다. 감사 컬럼은 테스트 전용 Entity로 실제 MySQL에서 검증하고, 시간은 `MutableClock`으로 조작한다.
+
 ## 테스트 DB
 
 Spring 컨텍스트를 로드하는 테스트는 `MySqlTestContainerInitializer`(`src/test/resources/META-INF/spring.factories`로 자동 등록)가 띄운 Testcontainers MySQL 8.0에 연결한다. 개발 DB(`dozy_inventory`)와 완전히 분리되며 Docker가 필요하다.
