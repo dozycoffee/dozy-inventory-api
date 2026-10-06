@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.AuthenticationException
 import org.springframework.validation.FieldError
 import org.springframework.web.ErrorResponse
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -35,6 +37,10 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         val status: HttpStatus = ErrorTypeHttpStatusMapper.resolve(errorCode.errorType)
         return ResponseEntity.status(status).body(Problems.create(status, errorCode.code, errorCode.message, exchange))
     }
+
+    /** 보안 예외는 Security 필터 체인의 401/403 핸들러가 응답하도록 그대로 전파한다 */
+    @ExceptionHandler(AccessDeniedException::class, AuthenticationException::class)
+    fun handleSecurityException(e: RuntimeException): Unit = throw e
 
     @ExceptionHandler(Exception::class)
     fun handleUnexpected(
