@@ -30,8 +30,8 @@
   {
     "id": "F-005",
     "name": "상품 마스터",
-    "description": "product 도메인(등록·조회·상태 변경)과 상품 이벤트 발행 포트. 패키지 구조는 ADR-0010과 docs/architecture.md로 확정했다(도메인 모델과 영속성 엔티티 분리, 상대 도메인은 UseCase만 호출, /api/v1). 구현은 사용자가 직접 진행한다. category·status enum과 CHECK 제약의 일치 검증 테스트를 함께 둔다.",
-    "status": "pending",
+    "description": "product 도메인(등록·조회·상태 변경)과 상품 이벤트 발행 포트. 패키지 구조는 ADR-0010과 docs/architecture.md로 확정했다(도메인 모델과 영속성 엔티티 분리, 상대 도메인은 UseCase만 호출, /api/v1). 구현은 사용자가 직접 진행한다. category·status enum과 CHECK 제약의 일치 검증 테스트를 함께 둔다. 진행: 도메인 모델, application 계층(등록·상태 변경·ID/코드 조회·목록 조회 UseCase, 서비스, 출력 포트)은 완료. 남은 일: 영속성 어댑터(enum·CHECK 일치 테스트 포함), 이벤트 발행기 구현(F-018 전에는 임시), ProductService에 @Service 연결, 웹 어댑터(F-020 이후).",
+    "status": "in_progress",
     "dependencies": ["F-004"]
   },
   {
