@@ -30,6 +30,7 @@ src/main/kotlin/com/dozycoffee/ims
 │   │   └── scheduler            // 배치 트리거 (유통기한 스캔, 예약 만료 등)
 │   └── out
 │       ├── persistence          // XxxEntity, XxxR2dbcRepository, XxxPersistenceAdapter
+│       ├── event                // 이벤트 발행 어댑터 (Outbox 저장 등)
 │       └── client               // 외부 서비스 호출 어댑터 (WMS 등)
 ├── application
 │   ├── port
