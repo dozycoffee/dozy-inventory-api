@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-05)
+Accepted (2026-10-05). PR 머지 방식과 선형 이력 규칙은 [ADR-0012](0012-merge-commit-strategy.md)로 대체했다.
 
 ## 배경 (Context)
 
