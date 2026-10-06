@@ -2,12 +2,12 @@
 
 ## 현재 상태
 
-- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0009), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
-- 완료: F-001(골격), F-002(GitHub 저장소 설정), F-003(Flyway 마이그레이션 V1·V2), F-004(전역 공통 모듈). 진행 중: F-005(상품 마스터) — 도메인 모델과 application 계층까지 완료.
+- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0011), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
+- 완료: F-001(골격), F-002(GitHub 저장소 설정), F-003(Flyway 마이그레이션 V1·V2), F-004(전역 공통 모듈), F-020(인증 연동). 진행 중: F-005(상품 마스터) — 도메인 모델과 application 계층까지 완료.
 - 패키지 구조 확정(ADR-0010): 도메인 모델과 영속성 엔티티 분리(도메인은 감사 필드를 모름), 다른 도메인은 UseCase로만 호출, 도메인 패키지 6개, `/api/v1`. F-005(상품 마스터)는 사용자가 직접 구현한다.
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
-- 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겼다. `dozy-auth` 서버에서 `ims` audience, `ims:service`·`ims:admin` role, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`로 작성). 실제 서버와 연동을 확인하거나 배포하기 전에 관리자 API로 등록한다.
-- 미확정: `reservation.channel` 값(채널 종류), 캐시 도입 시점, system 토큰에 클라이언트 이름이 없어 `inventory_history.requester_service`를 채우는 방식(F-020에서 결정).
+- 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겨 완료했다. `dozy-auth` 서버에 `ims` audience, role 3개, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`). 실제 서버와 연동을 확인하거나 배포하기 전에 관리자 API로 등록한다.
+- 미확정: `reservation.channel` 값(채널 종류), 캐시 도입 시점.
 
 ## 세션 로그
 
@@ -31,9 +31,11 @@
 - `DomainValidator.requireNotBlank`를 추가했고, `port/in` 백틱 패키지명을 위해 ktlint `package-name` 규칙을 껐다.
 - `dozy-auth` 최신 상태를 확인했다: 스타터 0.2.1 이후 변경이 없고 WebFlux·role 인가·401/403·`auth-test`를 지원한다. IMS 연동에 필요한 기능은 모두 있다.
 
+- F-020: `dozy-auth` 스타터 0.2.1을 연동했다(`SecurityConfig`, `SecurityContextActorProvider`, `ImsRole`). 결정은 ADR-0011: role을 3개(`service`·`warehouse_manager`·`admin`)로 나누고 창고 범위는 `warehouse_access` 사본으로 판단, `requester_service`는 principalId(UUID) 저장, `local`은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 빌드·CI에 `GPR_USER`·`GPR_TOKEN`이 필요하다.
+
 ## 다음 세션에서 할 일
 
 1. 상품 마스터(F-005) 남은 일: 영속성 어댑터(`ProductEntity`, R2DBC 저장소, `translatingDuplicateKey`, enum·CHECK 일치 테스트), 이벤트 발행기(F-018 전까지 임시 구현), `ProductService`에 `@Service` 연결, 웹 어댑터(F-020 이후).
 2. Konsist 아키텍처 테스트 도입(F-006), 재고 모델(F-007).
-3. 첫 API(F-008) 전에 인증 연동(F-020)을 진행한다. `auth-test`로 테스트하며, 실제 서버 연동 확인 전에 `dozy-auth`에 `ims` audience·role·system client를 등록한다(사용자 작업).
+3. 실제 서버 연동 확인·배포 전에 `dozy-auth`에 `ims` audience, `ims:service`·`ims:warehouse_manager`·`ims:admin` role, system client(`svc-wms`, `svc-oms`, `svc-store`)를 등록한다(사용자 작업).
 4. Dependabot이 제외 규칙대로 동작하는지 다음 점검 때 확인한다.
