@@ -50,7 +50,7 @@ dependencies {
 spotless {
     kotlin {
         target("src/**/*.kt")
-        ktlint("1.8.0")
+        ktlint("1.8.0").editorConfigOverride(mapOf("ktlint_standard_package-name" to "disabled"))
     }
     kotlinGradle {
         target("*.gradle.kts")
