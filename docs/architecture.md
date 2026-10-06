@@ -93,7 +93,7 @@ src/main/kotlin/com/dozycoffee/ims
 | `config` | `Clock` 빈(Asia/Seoul), R2DBC Auditing 설정 |
 | `error` | `ErrorCode`, `BusinessException` 계층, `GlobalExceptionHandler`(Problem Details), `TraceIdWebFilter` |
 | `persistence` | `translatingDuplicateKey` (중복 키 위반 변환) |
-| `security` | `Actor`, `CurrentActorProvider`, `ActorContext`, `LocalActorProvider`(`local` 프로필 전용) |
+| `security` | `Actor`, `CurrentActorProvider`, `ActorContext`, `SecurityConfig`(보안 체인), `SecurityContextActorProvider`(토큰 기반, `local` 외), `LocalActorProvider`(`local` 전용), `ImsRole`·`ImsAuthorize`(role과 `@PreAuthorize` 식) |
 
 결정 배경은 [ADR-0009](adr/0009-global-module-decisions.md)에 있다.
 

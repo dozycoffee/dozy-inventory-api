@@ -21,20 +21,21 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 | DB | MySQL 8.0, Spring Data R2DBC, Flyway (스키마 `dozy_inventory`) |
 | Architecture | 헥사고날 (패키지 루트 `com.dozycoffee.ims`) |
 | Messaging | Kafka + Outbox (구현 예정) |
-| Auth | `dozy-auth` 스타터 (구현 예정) |
+| Auth | `dozy-auth` 스타터 0.2.1 (WebFlux, `auth-test`) |
 | Build / Lint / Test | Gradle (Kotlin DSL), Spotless(ktlint), JUnit + Testcontainers(MySQL) |
 
 ## 명령어
 
 ```bash
-./scripts/verify.sh                     # 서식 검사 + 빌드 + 테스트. 작업 완료 전 반드시 통과해야 한다 (Docker 필요)
+./scripts/verify.sh                     # 서식 검사 + 빌드 + 테스트. 작업 완료 전 반드시 통과해야 한다 (Docker, GPR_USER·GPR_TOKEN 필요)
 ./gradlew test                          # 전체 테스트
 ./gradlew test --tests "com.dozycoffee.ims.SomeTest"   # 특정 테스트
 ./gradlew spotlessApply                 # 서식 자동 정렬
 
+export GPR_USER=<깃허브 계정> GPR_TOKEN=<read:packages 토큰>   # dozy-auth 스타터 다운로드용. 저장소에 두지 않는다
 cp .env.example .env                    # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
 docker compose up -d                    # 로컬 MySQL (호스트 포트 3307)
-./gradlew bootRun                       # 로컬 실행 (포트 8082, .env를 환경변수로 읽는다). local 프로필 없이는 기동하지 않는다
+./gradlew bootRun                       # 로컬 실행 (포트 8082, .env를 환경변수로 읽는다). local 프로필은 토큰 없이 개발 사용자로 동작하고, 그 외 프로필은 Auth 토큰이 필요하다
 ```
 
 ## 문서
