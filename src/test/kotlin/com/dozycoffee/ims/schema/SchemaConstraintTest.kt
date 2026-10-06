@@ -1,5 +1,6 @@
 package com.dozycoffee.ims.schema
 
+import com.dozycoffee.ims.support.ImsIntegrationTest
 import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -7,11 +8,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.awaitRowsUpdated
 
-@SpringBootTest
+@ImsIntegrationTest
 class SchemaConstraintTest {
     @Autowired
     private lateinit var databaseClient: DatabaseClient
