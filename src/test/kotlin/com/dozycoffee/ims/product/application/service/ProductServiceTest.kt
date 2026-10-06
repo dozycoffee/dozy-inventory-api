@@ -141,13 +141,14 @@ class ProductServiceTest {
         }
 
     @Test
-    fun `목록 조회는 필터와 오프셋을 전달하고 전체 건수를 함께 반환한다`() =
+    fun `목록 조회는 정규화한 코드와 필터, 오프셋을 전달하고 전체 건수를 함께 반환한다`() =
         runBlocking<Unit> {
             val products: List<Product> = listOf(ProductTestBuilder().build(), ProductTestBuilder().productId(2L).build())
-            whenever(productRepository.findAll(ProductCategory.BEAN, ProductStatus.ACTIVE, 20L, 10)).thenReturn(products)
-            whenever(productRepository.count(ProductCategory.BEAN, ProductStatus.ACTIVE)).thenReturn(25L)
+            whenever(productRepository.findAll("BEAN-001", ProductCategory.BEAN, ProductStatus.ACTIVE, 20L, 10)).thenReturn(products)
+            whenever(productRepository.count("BEAN-001", ProductCategory.BEAN, ProductStatus.ACTIVE)).thenReturn(25L)
 
-            val result: ProductPageResult = service.list(ListProductsQuery(ProductCategory.BEAN, ProductStatus.ACTIVE, page = 2, size = 10))
+            val result: ProductPageResult =
+                service.list(ListProductsQuery(" bean-001 ", ProductCategory.BEAN, ProductStatus.ACTIVE, page = 2, size = 10))
 
             assertEquals(listOf(1L, 2L), result.items.map { it.productId })
             assertEquals(25L, result.totalElements)

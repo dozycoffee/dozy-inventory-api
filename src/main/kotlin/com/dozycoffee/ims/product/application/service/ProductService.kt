@@ -16,8 +16,10 @@ import com.dozycoffee.ims.product.application.port.out.ProductRepository
 import com.dozycoffee.ims.product.domain.exception.DuplicateProductCodeException
 import com.dozycoffee.ims.product.domain.exception.ProductNotFoundException
 import com.dozycoffee.ims.product.domain.model.Product
+import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+@Service
 class ProductService(
     private val productRepository: ProductRepository,
     private val productEventPublisher: ProductEventPublisher,
@@ -69,11 +71,12 @@ class ProductService(
 
     @Transactional(readOnly = true)
     override suspend fun list(query: ListProductsQuery): ProductPageResult {
+        val productCode: String? = query.productCode?.let { Product.normalizeProductCode(it) }
         val items: List<ProductResult> =
             productRepository
-                .findAll(query.category, query.productStatus, query.offset, query.size)
+                .findAll(productCode, query.category, query.productStatus, query.offset, query.size)
                 .map { ProductResult.from(it) }
-        val totalElements: Long = productRepository.count(query.category, query.productStatus)
+        val totalElements: Long = productRepository.count(productCode, query.category, query.productStatus)
         return ProductPageResult(items, query.page, query.size, totalElements)
     }
 }
