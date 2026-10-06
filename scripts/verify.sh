@@ -10,4 +10,9 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
+if [ -z "${GPR_TOKEN:-}" ] && ! grep -qs '^gpr.token' ~/.gradle/gradle.properties; then
+  echo "dozy-auth 스타터를 받으려면 GPR_USER·GPR_TOKEN(read:packages 토큰) 환경변수가 필요합니다." >&2
+  exit 1
+fi
+
 ./gradlew spotlessCheck build --console=plain
