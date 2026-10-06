@@ -11,10 +11,11 @@
 | [0005](0005-separation-without-data-migration.md) | WMS에서 IMS로 이관 없이 분리 | Accepted |
 | [0006](0006-service-authentication-and-warehouse-access.md) | 서비스 간 인증과 창고 접근 | Accepted (role 구성은 ADR-0011로 대체) |
 | [0007](0007-no-tracking-after-outbound.md) | 출고 이후 재고는 추적하지 않는다 | Accepted |
-| [0008](0008-repository-conventions.md) | 저장소 운영 규칙 | Accepted |
+| [0008](0008-repository-conventions.md) | 저장소 운영 규칙 | Accepted (머지 방식은 ADR-0012로 대체) |
 | [0009](0009-global-module-decisions.md) | 전역 공통 모듈 설계 결정 | Accepted |
 | [0010](0010-package-structure.md) | 도메인 패키지 구조와 도메인 간 호출 규칙 | Accepted |
 | [0011](0011-auth-integration.md) | dozy-auth 인증 연동 | Accepted |
+| [0012](0012-merge-commit-strategy.md) | PR은 머지 커밋으로 머지 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
