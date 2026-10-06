@@ -16,8 +16,10 @@ import com.dozycoffee.ims.product.application.port.out.ProductRepository
 import com.dozycoffee.ims.product.domain.exception.DuplicateProductCodeException
 import com.dozycoffee.ims.product.domain.exception.ProductNotFoundException
 import com.dozycoffee.ims.product.domain.model.Product
+import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+@Service
 class ProductService(
     private val productRepository: ProductRepository,
     private val productEventPublisher: ProductEventPublisher,
