@@ -32,3 +32,16 @@ Spring 컨텍스트를 로드하는 테스트는 `MySqlTestContainerInitializer`
 - 정상 흐름뿐 아니라 경계값, 실패, 중복·동시 요청을 포함한다.
 - 테스트 픽스처는 도메인별 `fixture/` 패키지에 두고 `XxxTestBuilder`(도메인 모델), `XxxDtoBuilder`(DTO)를 쓴다.
 - Controller 테스트는 `@WebFluxTest`와 `WebTestClient`를 쓴다.
+
+## API 문서
+
+API 명세는 컨트롤러 테스트가 만든다. 컨트롤러에 문서용 어노테이션을 붙이지 않는다. 결정 배경은 [ADR-0013](adr/0013-api-docs-with-rest-docs.md)이다.
+
+- 새 API(엔드포인트)를 만들면 그 컨트롤러 테스트에서 `ApiDoc.operation(...)`으로 **성공 응답을 반드시 문서화**한다. 별도의 문서 전용 테스트를 만들지 않고, 같은 `*ControllerTest`의 주요 성공·실패 케이스에 `.consumeWith(...)`를 붙인다.
+- 호출자가 구분해서 처리해야 하는 오류 응답(400 검증 실패, 404, 409 등)도 대표 케이스를 문서화한다. 같은 경로와 메서드의 문서는 하나의 operation으로 합쳐진다. 모든 오류 케이스를 문서화할 필요는 없다.
+- 컨트롤러 테스트 클래스에 `@ExtendWith(RestDocumentationExtension::class)`를 붙이고 `@BeforeEach`에서 `documentationConfiguration(restDocumentation)`을 필터로 가진 `WebTestClient`를 만든다(`ProductControllerTest` 참고).
+- `ApiDoc` 도우미(`support/ApiDoc.kt`)를 쓴다. 토큰 값은 문서에 남지 않고 `Bearer {access-token}`으로 치환된다. 인증이 필요한 요청은 `ApiDoc.authorization`을, 오류 응답은 `ApiDoc.problem()`(검증 실패는 `withErrors = true`)를 붙인다.
+- 요청·응답 필드를 `requestFields`, `responseFields`로 빠짐없이 적는다. 적지 않은 필드가 있으면 테스트가 실패한다. 경로 변수는 `uri("/api/v1/products/{productId}", id)`처럼 템플릿으로 쓰고 `pathParameters`로, 쿼리 파라미터는 `queryParameters`로 적는다.
+- 제약(필수 여부, 길이, enum 값, 허용 role)은 자동으로 문서에 나오지 않으므로 필드 설명과 operation 설명에 적는다.
+- `requestSchema`, `responseSchema`에 `RegisterProductRequest`, `ProductResponse`처럼 DTO 클래스 이름을 넣어 스키마 이름을 정한다. 오류 응답은 `Problem`이다.
+- 생성: `./gradlew openapi3`(`test`를 먼저 실행)는 `build/api-spec/openapi3.yaml`을 만든다. `./gradlew build`와 `./scripts/verify.sh`도 만든다. CI는 이 파일을 `openapi-spec` 아티팩트로 올린다.

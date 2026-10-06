@@ -16,6 +16,7 @@
 | [0010](0010-package-structure.md) | 도메인 패키지 구조와 도메인 간 호출 규칙 | Accepted |
 | [0011](0011-auth-integration.md) | dozy-auth 인증 연동 | Accepted |
 | [0012](0012-merge-commit-strategy.md) | PR은 머지 커밋으로 머지 | Accepted |
+| [0013](0013-api-docs-with-rest-docs.md) | API 명세는 REST Docs로 만든 OpenAPI 파일로 관리 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
