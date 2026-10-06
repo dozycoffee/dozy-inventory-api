@@ -1,13 +1,18 @@
 package com.dozycoffee.ims.global.error
 
+import com.dozycoffee.ims.global.security.SecurityConfig
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 import java.nio.charset.StandardCharsets
 
 @WebFluxTest(ErrorTestController::class)
+@ActiveProfiles("local")
+@Import(SecurityConfig::class)
 class GlobalExceptionHandlerTest {
     @Autowired
     private lateinit var webTestClient: WebTestClient

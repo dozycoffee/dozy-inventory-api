@@ -12,6 +12,6 @@ class LocalActorProvider : CurrentActorProvider {
 
     companion object {
         val LOCAL_PRINCIPAL_ID: UUID = UUID.fromString("00000000-0000-7000-8000-000000000001")
-        val LOCAL_USER: UserActor = UserActor(LOCAL_PRINCIPAL_ID, setOf("service", "admin"))
+        val LOCAL_USER: UserActor = UserActor(LOCAL_PRINCIPAL_ID, ImsRole.entries.map { it.code }.toSet())
     }
 }

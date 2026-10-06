@@ -23,5 +23,11 @@ spring:
       datetime:
         write-dates-as-timestamps: false
 
+dozy:
+  auth:
+    audience: ims
+    accepted-realms: [internal]
+    issuer-base-uri: ${AUTH_ISSUER_BASE_URI:http://localhost:8081}
+
 server:
   port: ${SERVER_PORT:8082}
