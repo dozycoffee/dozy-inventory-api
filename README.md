@@ -83,9 +83,9 @@ IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고,
 ### 로컬 실행
 
 ```bash
-cp .env.example .env        # DB_PASSWORD를 채운다
+cp .env.example .env        # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
 docker compose up -d        # MySQL (호스트 포트 3307)
-./gradlew bootRun           # 애플리케이션 (포트 8082)
+./gradlew bootRun           # 애플리케이션 (포트 8082). 인증 연동 전이라 local 프로필로만 기동한다
 ```
 
 ### 검증
