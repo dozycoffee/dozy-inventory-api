@@ -6,6 +6,7 @@ import com.dozycoffee.ims.product.domain.enumeration.ProductStatus
 import com.dozycoffee.ims.product.domain.exception.ProductErrorCode
 
 data class ListProductsQuery(
+    val productCode: String?,
     val category: ProductCategory?,
     val productStatus: ProductStatus?,
     val page: Int,

@@ -13,8 +13,9 @@ interface ProductRepository {
 
     suspend fun existsByProductCode(productCode: String): Boolean
 
-    /** `product_id` 오름차순으로 정렬해 반환한다. 필터가 null이면 해당 조건을 적용하지 않는다 */
+    /** `product_id` 오름차순으로 정렬해 반환한다. 필터가 null이면 해당 조건을 적용하지 않는다. [productCode]는 정규화된 값이다 */
     suspend fun findAll(
+        productCode: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
         offset: Long,
@@ -22,6 +23,7 @@ interface ProductRepository {
     ): List<Product>
 
     suspend fun count(
+        productCode: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
     ): Long
