@@ -12,7 +12,7 @@ API 명세를 Notion 같은 정적 문서로 쓰면 코드와 어긋난다. Swag
 ## 결정 (Decision)
 
 1. **REST Docs + `restdocs-api-spec`으로 컨트롤러 테스트에서 OpenAPI 3 파일(`build/api-spec/openapi3.yaml`)을 만든다.** 컨트롤러에는 문서용 어노테이션을 붙이지 않는다. 문서화하지 않은 필드가 있으면 테스트가 실패한다.
-2. **문서 전용 테스트를 따로 두지 않는다.** 컨트롤러 테스트의 주요 성공·실패 케이스에 `ApiDoc.operation(...)`을 붙인다. 새 API는 성공 응답 문서화가 필수다(규칙은 [testing.md](../testing.md)).
+2. **문서 전용 테스트를 따로 두지 않는다.** 컨트롤러 테스트의 주요 성공·실패 케이스에 `.consumeWith(XxxApiDocs.xxx())` 한 줄을 붙이고, 명세 본문(`ApiDoc.operation(...)`)은 도메인별 `XxxApiDocs` 객체에 둬 검증 코드와 분리한다. 새 API는 성공 응답 문서화가 필수다(규칙은 [testing.md](../testing.md)).
 3. **`./gradlew build`가 `openapi3`을 실행하고 CI가 `openapi3.yaml`을 `openapi-spec` 아티팩트로 올린다.** 서버나 DB 없이 테스트만으로 명세가 나오고 Swagger UI, Redoc, Postman 등으로 열 수 있다. 정적 사이트 배포는 이번에 하지 않는다(이 레포가 공개라 명세 공개 여부를 정한 뒤 결정한다).
 4. 버전은 `restdocs-api-spec` 0.20.1이다. Spring Boot 4.1.1, Gradle 9.5.1, Kotlin 2.3에서 동작을 확인했다.
 

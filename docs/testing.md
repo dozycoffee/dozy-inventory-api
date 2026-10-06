@@ -37,7 +37,8 @@ Spring 컨텍스트를 로드하는 테스트는 `MySqlTestContainerInitializer`
 
 API 명세는 컨트롤러 테스트가 만든다. 컨트롤러에 문서용 어노테이션을 붙이지 않는다. 결정 배경은 [ADR-0013](adr/0013-api-docs-with-rest-docs.md)이다.
 
-- 새 API(엔드포인트)를 만들면 그 컨트롤러 테스트에서 `ApiDoc.operation(...)`으로 **성공 응답을 반드시 문서화**한다. 별도의 문서 전용 테스트를 만들지 않고, 같은 `*ControllerTest`의 주요 성공·실패 케이스에 `.consumeWith(...)`를 붙인다.
+- 새 API(엔드포인트)를 만들면 그 컨트롤러 테스트에서 **성공 응답을 반드시 문서화**한다. 별도의 문서 전용 테스트를 만들지 않고, 같은 `*ControllerTest`의 주요 성공·실패 케이스에 `.consumeWith(XxxApiDocs.register())`처럼 한 줄을 붙인다.
+- 필드 설명 같은 명세 본문은 컨트롤러 테스트에 쓰지 않고 도메인별 `XxxApiDocs` 객체(`ProductApiDocs`)에 `ApiDoc.operation(...)`으로 정의한다. 테스트는 검증, `XxxApiDocs`는 명세로 나뉜다.
 - 호출자가 구분해서 처리해야 하는 오류 응답(400 검증 실패, 404, 409 등)도 대표 케이스를 문서화한다. 같은 경로와 메서드의 문서는 하나의 operation으로 합쳐진다. 모든 오류 케이스를 문서화할 필요는 없다.
 - 컨트롤러 테스트 클래스에 `@ExtendWith(RestDocumentationExtension::class)`를 붙이고 `@BeforeEach`에서 `documentationConfiguration(restDocumentation)`을 필터로 가진 `WebTestClient`를 만든다(`ProductControllerTest` 참고).
 - `ApiDoc` 도우미(`support/ApiDoc.kt`)를 쓴다. 토큰 값은 문서에 남지 않고 `Bearer {access-token}`으로 치환된다. 인증이 필요한 요청은 `ApiDoc.authorization`을, 오류 응답은 `ApiDoc.problem()`(검증 실패는 `withErrors = true`)를 붙인다.
