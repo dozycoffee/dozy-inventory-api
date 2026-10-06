@@ -40,6 +40,15 @@ jobs:
           GPR_USER: ${{ github.actor }}
           GPR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Upload OpenAPI spec
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-spec
+          path: build/api-spec/openapi3.yaml
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v7
