@@ -32,9 +32,9 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 ./gradlew test --tests "com.dozycoffee.ims.SomeTest"   # 특정 테스트
 ./gradlew spotlessApply                 # 서식 자동 정렬
 
-cp .env.example .env                    # DB_PASSWORD를 채운다
+cp .env.example .env                    # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
 docker compose up -d                    # 로컬 MySQL (호스트 포트 3307)
-./gradlew bootRun                       # 로컬 실행 (포트 8082, .env를 환경변수로 읽는다)
+./gradlew bootRun                       # 로컬 실행 (포트 8082, .env를 환경변수로 읽는다). local 프로필 없이는 기동하지 않는다
 ```
 
 ## 문서
