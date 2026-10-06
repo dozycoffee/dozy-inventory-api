@@ -5,4 +5,9 @@ object DomainValidator {
         value: T?,
         errorCode: ErrorCode,
     ): T = value ?: throw InvalidDomainValueException(errorCode)
+
+    fun requireNotBlank(
+        value: String?,
+        errorCode: ErrorCode,
+    ): String = if (value.isNullOrBlank()) throw InvalidDomainValueException(errorCode) else value
 }
