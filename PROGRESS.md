@@ -5,7 +5,7 @@
 - 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0009), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
 - 완료: F-001(골격), F-002(GitHub 저장소 설정), F-003(Flyway 마이그레이션 V1·V2), F-004(전역 공통 모듈).
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
-- 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겼다. 첫 API 전에 `dozy-auth` 서버에서 `ims` audience, `ims:service`·`ims:admin` role, system client를 등록해야 한다(운영 작업, 관리자 API).
+- 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겼다. `dozy-auth` 서버에서 `ims` audience, `ims:service`·`ims:admin` role, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`로 작성). 실제 서버와 연동을 확인하거나 배포하기 전에 관리자 API로 등록한다.
 - 미확정: `reservation.channel` 값(채널 종류), 캐시 도입 시점, system 토큰에 클라이언트 이름이 없어 `inventory_history.requester_service`를 채우는 방식(F-020에서 결정).
 
 ## 세션 로그
@@ -29,5 +29,5 @@
 
 1. 상품 마스터(F-005): 첫 도메인 PR로 패키지 구조를 확정하고 `docs/architecture.md`를 갱신한다. category·status enum과 CHECK 제약의 일치 검증 테스트를 함께 둔다.
 2. Konsist 아키텍처 테스트 도입(F-006), 재고 모델(F-007).
-3. 첫 API(F-008) 전에 `dozy-auth` 서버에서 `ims` audience·role·system client를 등록하고(사용자 작업) 인증 연동(F-020)을 진행한다.
+3. 첫 API(F-008) 전에 인증 연동(F-020)을 진행한다. `auth-test`로 테스트하며, 실제 서버 연동 확인 전에 `dozy-auth`에 `ims` audience·role·system client를 등록한다(사용자 작업).
 4. Dependabot이 제외 규칙대로 동작하는지 다음 점검 때 확인한다.
