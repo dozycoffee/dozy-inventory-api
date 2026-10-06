@@ -49,6 +49,18 @@ src/main/kotlin/com/dozycoffee/ims
 - 이벤트 발행은 `application/port/out`의 포트로 추상화한다. Kafka는 어댑터 구현 세부사항이며 도메인과 서비스는 브로커를 알지 못한다.
 - 외부 서비스(WMS, OMS, `dozy-auth`)와의 통신도 포트와 어댑터로 감싼다.
 
+## global 패키지
+
+| 패키지 | 내용 |
+|--------|------|
+| `common` | `BaseEntity`(감사 컬럼), `SoftDeletableEntity` |
+| `config` | `Clock` 빈(Asia/Seoul), R2DBC Auditing 설정 |
+| `error` | `ErrorCode`, `BusinessException` 계층, `GlobalExceptionHandler`(Problem Details), `TraceIdWebFilter` |
+| `persistence` | `translatingDuplicateKey` (중복 키 위반 변환) |
+| `security` | `Actor`, `CurrentActorProvider`, `ActorContext`, `LocalActorProvider`(`local` 프로필 전용) |
+
+결정 배경은 [ADR-0009](adr/0009-global-module-decisions.md)에 있다.
+
 ## 설정
 
 - 설정은 `application.yaml`에서 환경변수로 받는다. 비밀(DB 비밀번호 등)에는 기본값을 두지 않는다.

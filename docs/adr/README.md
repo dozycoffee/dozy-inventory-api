@@ -12,6 +12,7 @@
 | [0006](0006-service-authentication-and-warehouse-access.md) | 서비스 간 인증과 창고 접근 | Accepted |
 | [0007](0007-no-tracking-after-outbound.md) | 출고 이후 재고는 추적하지 않는다 | Accepted |
 | [0008](0008-repository-conventions.md) | 저장소 운영 규칙 | Accepted |
+| [0009](0009-global-module-decisions.md) | 전역 공통 모듈 설계 결정 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
