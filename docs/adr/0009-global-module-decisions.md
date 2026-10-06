@@ -23,6 +23,6 @@ IMS는 예약 만료(TTL), 유통기한 스캔처럼 시간에 따라 동작이 
 ## 결과 (Consequences)
 
 - 얻는 것: 한 서비스 안의 오류 형식 통일과 `dozy-auth` 규약 일치, 코드 충돌 방지, 시간 로직의 테스트 용이성, 감사 컬럼 누락 방지, 인증 없이 배포되는 사고 방지.
-- 감수하는 것: 시간이 필요한 곳마다 `Clock`을 받아야 한다. 직접 SQL은 감사 컬럼을 수동으로 채워야 한다. 인증 구현이 들어오기 전에는 `local` 프로필 밖에서 앱이 기동하지 않는다(로컬은 `.env`의 `SPRING_PROFILES_ACTIVE=local`). 오류 코드가 길어진다. 첫 API 전에 `dozy-auth` 서버에서 `ims` audience, role, system client를 등록해야 한다(운영 작업).
+- 감수하는 것: 시간이 필요한 곳마다 `Clock`을 받아야 한다. 직접 SQL은 감사 컬럼을 수동으로 채워야 한다. 인증 구현이 들어오기 전에는 `local` 프로필 밖에서 앱이 기동하지 않는다(로컬은 `.env`의 `SPRING_PROFILES_ACTIVE=local`). 오류 코드가 길어진다. `dozy-auth` 서버에서 `ims` audience, role, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`의 `@WithDozyPrincipal`, `DozyTestTokens`로 작성한다). 실제 서버와 연동을 확인하거나 배포하기 전에 등록한다(운영 작업).
 - 알려진 이슈: system 토큰에는 클라이언트 이름(`svc-wms`)이 없고 `principalId`(UUID)만 있다. ERD의 `requester_service`에 서비스 이름을 토큰만으로 채울 수 없으므로, UUID를 그대로 저장하거나 설정으로 UUID를 이름에 매핑하는 방식을 인증 연동에서 정해야 한다.
 - Spring Security 의존성과 401/403 처리는 인증 연동에서 추가한다. 현재 `GlobalExceptionHandler`는 보안 예외를 다루지 않는다.
