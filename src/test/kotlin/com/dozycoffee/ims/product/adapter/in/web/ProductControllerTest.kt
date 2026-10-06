@@ -16,8 +16,11 @@ import com.dozycoffee.ims.product.domain.enumeration.ProductCategory
 import com.dozycoffee.ims.product.domain.enumeration.ProductStatus
 import com.dozycoffee.ims.product.domain.exception.DuplicateProductCodeException
 import com.dozycoffee.ims.product.domain.exception.ProductNotFoundException
+import com.dozycoffee.ims.support.ApiDoc
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
@@ -26,14 +29,29 @@ import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.restdocs.RestDocumentationContextProvider
+import org.springframework.restdocs.RestDocumentationExtension
+import org.springframework.restdocs.headers.HeaderDocumentation.headerWithName
+import org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders
+import org.springframework.restdocs.payload.JsonFieldType
+import org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath
+import org.springframework.restdocs.payload.PayloadDocumentation.requestFields
+import org.springframework.restdocs.payload.PayloadDocumentation.responseFields
+import org.springframework.restdocs.payload.PayloadDocumentation.subsectionWithPath
+import org.springframework.restdocs.request.RequestDocumentation.parameterWithName
+import org.springframework.restdocs.request.RequestDocumentation.pathParameters
+import org.springframework.restdocs.request.RequestDocumentation.queryParameters
+import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation.documentationConfiguration
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.reactive.server.WebTestClient
-import org.springframework.test.web.reactive.server.WebTestClient.RequestBodySpec
 
 @WebFluxTest(ProductController::class)
 @Import(SecurityConfig::class, SecurityContextActorProvider::class)
+@ExtendWith(RestDocumentationExtension::class)
 class ProductControllerTest {
     @Autowired
+    private lateinit var baseClient: WebTestClient
+
     private lateinit var webTestClient: WebTestClient
 
     @Autowired
@@ -55,6 +73,11 @@ class ProductControllerTest {
 
     private val registerBody: String =
         """{"productCode":"BEAN-001","productName":"에티오피아 원두","category":"BEAN","unit":"KG","shelfLifeDays":180}"""
+
+    @BeforeEach
+    fun setUp(restDocumentation: RestDocumentationContextProvider) {
+        webTestClient = baseClient.mutate().filter(documentationConfiguration(restDocumentation)).build()
+    }
 
     private fun bearer(role: String): String = tokens.issue(roles = listOf("ims:$role"))
 
@@ -89,6 +112,7 @@ class ProductControllerTest {
                 .isEqualTo("BEAN")
                 .jsonPath("$.productStatus")
                 .isEqualTo("ACTIVE")
+                .consumeWith(ProductApiDocs.register())
             verifyBlocking(registerProductUseCase) {
                 register(RegisterProductCommand("BEAN-001", "에티오피아 원두", ProductCategory.BEAN, "KG", 180))
             }
@@ -104,6 +128,7 @@ class ProductControllerTest {
             .isEqualTo("VALIDATION_FAILED")
             .jsonPath("$.errors.length()")
             .isEqualTo(2)
+            .consumeWith(ProductApiDocs.registerInvalid())
     }
 
     @Test
@@ -124,6 +149,7 @@ class ProductControllerTest {
                 .expectBody()
                 .jsonPath("$.code")
                 .isEqualTo("IMS_DUPLICATE_PRODUCT_CODE")
+                .consumeWith(ProductApiDocs.registerDuplicate())
         }
 
     @Test
@@ -137,7 +163,7 @@ class ProductControllerTest {
     private fun patchStatus(role: String): WebTestClient.ResponseSpec =
         webTestClient
             .patch()
-            .uri("/api/v1/products/7/status")
+            .uri("/api/v1/products/{productId}/status", 7)
             .headers { headers: HttpHeaders -> headers.setBearerAuth(bearer(role)) }
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue("""{"productStatus":"INACTIVE"}""")
@@ -154,7 +180,24 @@ class ProductControllerTest {
                 .expectBody()
                 .jsonPath("$.productStatus")
                 .isEqualTo("INACTIVE")
+                .consumeWith(ProductApiDocs.changeStatus())
             verifyBlocking(changeProductStatusUseCase) { changeStatus(ChangeProductStatusCommand(7L, ProductStatus.INACTIVE)) }
+        }
+
+    @Test
+    fun `상품 단건 조회 응답을 문서화한다`() =
+        runBlocking<Unit> {
+            whenever(getProductUseCase.getById(7L)).thenReturn(result)
+
+            webTestClient
+                .get()
+                .uri("/api/v1/products/{productId}", 7)
+                .headers { it.setBearerAuth(bearer("service")) }
+                .exchange()
+                .expectStatus()
+                .isOk
+                .expectBody()
+                .consumeWith(ProductApiDocs.get())
         }
 
     @Test
@@ -183,7 +226,7 @@ class ProductControllerTest {
 
             webTestClient
                 .get()
-                .uri("/api/v1/products/9")
+                .uri("/api/v1/products/{productId}", 9)
                 .headers { it.setBearerAuth(bearer("admin")) }
                 .exchange()
                 .expectStatus()
@@ -191,6 +234,7 @@ class ProductControllerTest {
                 .expectBody()
                 .jsonPath("$.code")
                 .isEqualTo("IMS_PRODUCT_NOT_FOUND")
+                .consumeWith(ProductApiDocs.getNotFound())
         }
 
     @Test
@@ -200,8 +244,14 @@ class ProductControllerTest {
 
             webTestClient
                 .get()
-                .uri("/api/v1/products?code=bean-001&category=BEAN&status=ACTIVE&page=1&size=10")
-                .headers { it.setBearerAuth(bearer("service")) }
+                .uri(
+                    "/api/v1/products?code={code}&category={category}&status={status}&page={page}&size={size}",
+                    "bean-001",
+                    "BEAN",
+                    "ACTIVE",
+                    1,
+                    10,
+                ).headers { it.setBearerAuth(bearer("service")) }
                 .exchange()
                 .expectStatus()
                 .isOk
@@ -214,6 +264,7 @@ class ProductControllerTest {
                 .isEqualTo(10)
                 .jsonPath("$.totalElements")
                 .isEqualTo(11)
+                .consumeWith(ProductApiDocs.list())
             verifyBlocking(listProductsUseCase) { list(ListProductsQuery("bean-001", ProductCategory.BEAN, ProductStatus.ACTIVE, 1, 10)) }
         }
 

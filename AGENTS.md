@@ -23,6 +23,7 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 | Messaging | Kafka + Outbox (구현 예정) |
 | Auth | `dozy-auth` 스타터 0.2.1 (WebFlux, `auth-test`) |
 | Build / Lint / Test | Gradle (Kotlin DSL), Spotless(ktlint), JUnit + Testcontainers(MySQL) |
+| API 문서 | Spring REST Docs + restdocs-api-spec(OpenAPI 3), CI 아티팩트 |
 
 ## 명령어
 
@@ -31,6 +32,7 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 ./gradlew test                          # 전체 테스트
 ./gradlew test --tests "com.dozycoffee.ims.SomeTest"   # 특정 테스트
 ./gradlew spotlessApply                 # 서식 자동 정렬
+./gradlew openapi3                      # 컨트롤러 테스트로 API 명세 생성 (build/api-spec/openapi3.yaml)
 
 export GPR_USER=<깃허브 계정> GPR_TOKEN=<read:packages 토큰>   # dozy-auth 스타터 다운로드용. 저장소에 두지 않는다
 cp .env.example .env                    # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
@@ -56,6 +58,7 @@ docker compose up -d                    # 로컬 MySQL (호스트 포트 3307)
 
 ## 반드시 지킬 것
 
+- 새 API를 만들면 컨트롤러 테스트에서 `.consumeWith(XxxApiDocs.xxx())`로 성공 응답을 문서화한다(명세 본문은 `XxxApiDocs` 객체에 둔다)(규칙은 `docs/testing.md`). 컨트롤러에 문서용 어노테이션을 붙이지 않는다.
 - 변경하거나 추가한 기능에는 테스트가 따라야 한다. 완료를 선언하기 전에 `./scripts/verify.sh`를 통과시킨다.
 - 비밀번호·키 같은 비밀은 코드나 설정 기본값에 넣지 않는다. 환경변수로 주입한다. 이 레포는 공개 레포다.
 - IMS는 **입고 확정된 재고만** 다룬다. 입고 예정, Zone·Location, 출고 이후 재고(가맹점)는 IMS의 책임이 아니다.

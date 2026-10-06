@@ -46,6 +46,7 @@ IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고,
 | Build | Gradle (Kotlin DSL) |
 | Lint | Spotless (ktlint) |
 | Test | JUnit 5, Mockito-Kotlin, Testcontainers |
+| API 문서 | Spring REST Docs + restdocs-api-spec (OpenAPI 3) |
 
 <br>
 
@@ -105,4 +106,5 @@ docker compose up -d        # MySQL (호스트 포트 3307)
 - [아키텍처](docs/architecture.md)
 - [ERD](docs/erd.md)
 - [예약 동시성과 멱등성](docs/concurrency-and-idempotency.md)
+- API 명세: 컨트롤러 테스트가 OpenAPI 파일을 만듭니다(`./gradlew openapi3` → `build/api-spec/openapi3.yaml`). CI의 `openapi-spec` 아티팩트에서 받을 수 있습니다 ([ADR-0013](docs/adr/0013-api-docs-with-rest-docs.md))
 - [설계 결정 기록(ADR)](docs/adr/README.md)

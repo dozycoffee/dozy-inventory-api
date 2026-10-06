@@ -145,5 +145,12 @@
     "description": "warehouse_access 사본, WMS 소속 변경 이벤트 수신, 사본이 없을 때 거부와 로그·알림. 모든 API에 창고별 리소스 인가를 적용한다.",
     "status": "pending",
     "dependencies": ["F-020", "F-018"]
+  },
+  {
+    "id": "F-022",
+    "name": "API 문서화(REST Docs + OpenAPI)",
+    "description": "컨트롤러 테스트로 OpenAPI 3 명세(build/api-spec/openapi3.yaml)를 만들고 CI가 openapi-spec 아티팩트로 올린다. 상품 API 4개를 문서화했다. 결정은 ADR-0013, 규칙은 docs/testing.md. 새 API는 컨트롤러 테스트에서 성공 응답 문서화가 필수다. 정적 사이트(GitHub Pages) 배포는 명세 공개 여부를 정한 뒤 결정한다.",
+    "status": "completed",
+    "dependencies": ["F-005"]
   }
 ]

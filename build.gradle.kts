@@ -6,6 +6,7 @@ plugins {
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "8.10.3"
+    id("com.epages.restdocs-api-spec") version "0.20.1"
 }
 
 group = "com.dozycoffee"
@@ -37,6 +38,13 @@ repositories {
 }
 
 val dozyAuthVersion: String = "0.2.1"
+val restdocsApiSpecVersion: String = "0.20.1"
+
+configurations.testImplementation {
+    // restdocs-api-spec이 끌어오는 servlet(Spring MVC, Tomcat) 스택이 있으면 테스트 컨텍스트가 reactive가 아니게 된다
+    exclude(group = "org.springframework.boot", module = "spring-boot-starter-web")
+    exclude(group = "org.springframework.boot", module = "spring-boot-starter-hateoas")
+}
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
@@ -54,6 +62,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-data-r2dbc-test")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
     testImplementation("com.dozycoffee.auth:auth-test:$dozyAuthVersion")
+    testImplementation("org.springframework.restdocs:spring-restdocs-webtestclient")
+    testImplementation("com.epages:restdocs-api-spec:$restdocsApiSpecVersion")
+    testImplementation("com.epages:restdocs-api-spec-webtestclient:$restdocsApiSpecVersion")
     testImplementation("org.testcontainers:testcontainers-mysql")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -92,4 +103,21 @@ tasks.bootRun {
                 environment(line.substring(0, index).trim(), line.substring(index + 1).trim())
             }
     }
+}
+
+openapi3 {
+    setServer("http://localhost:8082")
+    title = "DOZY COFFEE IMS API"
+    description = "재고 관리 시스템(IMS) API"
+    version = project.version.toString()
+    format = "yaml"
+}
+
+// 플러그인이 openapi3 태스크를 평가 이후에 등록하므로 등록되는 시점에 설정한다
+tasks.matching { it.name == "openapi3" }.configureEach {
+    dependsOn(tasks.test)
+}
+
+tasks.build {
+    dependsOn("openapi3")
 }
