@@ -15,6 +15,12 @@
 - 이슈는 템플릿(`feature`, `bug`, `refactor`, `chore`)으로 만든다. 빈 이슈는 허용하지 않는다.
 - 기능, 버그 수정, 리팩토링, 구조에 영향을 주는 빌드·설정 변경처럼 이슈가 필요한 작업은 PR을 올릴 때 이슈도 함께 만들어 PR 본문의 "연관된 이슈"에 `- Closes #이슈번호` 형식(목록 항목)으로 연결한다. 이슈가 없으면 `- 없음 (사유)`로 적는다. 진행 기록 갱신 같은 사소한 문서 변경은 이슈 없이 올려도 된다.
 - 이슈와 PR의 Assignees에는 `jinwoojwa`를 지정한다.
+- 이슈를 만들 때 **Type**을 지정한다. `feature`는 Feature, `bug`는 Bug, `refactor`와 `chore`는 Task이다. 이슈 템플릿이 `type:`으로 자동 지정하고, `gh issue create`로 만들 때는 `--type`을 쓴다.
+- 이슈를 만들 때 조직 이슈 **Field**(Priority, Effort, Start date, Target date)도 채운다.
+  - Priority: `Urgent`(장애·보안, 즉시 대응), `High`(로드맵에서 다음 작업이 의존하는 기반 작업이나 주요 기능), `Medium`(일반 기능·버그), `Low`(개선·정리)
+  - Effort: `High`(여러 도메인에 걸친 큰 변경), `Medium`(한 도메인의 기능 단위), `Low`(설정·문서·소규모 수정)
+  - Start date는 작업 시작일, Target date는 머지 목표일이다.
+  - 설정은 `gh api -X PUT repos/dozycoffee/dozy-inventory-api/issues/{번호}/issue-field-values --input -`에 `{"issue_field_values":[{"field_id":필드ID,"value":"High"}, ...]}`를 넘긴다(날짜는 `YYYY-MM-DD`). 필드 ID는 `gh api orgs/dozycoffee/issue-fields`로 조회한다. 이 호출은 기존 필드 값을 덮어쓴다.
 - 이슈의 "작업 상세 내용" 체크박스는 PR을 열기 전에 이번 PR에서 완료한 항목을 `gh issue edit`로 `- [x]`로 체크한다. 이슈를 닫아도 체크박스는 자동으로 갱신되지 않는다.
 
 ## PR
