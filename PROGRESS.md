@@ -29,7 +29,7 @@
 
 - F-005: 상품 마스터를 완료했다. 도메인 모델(`Product`, 상품 코드는 trim·대문자로 정규화), application 계층(등록, 상태 변경, ID 조회, 코드·분류·상태 필터 목록 조회), 영속성 어댑터(`BaseEntity`만 상속, 필터는 `R2dbcEntityTemplate` Criteria, 중복 키는 `DuplicateProductCodeException`으로 변환, enum과 CHECK 제약 일치 테스트), 로그만 남기는 이벤트 발행기, 웹 어댑터(`/api/v1/products`: 조회는 모든 role, 등록·상태 변경은 admin)를 구현했다. 상품 수정·삭제는 두지 않는다(상태는 INACTIVE로 대체). 상품 ID는 DB AUTO_INCREMENT.
 - `DomainValidator.requireNotBlank`를 추가했고, `port/in` 백틱 패키지명을 위해 ktlint `package-name` 규칙을 껐다.
-- `dozy-auth` 최신 상태를 확인했다: 스타터 0.2.1 이후 변경이 없고 WebFlux·role 인가·401/403·`auth-test`를 지원한다. IMS 연동에 필요한 기능은 모두 있다.
+- `dozy-auth` 최신 상태를 확인했다: 스타터 0.2.1 이후 변경이 없고 WebFlux·role 인가·401/403·`auth-test`를 지원한다. inventory 서비스 연동에 필요한 기능은 모두 있다.
 
 - F-020: `dozy-auth` 스타터 0.2.1을 연동했다(`SecurityConfig`, `SecurityContextActorProvider`, `InventoryRole`). 결정은 ADR-0011: role을 3개(`service`·`warehouse_manager`·`admin`)로 나누고 창고 범위는 `warehouse_access` 사본으로 판단, `requester_service`는 principalId(UUID) 저장, `local`은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 빌드·CI에 `GPR_USER`·`GPR_TOKEN`이 필요하다.
 - F-022: REST Docs + `restdocs-api-spec`으로 컨트롤러 테스트에서 OpenAPI 명세를 만들고 CI가 `openapi-spec` 아티팩트로 올린다(ADR-0013). 상품 API 4개를 문서화했고 새 API는 성공 응답 문서화가 필수다(`docs/testing.md`). `restdocs-api-spec`이 servlet 스택을 끌어와 빌드에서 제외한다. 정적 사이트 배포는 명세 공개 여부를 정한 뒤 정한다.

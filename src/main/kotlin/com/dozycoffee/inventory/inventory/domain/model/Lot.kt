@@ -6,7 +6,7 @@ import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import java.time.LocalDate
 
-/** 공급사가 부여한 Lot 번호 단위. 번호·제조일자·유통기한은 공급사 값이며 IMS가 바꾸거나 만들지 않는다 */
+/** 공급사가 부여한 Lot 번호 단위. 번호·제조일자·유통기한은 공급사 값이며 inventory 서비스가 바꾸거나 만들지 않는다 */
 class Lot private constructor(
     val lotId: Long?,
     val productId: Long,

@@ -135,7 +135,7 @@
   {
     "id": "F-020",
     "name": "dozy-auth 인증 연동 (첫 API 전에 수행)",
-    "description": "auth-spring-boot-starter(0.2.1 이상, WebFlux) 연동, system client·직원 토큰 인가, inventory:service·warehouse_manager·admin role, 보안 예외 401/403 처리, 토큰 기반 CurrentActorProvider(local 프로필 우회 유지). 개발·테스트는 auth-test(@WithDozyPrincipal, DozyTestTokens)로 하며 등록이 필요 없다. 실제 서버 연동 확인·배포 전에 dozy-auth 서버에서 inventory audience, role, system client를 등록한다(관리자 API). 결정은 ADR-0011: role 3개(inventory:service·warehouse_manager·admin), requester_service는 principalId(UUID) 그대로 저장, local은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 서비스 간 호출용 dozySystemWebClient는 IMS가 동기 호출할 곳이 생길 때 구성한다. 운영 작업: dozy-auth에 inventory audience, role 3개, system client 등록(실제 서버 연동·배포 전).",
+    "description": "auth-spring-boot-starter(0.2.1 이상, WebFlux) 연동, system client·직원 토큰 인가, inventory:service·warehouse_manager·admin role, 보안 예외 401/403 처리, 토큰 기반 CurrentActorProvider(local 프로필 우회 유지). 개발·테스트는 auth-test(@WithDozyPrincipal, DozyTestTokens)로 하며 등록이 필요 없다. 실제 서버 연동 확인·배포 전에 dozy-auth 서버에서 inventory audience, role, system client를 등록한다(관리자 API). 결정은 ADR-0011: role 3개(inventory:service·warehouse_manager·admin), requester_service는 principalId(UUID) 그대로 저장, local은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 서비스 간 호출용 dozySystemWebClient는 inventory 서비스가 동기 호출할 곳이 생길 때 구성한다. 운영 작업: dozy-auth에 inventory audience, role 3개, system client 등록(실제 서버 연동·배포 전).",
     "status": "completed",
     "dependencies": ["F-004"]
   },

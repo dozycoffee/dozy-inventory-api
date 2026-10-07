@@ -7,7 +7,7 @@ sealed interface Actor {
     val auditName: String
 }
 
-/** 인증된 사용자. [roles]는 IMS audience의 role 코드(prefix 제거)다 */
+/** 인증된 사용자. [roles]는 inventory audience의 role 코드(prefix 제거)다 */
 data class UserActor(
     val principalId: UUID,
     val roles: Set<String>,

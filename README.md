@@ -14,9 +14,9 @@
 
 ![DOZY COFFEE Banner](.github/assets/dozycoffee_banner.png)
 
-본 프로젝트는 커피 프랜차이즈 **DOZY COFFEE**의 원부자재 재고 관리 시스템(IMS, Inventory Management System) 백엔드 API 서버입니다.
+본 프로젝트는 커피 프랜차이즈 **DOZY COFFEE**의 원부자재 재고 관리 서비스(inventory) 백엔드 API 서버입니다.
 
-IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고, 그중 몇 개를 약속할 수 있는가"를 책임집니다. 창고 작업(입고·출고·반품·실사·폐기의 물리적 수행)은 WMS가, 재고 수량과 예약은 IMS가 맡고, OMS와 가맹점 서비스가 같은 재고를 IMS를 통해 바라봅니다.
+inventory 서비스는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고, 그중 몇 개를 약속할 수 있는가"를 책임집니다. 창고 작업(입고·출고·반품·실사·폐기의 물리적 수행)은 WMS가, 재고 수량과 예약은 inventory 서비스가 맡고, OMS와 가맹점 서비스가 같은 재고를 inventory 서비스를 통해 바라봅니다.
 
 > 설계가 확정되어 도메인별로 구현을 진행 중입니다. 구현 순서는 [feature_list.json](feature_list.json)을 따릅니다.
 
