@@ -21,5 +21,6 @@ enum class InventoryRole(
 object InventoryAuthorize {
     const val ANY: String = "hasAnyRole('service','warehouse_manager','admin')"
     const val SERVICE: String = "hasRole('service')"
+    const val SERVICE_OR_ADMIN: String = "hasAnyRole('service','admin')"
     const val ADMIN: String = "hasRole('admin')"
 }
