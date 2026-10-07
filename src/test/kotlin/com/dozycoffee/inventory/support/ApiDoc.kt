@@ -5,6 +5,7 @@ import com.epages.restdocs.apispec.Schema
 import com.epages.restdocs.apispec.WebTestClientRestDocumentationWrapper.document
 import com.epages.restdocs.apispec.WebTestClientRestDocumentationWrapper.resourceDetails
 import org.springframework.http.HttpHeaders
+import org.springframework.restdocs.headers.HeaderDescriptor
 import org.springframework.restdocs.headers.HeaderDocumentation.headerWithName
 import org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders
 import org.springframework.restdocs.operation.preprocess.Preprocessors.modifyHeaders
@@ -22,9 +23,14 @@ import java.util.function.Consumer
  * 문서화한 요청·응답 필드와 실제 값이 다르면 테스트가 실패한다.
  */
 object ApiDoc {
+    private val authorizationDescriptor: HeaderDescriptor =
+        headerWithName(HttpHeaders.AUTHORIZATION).description("Bearer 액세스 토큰. 호출에 필요한 inventory role은 API 설명에 적는다")
+
     /** 인증이 필요한 요청의 토큰 헤더 스니펫. 실제 토큰은 문서에 남지 않도록 [operation]이 치환한다 */
-    val authorization: Snippet =
-        requestHeaders(headerWithName(HttpHeaders.AUTHORIZATION).description("Bearer 액세스 토큰. 호출에 필요한 inventory role은 API 설명에 적는다"))
+    val authorization: Snippet = requestHeaders(authorizationDescriptor)
+
+    /** 토큰 헤더에 이 API의 헤더를 더한 스니펫. 요청 헤더 스니펫은 하나만 쓸 수 있어 함께 적는다 */
+    fun authorizationAnd(vararg extra: HeaderDescriptor): Snippet = requestHeaders(listOf(authorizationDescriptor) + extra)
 
     /** 오류 응답(Problem Details)의 필드 스니펫. `errors`는 검증 실패(400)에만 있다 */
     fun problem(withErrors: Boolean = false): Snippet =

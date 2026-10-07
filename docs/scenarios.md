@@ -57,6 +57,7 @@ WMS에서 검수·적재가 끝난 입고분을 재고로 반영한다. 입고 �
 - **멱등**: 같은 멱등 키의 재요청은 반영하지 않고 저장된 이력으로 처음 응답과 같은 결과(처음 시점의 `quantityAfter`)를 반환한다. 같은 키에 다른 내용이 오면 거부한다(`INV_IDEMPOTENCY_KEY_CONFLICT`, 409).
 - **반려**: 수량이 1 미만, 품질 상태가 폐기 예정, 멱등 키 형식 오류는 400이고 상품이 inventory 서비스에 없으면 404이다. 비활성(`INACTIVE`) 상품도 이미 도착한 물건이므로 반영한다.
 - **이벤트**: `재고 증가` 이벤트를 발행한다(Outbox 구현 전에는 로그만 남긴다).
+- **API**: `POST /api/v1/inbound-receipts`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `productId`, `quantity`, `qualityStatus`, `lotNumber`, `manufactureDate`, `expirationDate`, `inboundItemId`이다. 처음 반영과 재요청 모두 200이다([ADR-0019](adr/0019-inbound-receipt-api.md)).
 
 ### 상태 흐름
 

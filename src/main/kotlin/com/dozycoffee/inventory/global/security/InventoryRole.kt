@@ -20,5 +20,6 @@ enum class InventoryRole(
 /** `@PreAuthorize`에 쓰는 SpEL 식. 어노테이션 인자는 컴파일 타임 상수여야 해서 문자열로 둔다 */
 object InventoryAuthorize {
     const val ANY: String = "hasAnyRole('service','warehouse_manager','admin')"
+    const val SERVICE: String = "hasRole('service')"
     const val ADMIN: String = "hasRole('admin')"
 }
