@@ -21,5 +21,11 @@ enum class ReservationErrorCode(
         "INV_INVALID_RESERVATION_ITEMS",
         "예약 상품은 1개 이상 100개 이하이고 중복될 수 없으며 수량은 1 이상이고 할당 수량의 합과 같아야 합니다.",
     ),
+    DUPLICATE_ORDER_RESERVATION(
+        ErrorType.CONFLICT,
+        "INV_DUPLICATE_ORDER_RESERVATION",
+        "같은 채널의 같은 주문에 이미 살아 있는 예약이 있습니다.",
+    ),
+    PRODUCT_NOT_RESERVABLE(ErrorType.CONFLICT, "INV_PRODUCT_NOT_RESERVABLE", "비활성 상품은 예약할 수 없습니다."),
     DUPLICATE_RESERVATION_KEY(ErrorType.CONFLICT, "INV_DUPLICATE_RESERVATION_KEY", "이미 처리한 예약 멱등 키입니다."),
 }

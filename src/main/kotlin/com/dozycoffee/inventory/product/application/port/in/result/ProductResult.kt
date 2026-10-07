@@ -13,6 +13,10 @@ data class ProductResult(
     val shelfLifeDays: Int?,
     val productStatus: ProductStatus,
 ) {
+    /** 판매 중인(`ACTIVE`) 상품인지. 다른 도메인이 상태 열거형을 알 필요 없게 한다 */
+    val isActive: Boolean
+        get() = productStatus == ProductStatus.ACTIVE
+
     companion object {
         fun from(product: Product): ProductResult =
             ProductResult(

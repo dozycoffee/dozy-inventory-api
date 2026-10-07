@@ -31,7 +31,8 @@ src/main/kotlin/com/dozycoffee/inventory
 │   └── out
 │       ├── persistence          // XxxEntity, XxxR2dbcRepository, XxxPersistenceAdapter
 │       ├── event                // 이벤트 발행 어댑터 (Outbox 저장 등)
-│       └── client               // 외부 서비스 호출 어댑터 (WMS 등)
+│       ├── client               // 외부 서비스 호출 어댑터 (WMS 등)
+│       └── config               // 설정값을 포트로 제공하는 어댑터 (@ConfigurationProperties 바인딩)
 ├── application
 │   ├── port
 │   │   ├── in
