@@ -36,6 +36,11 @@ enum class InventoryErrorCode(
     ),
     LOT_MISMATCH(ErrorType.CONFLICT, "INV_LOT_MISMATCH", "이미 등록된 Lot과 제조일자 또는 유통기한이 다릅니다."),
     IDEMPOTENCY_KEY_CONFLICT(ErrorType.CONFLICT, "INV_IDEMPOTENCY_KEY_CONFLICT", "이미 처리한 멱등 키가 다른 내용으로 다시 요청되었습니다."),
+    INVALID_AVAILABILITY_QUERY(
+        ErrorType.VALIDATION,
+        "INV_INVALID_AVAILABILITY_QUERY",
+        "상품은 1개 이상 100개 이하이고 창고는 지정하면 1개 이상 100개 이하이며 ID는 모두 양수여야 합니다.",
+    ),
     INSUFFICIENT_AVAILABLE_QUANTITY(ErrorType.CONFLICT, "INV_INSUFFICIENT_AVAILABLE_QUANTITY", "가용 수량이 부족합니다."),
     INSUFFICIENT_RESERVED_QUANTITY(ErrorType.CONFLICT, "INV_INSUFFICIENT_RESERVED_QUANTITY", "예약 수량이 부족합니다."),
     INVENTORY_NOT_RESERVABLE(ErrorType.CONFLICT, "INV_INVENTORY_NOT_RESERVABLE", "정상 품질 상태의 재고만 예약할 수 있습니다."),
