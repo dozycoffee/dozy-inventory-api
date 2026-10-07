@@ -58,8 +58,8 @@
   {
     "id": "F-009",
     "name": "재고 조회",
-    "description": "가용 재고 조회(채널용)와 재고 현황·상세·Lot·이력 조회(관리자용). 시나리오 4장.",
-    "status": "pending",
+    "description": "가용 재고 조회(채널용)와 재고 현황·상세·Lot·이력 조회(관리자용). 시나리오 4장. 결정은 ADR-0020. 단계: (1) 채널용 가용 재고 조회(영속성·application → web), (2) 관리자 재고 현황·상세·이력(`productIds` 없는 전체 조회는 여기서 제공).",
+    "status": "in_progress",
     "dependencies": ["F-007", "F-020"]
   },
   {
