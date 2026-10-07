@@ -101,12 +101,10 @@ class Inventory private constructor(
         reason: String?,
         at: LocalDateTime,
     ): Boolean {
-        if (reason.isNullOrBlank() || reason.length > MAX_HOLD_REASON_LENGTH) {
-            throw InvalidDomainValueException(InventoryErrorCode.INVALID_HOLD_REASON)
-        }
+        val validReason: String = requireValidHoldReason(reason)
         if (allocationHold) return false
         allocationHold = true
-        holdReason = reason
+        holdReason = validReason
         heldAt = at
         return true
     }
@@ -129,11 +127,24 @@ class Inventory private constructor(
     override fun hashCode(): Int = inventoryId?.hashCode() ?: System.identityHashCode(this)
 
     private fun requirePositive(amount: Int) {
-        if (amount < 1) throw InvalidDomainValueException(InventoryErrorCode.INVALID_QUANTITY)
+        requireValidAmount(amount)
     }
 
     companion object {
         private const val MAX_HOLD_REASON_LENGTH: Int = 100
+
+        /** 수량 변경 요청의 수량은 1 이상이어야 한다. 모델 없이 SQL로 갱신하는 경로도 같은 규칙을 쓴다 */
+        fun requireValidAmount(amount: Int) {
+            if (amount < 1) throw InvalidDomainValueException(InventoryErrorCode.INVALID_QUANTITY)
+        }
+
+        /** 보류 사유는 비어 있을 수 없고 100자를 넘을 수 없다 */
+        fun requireValidHoldReason(reason: String?): String {
+            if (reason.isNullOrBlank() || reason.length > MAX_HOLD_REASON_LENGTH) {
+                throw InvalidDomainValueException(InventoryErrorCode.INVALID_HOLD_REASON)
+            }
+            return reason
+        }
 
         /** 수량이 0인 새 행을 만든다. 입고는 이 행의 수량을 늘리는 것이다 */
         fun create(
