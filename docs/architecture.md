@@ -110,7 +110,7 @@ src/main/kotlin/com/dozycoffee/ims
 | 테스트 | 검사 내용 |
 |--------|-----------|
 | `LayerDependencyTest` | 같은 도메인의 계층 간 import 방향, 다른 도메인은 `application/port/in`만 import, `global`은 도메인 import 금지, `domain`의 Spring·R2DBC·Reactor·jakarta·`global.error` 외 `global` import 금지, `application`·`adapter/in`의 웹·영속성 기술 import 금지 |
-| `NamingRuleTest` | 접미사(`UseCase`, `Command`, `Query`, `Result`, `Repository`, `R2dbcRepository`, `PersistenceAdapter`, `Entity`, `Service`, `Controller`, `Request`, `Response`, `ErrorCode`, `Exception`)별 종류·패키지, `Entity`의 `BaseEntity` 상속, `Controller`의 `@RestController`, 도메인 모델의 `data class`·감사 필드 금지 |
+| `NamingRuleTest` | 접미사(`UseCase`, `Command`, `Query`, `Result`, `Repository`, `R2dbcRepository`, `PersistenceAdapter`, `Entity`, `Service`, `Controller`, `Request`, `Response`, `ErrorCode`, `Exception`)별 종류·패키지, `Entity`의 `BaseEntity` 상속, `Controller`의 `@RestController`, 도메인 모델의 `data class`·변경 가능한(`var`) 감사 필드 금지(응답에 필요한 읽기 전용 `val`은 허용) |
 | `ConventionRuleTest` | `!!`, `@Autowired`, `now()` 직접 호출, `@Transactional` 위치, Reactor 타입 위치, 클래스 프로퍼티와 함수 반환 타입 명시([conventions.md](conventions.md)) |
 
 새 접미사나 패키지를 정할 때는 이 문서의 구조와 `NamingRuleTest`의 규칙표를 함께 고친다.

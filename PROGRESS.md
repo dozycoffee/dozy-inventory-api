@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0014), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
+- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0015), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
 - 완료: F-001(골격), F-002(GitHub 저장소 설정), F-003(Flyway 마이그레이션 V1·V2), F-004(전역 공통 모듈), F-005(상품 마스터), F-006(Konsist 아키텍처 테스트), F-020(인증 연동), F-022(API 문서화).
 - 패키지 구조 확정(ADR-0010): 도메인 모델과 영속성 엔티티 분리(도메인은 감사 필드를 모름), 다른 도메인은 UseCase로만 호출, 도메인 패키지 6개, `/api/v1`. F-005(상품 마스터)는 사용자가 직접 구현한다.
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
@@ -34,10 +34,11 @@
 - F-020: `dozy-auth` 스타터 0.2.1을 연동했다(`SecurityConfig`, `SecurityContextActorProvider`, `ImsRole`). 결정은 ADR-0011: role을 3개(`service`·`warehouse_manager`·`admin`)로 나누고 창고 범위는 `warehouse_access` 사본으로 판단, `requester_service`는 principalId(UUID) 저장, `local`은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 빌드·CI에 `GPR_USER`·`GPR_TOKEN`이 필요하다.
 - F-022: REST Docs + `restdocs-api-spec`으로 컨트롤러 테스트에서 OpenAPI 명세를 만들고 CI가 `openapi-spec` 아티팩트로 올린다(ADR-0013). 상품 API 4개를 문서화했고 새 API는 성공 응답 문서화가 필수다(`docs/testing.md`). `restdocs-api-spec`이 servlet 스택을 끌어와 빌드에서 제외한다. 정적 사이트 배포는 명세 공개 여부를 정한 뒤 정한다.
 - F-006: Konsist 0.17.3으로 아키텍처 규칙을 테스트로 강제한다(ADR-0014). 레이어 의존 방향, 도메인 간 호출(다른 도메인은 `application/port/in`만), 이름·위치, 컨벤션(`!!`, `@Autowired`, `now()` 직접 호출, `@Transactional`·Reactor 위치, 프로퍼티·반환 타입 명시) 규칙을 `architecture` 패키지에 두었다. 규칙마다 일부러 위반 코드를 넣어 테스트가 실패하는 것을 확인했다.
+- F-007(진행 중): 재고 도메인 계층을 구현했다(ADR-0015). `Lot`(상태 판정은 기준일·임박 일수를 인자로), `Inventory`(`increase`·`decrease`·`reserve`·`release`·`ship`·`hold`·`releaseHold`, 수량 불변식과 예약 불가 원인 판별), `InventoryHistory`(불변, 유형별 변동량 부호 규칙), `IdempotencyKey`, `InventoryKey`와 enum 4개, 예외·오류 코드. 무작위 연산으로 수량 불변식도 검증한다. Konsist 규칙은 도메인 모델의 읽기 전용 감사 값(`val createdAt`)을 허용하도록 조정했다. 영속성 어댑터(출력 포트, `INSERT ... ON DUPLICATE KEY UPDATE` 입고 upsert, 조건부 갱신 쿼리, enum·CHECK 일치 테스트)는 다음 PR이다.
 
 ## 다음 세션에서 할 일
 
 1. F-018 구현 때 `LoggingProductEventPublisher`를 Outbox 저장 구현으로 교체한다(지금은 이벤트가 실제로 발행되지 않는다).
-2. 재고 모델(F-007).
+2. 재고 모델(F-007) 영속성 어댑터 PR: 출력 포트, 입고 upsert, 조건부 갱신 쿼리, `inventory_history`용 생성 정보만 가진 엔티티 기반 클래스(`BaseEntity`는 `updated_*` 컬럼이 필요해 쓸 수 없다), enum·CHECK 일치 테스트.
 3. 실제 서버 연동 확인·배포 전에 `dozy-auth`에 `ims` audience, `ims:service`·`ims:warehouse_manager`·`ims:admin` role, system client(`svc-wms`, `svc-oms`, `svc-store`)를 등록한다(사용자 작업).
 4. Dependabot이 제외 규칙대로 동작하는지 다음 점검 때 확인한다.
