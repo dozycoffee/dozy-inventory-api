@@ -103,6 +103,14 @@ src/main/kotlin/com/dozycoffee/ims
 - 설정은 `application.yaml`에서 환경변수로 받는다. 비밀(DB 비밀번호 등)에는 기본값을 두지 않는다.
 - 예약 TTL 상한(채널별), 조정 승인 임계치 같은 업무 설정값은 테이블이 아니라 애플리케이션 설정으로 둔다.
 
-## 아키텍처 테스트 (예정)
+## 아키텍처 테스트
 
-위 규칙은 Konsist로 검사한다(F-006): `domain`의 Spring·R2DBC import 금지, `adapter → application → domain` 의존 방향, 다른 도메인은 `application.port.in`만 참조, Entity와 DTO 이름 규칙.
+위 규칙은 Konsist로 검사하고 위반하면 빌드(`./gradlew test`)가 실패한다. 테스트는 `src/test/kotlin/com/dozycoffee/ims/architecture`에 있고 production 소스만 검사한다. 결정 배경은 [ADR-0014](adr/0014-konsist-architecture-tests.md)이다.
+
+| 테스트 | 검사 내용 |
+|--------|-----------|
+| `LayerDependencyTest` | 같은 도메인의 계층 간 import 방향, 다른 도메인은 `application/port/in`만 import, `global`은 도메인 import 금지, `domain`의 Spring·R2DBC·Reactor·jakarta·`global.error` 외 `global` import 금지, `application`·`adapter/in`의 웹·영속성 기술 import 금지 |
+| `NamingRuleTest` | 접미사(`UseCase`, `Command`, `Query`, `Result`, `Repository`, `R2dbcRepository`, `PersistenceAdapter`, `Entity`, `Service`, `Controller`, `Request`, `Response`, `ErrorCode`, `Exception`)별 종류·패키지, `Entity`의 `BaseEntity` 상속, `Controller`의 `@RestController`, 도메인 모델의 `data class`·감사 필드 금지 |
+| `ConventionRuleTest` | `!!`, `@Autowired`, `now()` 직접 호출, `@Transactional` 위치, Reactor 타입 위치, 클래스 프로퍼티와 함수 반환 타입 명시([conventions.md](conventions.md)) |
+
+새 접미사나 패키지를 정할 때는 이 문서의 구조와 `NamingRuleTest`의 규칙표를 함께 고친다.
