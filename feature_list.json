@@ -37,8 +37,8 @@
   {
     "id": "F-006",
     "name": "Konsist 아키텍처 테스트 도입",
-    "description": "헥사고날 레이어 규칙(domain은 Spring·R2DBC·application·adapter를 import하지 않음, 다른 도메인은 application.port.in만 참조)과 Kotlin 컨벤션(도메인 모델은 data class 금지, 타입 명시 등)을 테스트로 강제한다. 규칙은 docs/architecture.md 기준.",
-    "status": "pending",
+    "description": "헥사고날 레이어 규칙(domain은 Spring·R2DBC·application·adapter를 import하지 않음, 다른 도메인은 application.port.in만 참조)과 Kotlin 컨벤션(도메인 모델은 data class 금지, 타입 명시 등)을 테스트로 강제한다. 규칙은 docs/architecture.md 기준. 결정은 ADR-0014(Konsist 0.17.3, 레이어·도메인 간 호출·이름·컨벤션 4가지 규칙, 블록 본문의 Unit 생략 허용).",
+    "status": "completed",
     "dependencies": ["F-005"]
   },
   {
