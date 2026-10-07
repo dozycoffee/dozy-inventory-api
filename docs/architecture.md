@@ -101,7 +101,7 @@ src/main/kotlin/com/dozycoffee/ims
 ## 설정
 
 - 설정은 `application.yaml`에서 환경변수로 받는다. 비밀(DB 비밀번호 등)에는 기본값을 두지 않는다.
-- 예약 TTL 상한(채널별), 조정 승인 임계치 같은 업무 설정값은 테이블이 아니라 애플리케이션 설정으로 둔다.
+- 예약 TTL 상한(채널별), 조정 승인 임계치 같은 업무 설정값은 테이블이 아니라 애플리케이션 설정으로 둔다. Lot 임박 기준 일수는 `ims.inventory.expiring-soon-days`(30)이다.
 
 ## 아키텍처 테스트
 
