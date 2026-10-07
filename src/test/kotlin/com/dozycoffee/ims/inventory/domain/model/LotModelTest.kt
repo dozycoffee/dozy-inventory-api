@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.LocalDate
@@ -103,5 +104,24 @@ class LotModelTest {
         assertEquals(LotStatus.EXPIRED, a.lotStatus)
         assertEquals(a, b)
         assertNotEquals(a, c)
+    }
+
+    @Nested
+    inner class `날짜 비교` {
+        @Test
+        fun `제조일자와 유통기한이 모두 같을 때만 같다`() {
+            val lot: Lot = create()
+
+            assertTrue(lot.hasSameDates(today.minusDays(10), today.plusDays(200)))
+            assertFalse(lot.hasSameDates(today.minusDays(11), today.plusDays(200)))
+            assertFalse(lot.hasSameDates(today.minusDays(10), today.plusDays(201)))
+        }
+
+        @Test
+        fun `한쪽이 없는 것과 있는 것은 다르고 둘 다 없으면 같다`() {
+            assertFalse(create().hasSameDates(null, today.plusDays(200)))
+            assertFalse(create(expirationDate = null).hasSameDates(today.minusDays(10), today.plusDays(200)))
+            assertTrue(create(manufactureDate = null, expirationDate = null).hasSameDates(null, null))
+        }
     }
 }

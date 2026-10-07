@@ -29,5 +29,10 @@ dozy:
     accepted-realms: [internal]
     issuer-base-uri: ${AUTH_ISSUER_BASE_URI:http://localhost:8081}
 
+ims:
+  inventory:
+    # 유통기한이 오늘부터 이 일수 이내이면 Lot을 임박 상태로 본다
+    expiring-soon-days: 30
+
 server:
   port: ${SERVER_PORT:8082}
