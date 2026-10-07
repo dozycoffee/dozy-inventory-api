@@ -34,6 +34,7 @@ import org.springframework.transaction.reactive.TransactionalOperator
 import org.springframework.transaction.reactive.executeAndAwait
 import java.time.Clock
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import kotlin.random.Random
 
 /**
@@ -58,9 +59,14 @@ class ReservationService(
         val channel: ReservationChannel = ReservationChannel.of(command.channel)
         val externalOrderId: ExternalOrderId = ExternalOrderId.of(command.externalOrderId)
         val requesterService: RequesterService = RequesterService.of(command.requesterService)
-        val now: LocalDateTime = LocalDateTime.now(clock)
+        // 시각 컬럼이 마이크로초(DATETIME(6))라 먼저 잘라 둔다. 그래야 첫 응답과 저장된 예약에서 다시 만든 응답이 같다
+        val now: LocalDateTime = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS)
         val expiry: ReservationExpiry =
-            ReservationExpiry.create(command.expiresAt, now.plus(reservationPolicy.maxTtlFor(channel.value)), now)
+            ReservationExpiry.create(
+                command.expiresAt.truncatedTo(ChronoUnit.MICROS),
+                now.plus(reservationPolicy.maxTtlFor(channel.value)),
+                now,
+            )
         val allocation: AllocateInventoryCommand =
             AllocateInventoryCommand(command.warehouseId, command.items.map { AllocateInventoryCommand.Item(it.productId, it.quantity) })
         val newReservation: (List<ReservationItem>) -> Reservation = { items: List<ReservationItem> ->

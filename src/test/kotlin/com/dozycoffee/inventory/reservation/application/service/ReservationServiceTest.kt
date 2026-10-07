@@ -237,6 +237,34 @@ class ReservationServiceTest {
     }
 
     @Nested
+    inner class `시각 정밀도` {
+        @Test
+        fun `나노초가 있는 시각은 DB 정밀도인 마이크로초로 잘라 저장하고 응답한다`() =
+            runBlocking<Unit> {
+                val nanoClock: Clock = Clock.fixed(now.plusNanos(123_456_789).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+                val nanoService: ReservationService =
+                    ReservationService(
+                        getProductUseCase,
+                        allocateInventoryUseCase,
+                        reservationRepository,
+                        reservationEventRepository,
+                        publisher,
+                        DirectTransactionalOperator(),
+                        nanoClock,
+                        ReservationPolicy { Duration.ofHours(1) },
+                    )
+                stubSuccess()
+
+                nanoService.create(command(expiresAt = now.plusMinutes(30).plusNanos(987_654_321)))
+
+                val saved = argumentCaptor<Reservation>()
+                verifyBlocking(reservationRepository) { save(saved.capture()) }
+                assertEquals(now.plusMinutes(30).plusNanos(987_654_000), saved.firstValue.expiry.expiresAt)
+                assertEquals(now.plusNanos(123_456_000).plusHours(1), saved.firstValue.expiry.maxExpiresAt)
+            }
+    }
+
+    @Nested
     inner class `요청 검증` {
         @Test
         fun `형식 오류는 어떤 것도 쓰기 전에 거부한다`() =
