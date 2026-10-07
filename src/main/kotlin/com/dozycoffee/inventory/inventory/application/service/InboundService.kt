@@ -44,7 +44,7 @@ class InboundService(
     private val inventoryEventPublisher: InventoryEventPublisher,
     private val transactionalOperator: TransactionalOperator,
     private val clock: Clock,
-    @Value("\${ims.inventory.expiring-soon-days}") private val expiringSoonDays: Int,
+    @Value("\${inventory.expiring-soon-days}") private val expiringSoonDays: Int,
 ) : ConfirmInboundUseCase {
     override suspend fun confirm(command: ConfirmInboundCommand): InboundResult {
         val key: IdempotencyKey = IdempotencyKey.of(command.idempotencyKey)

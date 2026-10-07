@@ -51,7 +51,7 @@
   {
     "id": "F-008",
     "name": "입고 확정 반영",
-    "description": "WMS의 입고 확정 요청을 재고에 반영한다(시나리오 3.1). Lot 최초 수신 시 등록, inventory upsert, INBOUND 이력, 멱등 키 처리. 결정은 ADR-0017(품목 1건=요청 1건, Lot 날짜 불일치 409, INACTIVE 상품 허용, 이벤트는 포트+로그, POST /api/v1/inbound-receipts는 ims:service만). 계층별로 PR을 나눈다: application 계층(UseCase, 서비스, 이벤트 포트, 통합 테스트) → 웹 어댑터(컨트롤러, API 문서화).",
+    "description": "WMS의 입고 확정 요청을 재고에 반영한다(시나리오 3.1). Lot 최초 수신 시 등록, inventory upsert, INBOUND 이력, 멱등 키 처리. 결정은 ADR-0017(품목 1건=요청 1건, Lot 날짜 불일치 409, INACTIVE 상품 허용, 이벤트는 포트+로그, POST /api/v1/inbound-receipts는 inventory:service만). 계층별로 PR을 나눈다: application 계층(UseCase, 서비스, 이벤트 포트, 통합 테스트) → 웹 어댑터(컨트롤러, API 문서화).",
     "status": "in_progress",
     "dependencies": ["F-007", "F-020"]
   },
@@ -135,7 +135,7 @@
   {
     "id": "F-020",
     "name": "dozy-auth 인증 연동 (첫 API 전에 수행)",
-    "description": "auth-spring-boot-starter(0.2.1 이상, WebFlux) 연동, system client·직원 토큰 인가, ims:service·warehouse_manager·admin role, 보안 예외 401/403 처리, 토큰 기반 CurrentActorProvider(local 프로필 우회 유지). 개발·테스트는 auth-test(@WithDozyPrincipal, DozyTestTokens)로 하며 등록이 필요 없다. 실제 서버 연동 확인·배포 전에 dozy-auth 서버에서 ims audience, role, system client를 등록한다(관리자 API). 결정은 ADR-0011: role 3개(ims:service·warehouse_manager·admin), requester_service는 principalId(UUID) 그대로 저장, local은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 서비스 간 호출용 dozySystemWebClient는 IMS가 동기 호출할 곳이 생길 때 구성한다. 운영 작업: dozy-auth에 ims audience, role 3개, system client 등록(실제 서버 연동·배포 전).",
+    "description": "auth-spring-boot-starter(0.2.1 이상, WebFlux) 연동, system client·직원 토큰 인가, inventory:service·warehouse_manager·admin role, 보안 예외 401/403 처리, 토큰 기반 CurrentActorProvider(local 프로필 우회 유지). 개발·테스트는 auth-test(@WithDozyPrincipal, DozyTestTokens)로 하며 등록이 필요 없다. 실제 서버 연동 확인·배포 전에 dozy-auth 서버에서 inventory audience, role, system client를 등록한다(관리자 API). 결정은 ADR-0011: role 3개(inventory:service·warehouse_manager·admin), requester_service는 principalId(UUID) 그대로 저장, local은 토큰 없이 개발 사용자, CORS·공개 경로 없음. 서비스 간 호출용 dozySystemWebClient는 IMS가 동기 호출할 곳이 생길 때 구성한다. 운영 작업: dozy-auth에 inventory audience, role 3개, system client 등록(실제 서버 연동·배포 전).",
     "status": "completed",
     "dependencies": ["F-004"]
   },

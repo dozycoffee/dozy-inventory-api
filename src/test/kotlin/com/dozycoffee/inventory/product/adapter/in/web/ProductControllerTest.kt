@@ -79,7 +79,7 @@ class ProductControllerTest {
         webTestClient = baseClient.mutate().filter(documentationConfiguration(restDocumentation)).build()
     }
 
-    private fun bearer(role: String): String = tokens.issue(roles = listOf("ims:$role"))
+    private fun bearer(role: String): String = tokens.issue(roles = listOf("inventory:$role"))
 
     private fun post(
         role: String?,

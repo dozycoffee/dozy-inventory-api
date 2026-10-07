@@ -1,7 +1,7 @@
 package com.dozycoffee.inventory.global.security
 
 /**
- * Auth에 `ims:{code}`로 등록하는 role 코드. 등록 후 code는 바꿀 수 없다.
+ * Auth에 `inventory:{code}`로 등록하는 role 코드. 등록 후 code는 바꿀 수 없다.
  * role은 기능 인가만 맡고, 창고별 접근 범위는 role이 아니라 `warehouse_access` 사본으로 판단한다.
  */
 enum class InventoryRole(

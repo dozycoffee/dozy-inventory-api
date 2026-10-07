@@ -51,7 +51,7 @@ class SecurityFilterChainTest {
 
     @Test
     fun `믿지 않는 키로 서명한 토큰은 401`() {
-        val token: String = tokens.issue(roles = listOf("ims:admin"), signedBy = DozyTestTokens.Key.UNTRUSTED)
+        val token: String = tokens.issue(roles = listOf("inventory:admin"), signedBy = DozyTestTokens.Key.UNTRUSTED)
 
         get("/test/security/any", token).expectStatus().isUnauthorized
     }
@@ -67,7 +67,7 @@ class SecurityFilterChainTest {
     fun `만료된 토큰은 401`() {
         val token: String =
             tokens.issue(
-                roles = listOf("ims:admin"),
+                roles = listOf("inventory:admin"),
                 issuedAt = Instant.now().minusSeconds(7200),
                 expiresAt = Instant.now().minusSeconds(3600),
             )
@@ -76,7 +76,7 @@ class SecurityFilterChainTest {
     }
 
     @Test
-    fun `ims role이 하나도 없는 토큰은 403 FORBIDDEN`() {
+    fun `inventory role이 하나도 없는 토큰은 403 FORBIDDEN`() {
         get("/test/security/any", employeeToken())
             .expectStatus()
             .isForbidden
@@ -87,7 +87,7 @@ class SecurityFilterChainTest {
 
     @Test
     fun `다른 audience의 role만 가진 토큰은 role이 없는 것으로 보고 403`() {
-        val token: String = tokens.issue(roles = listOf("wms:inbound_manager"), audience = listOf("ims", "wms"))
+        val token: String = tokens.issue(roles = listOf("wms:inbound_manager"), audience = listOf("inventory", "wms"))
 
         get("/test/security/any", token).expectStatus().isForbidden
     }
@@ -95,21 +95,21 @@ class SecurityFilterChainTest {
     @Test
     fun `세 role은 모두 공통 API를 호출할 수 있다`() {
         listOf("service", "warehouse_manager", "admin").forEach { role: String ->
-            get("/test/security/any", employeeToken("ims:$role")).expectStatus().isOk
+            get("/test/security/any", employeeToken("inventory:$role")).expectStatus().isOk
         }
     }
 
     @Test
     fun `admin 전용 API는 admin만 호출할 수 있다`() {
-        get("/test/security/admin", employeeToken("ims:warehouse_manager")).expectStatus().isForbidden
-        get("/test/security/admin", employeeToken("ims:service")).expectStatus().isForbidden
-        get("/test/security/admin", employeeToken("ims:admin")).expectStatus().isOk
+        get("/test/security/admin", employeeToken("inventory:warehouse_manager")).expectStatus().isForbidden
+        get("/test/security/admin", employeeToken("inventory:service")).expectStatus().isForbidden
+        get("/test/security/admin", employeeToken("inventory:admin")).expectStatus().isOk
     }
 
     @Test
     fun `토큰의 principalId와 role이 Actor가 된다`() {
         val id: UUID = UUID.fromString("0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73")
-        val token: String = tokens.issue(type = PrincipalType.SYSTEM, id = id, roles = listOf("ims:service"))
+        val token: String = tokens.issue(type = PrincipalType.SYSTEM, id = id, roles = listOf("inventory:service"))
 
         get("/test/security/actor", token)
             .expectStatus()

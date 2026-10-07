@@ -24,7 +24,7 @@ import java.util.function.Consumer
 object ApiDoc {
     /** 인증이 필요한 요청의 토큰 헤더 스니펫. 실제 토큰은 문서에 남지 않도록 [operation]이 치환한다 */
     val authorization: Snippet =
-        requestHeaders(headerWithName(HttpHeaders.AUTHORIZATION).description("Bearer 액세스 토큰. 호출에 필요한 ims role은 API 설명에 적는다"))
+        requestHeaders(headerWithName(HttpHeaders.AUTHORIZATION).description("Bearer 액세스 토큰. 호출에 필요한 inventory role은 API 설명에 적는다"))
 
     /** 오류 응답(Problem Details)의 필드 스니펫. `errors`는 검증 실패(400)에만 있다 */
     fun problem(withErrors: Boolean = false): Snippet =
