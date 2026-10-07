@@ -2,6 +2,7 @@ package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.error.DomainException
 import com.dozycoffee.inventory.global.security.CurrentActorProvider
+import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
@@ -15,6 +16,7 @@ import org.springframework.r2dbc.core.awaitRowsUpdated
 import org.springframework.r2dbc.core.flow
 import org.springframework.stereotype.Component
 import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
@@ -50,6 +52,29 @@ class InventoryPersistenceAdapter(
                     warehouseId = checkNotNull(row.get("warehouse_id", Long::class.javaObjectType)),
                     productId = checkNotNull(row.get("product_id", Long::class.javaObjectType)),
                     availableQuantity = checkNotNull(row.get("available", Long::class.javaObjectType)),
+                )
+            }.flow()
+            .toList()
+    }
+
+    override suspend fun findAllocationCandidates(
+        warehouseId: Long,
+        productIds: Set<Long>,
+        today: LocalDate,
+    ): List<AllocationCandidate> {
+        if (productIds.isEmpty()) return emptyList()
+        return databaseClient
+            .sql(ALLOCATION_CANDIDATES)
+            .bind("warehouseId", warehouseId)
+            .bind("productIds", productIds.toList())
+            .bind("today", today)
+            .map { row, _ ->
+                AllocationCandidate(
+                    productId = checkNotNull(row.get("product_id", Long::class.javaObjectType)),
+                    inventoryId = checkNotNull(row.get("inventory_id", Long::class.javaObjectType)),
+                    lotId = checkNotNull(row.get("lot_id", Long::class.javaObjectType)),
+                    expirationDate = row.get("expiration_date", LocalDate::class.java),
+                    availableQuantity = checkNotNull(row.get("available", Int::class.javaObjectType)),
                 )
             }.flow()
             .toList()
@@ -183,6 +208,20 @@ class InventoryPersistenceAdapter(
                AND warehouse_id IN (:warehouseIds)
              GROUP BY warehouse_id, product_id
              ORDER BY product_id, warehouse_id
+            """
+
+        const val ALLOCATION_CANDIDATES: String =
+            """
+            SELECT i.product_id, i.inventory_id, i.lot_id, l.expiration_date, i.quantity - i.reserved_quantity AS available
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
+             WHERE i.warehouse_id = :warehouseId
+               AND i.product_id IN (:productIds)
+               AND i.quality_status = 'NORMAL'
+               AND i.allocation_hold = 0
+               AND i.quantity - i.reserved_quantity > 0
+               AND (l.expiration_date IS NULL OR l.expiration_date > :today)
+             ORDER BY i.product_id, l.expiration_date IS NULL, l.expiration_date, i.inventory_id
             """
 
         const val INSERT_OR_INCREASE: String =

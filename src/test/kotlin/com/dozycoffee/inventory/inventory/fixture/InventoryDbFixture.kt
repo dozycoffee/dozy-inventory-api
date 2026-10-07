@@ -37,9 +37,10 @@ class InventoryDbFixture(
     suspend fun seedLot(
         productId: Long,
         lotNumber: String = "LOT-A",
+        expirationDate: LocalDate? = LocalDate.of(2027, 3, 1),
     ): Lot =
         lotPersistenceAdapter.save(
-            Lot.create(productId, lotNumber, LocalDate.of(2026, 9, 1), LocalDate.of(2027, 3, 1), LocalDate.of(2026, 10, 7), 30),
+            Lot.create(productId, lotNumber, LocalDate.of(2026, 9, 1), expirationDate, LocalDate.of(2026, 10, 7), 30),
         )
 
     /** 상태를 지정해 재고 행을 직접 넣는다. 보류 행은 `held_at`이 필요하다 */

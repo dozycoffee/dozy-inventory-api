@@ -2,6 +2,7 @@ package com.dozycoffee.inventory.inventory.application.port.out
 
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
@@ -23,6 +24,17 @@ interface InventoryRepository {
         productIds: Set<Long>,
         warehouseIds: Set<Long>?,
     ): List<AvailabilityRow>
+
+    /**
+     * 창고의 상품별 예약 후보 행을 할당 순서로 반환한다. 유통기한이 이른 순서이고 유통기한이 없는 Lot이 마지막이며
+     * 같으면 `inventory_id` 오름차순이다. 유통기한이 [today] 이하인 Lot은 제외한다. 락을 걸지 않는 조회이므로
+     * 결과는 예약 시도 사이에 바뀔 수 있다.
+     */
+    suspend fun findAllocationCandidates(
+        warehouseId: Long,
+        productIds: Set<Long>,
+        today: LocalDate,
+    ): List<AllocationCandidate>
 
     /** 같은 키(창고 × Lot × 품질 상태)의 행이 있으면 총 수량을 더하고 없으면 수량이 [amount]인 행을 만든다 */
     suspend fun increase(

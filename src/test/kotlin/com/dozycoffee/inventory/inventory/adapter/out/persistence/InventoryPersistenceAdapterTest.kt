@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.config.ClockConfig
 import com.dozycoffee.inventory.global.config.R2dbcConfig
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.global.security.LocalActorProvider
+import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
@@ -32,6 +33,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.test.context.ActiveProfiles
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @DataR2dbcTest
@@ -641,6 +643,80 @@ class InventoryPersistenceAdapterTest {
                 }
 
                 assertThat(mismatches).describedAs("SQL의 가용 계산과 도메인 모델이 달라지는 경우").isEmpty()
+            }
+    }
+
+    @Nested
+    inner class `예약 후보 조회` {
+        private val today: LocalDate = LocalDate.of(2026, 10, 7)
+
+        private suspend fun lot(
+            number: String,
+            expiration: LocalDate?,
+        ): Long = checkNotNull(fixture.seedLot(productId, number, expiration).lotId)
+
+        @Test
+        fun `유통기한이 이른 순서이고 유통기한이 없는 Lot은 마지막이며 같으면 행 ID 순서다`() =
+            runBlocking<Unit> {
+                val none: Long = fixture.insertInventory(10L, productId, lot("NONE", null))
+                val late: Long = fixture.insertInventory(10L, productId, lot("LATE", LocalDate.of(2027, 6, 1)))
+                val early: Long = fixture.insertInventory(10L, productId, lot("EARLY", LocalDate.of(2027, 1, 1)))
+                val sameLot: Long = lot("SAME", LocalDate.of(2027, 1, 1))
+                val sameFirst: Long = fixture.insertInventory(10L, productId, sameLot, qualityStatus = "NORMAL")
+
+                val candidates: List<AllocationCandidate> = adapter.findAllocationCandidates(10L, setOf(productId), today)
+
+                assertThat(candidates.map { it.inventoryId }).containsExactly(early, sameFirst, late, none)
+                assertThat(candidates.first().availableQuantity).isEqualTo(10)
+                assertThat(candidates.first().expirationDate).isEqualTo(LocalDate.of(2027, 1, 1))
+            }
+
+        @Test
+        fun `가용 수량은 총 수량에서 예약 수량을 뺀 값이고 남은 수량이 없으면 제외한다`() =
+            runBlocking<Unit> {
+                val partly: Long =
+                    fixture.insertInventory(
+                        10L,
+                        productId,
+                        lot("A", LocalDate.of(2027, 1, 1)),
+                        quantity = 10,
+                        reservedQuantity = 4,
+                    )
+                fixture.insertInventory(10L, productId, lot("B", LocalDate.of(2027, 2, 1)), quantity = 10, reservedQuantity = 10)
+
+                val candidates: List<AllocationCandidate> = adapter.findAllocationCandidates(10L, setOf(productId), today)
+
+                assertThat(candidates.map { it.inventoryId }).containsExactly(partly)
+                assertThat(candidates.single().availableQuantity).isEqualTo(6)
+            }
+
+        @Test
+        fun `불량 품질, 할당 보류, 다른 창고, 유통기한이 지났거나 오늘인 Lot은 제외한다`() =
+            runBlocking<Unit> {
+                val ok: Long = fixture.insertInventory(10L, productId, lot("OK", LocalDate.of(2026, 10, 8)))
+                fixture.insertInventory(10L, productId, lot("DEFECT", LocalDate.of(2027, 1, 1)), qualityStatus = "DEFECTIVE")
+                fixture.insertInventory(10L, productId, lot("HELD", LocalDate.of(2027, 1, 1)), hold = true)
+                fixture.insertInventory(20L, productId, lot("OTHER", LocalDate.of(2027, 1, 1)))
+                fixture.insertInventory(10L, productId, lot("TODAY", today))
+                fixture.insertInventory(10L, productId, lot("OLD", LocalDate.of(2026, 10, 1)))
+
+                val candidates: List<AllocationCandidate> = adapter.findAllocationCandidates(10L, setOf(productId), today)
+
+                assertThat(candidates.map { it.inventoryId }).containsExactly(ok)
+            }
+
+        @Test
+        fun `여러 상품을 한 번에 조회하고 상품별로 묶어 반환한다`() =
+            runBlocking<Unit> {
+                val other: Long = fixture.seedProduct("BEAN-002")
+                val otherLot: Long = checkNotNull(fixture.seedLot(other, "X", LocalDate.of(2027, 1, 1)).lotId)
+                val a: Long = fixture.insertInventory(10L, productId, lot("A", LocalDate.of(2027, 1, 1)))
+                val b: Long = fixture.insertInventory(10L, other, otherLot)
+
+                val candidates: List<AllocationCandidate> = adapter.findAllocationCandidates(10L, setOf(productId, other), today)
+
+                assertThat(candidates.map { it.productId to it.inventoryId }).containsExactlyInAnyOrder(productId to a, other to b)
+                assertThat(adapter.findAllocationCandidates(10L, emptySet(), today)).isEmpty()
             }
     }
 
