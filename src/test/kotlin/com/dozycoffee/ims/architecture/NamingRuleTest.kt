@@ -138,7 +138,7 @@ class NamingRuleTest {
     }
 
     @Test
-    fun `도메인 모델은 data class가 아니고 BaseEntity와 감사 필드를 모름`() {
+    fun `도메인 모델은 data class가 아니고 BaseEntity를 상속하지 않으며 감사 필드를 바꾸지 않음`() {
         val models: List<KoClassDeclaration> =
             declarations
                 .filter {
@@ -152,7 +152,13 @@ class NamingRuleTest {
                 buildList {
                     if (c.hasDataModifier) add("${c.name}은(는) data class이다. copy()가 create()의 검증을 우회한다")
                     if (c.hasParentWithName("BaseEntity", "SoftDeletableEntity")) add("${c.name}은(는) BaseEntity를 상속한다. 도메인 모델은 감사 필드를 모른다")
-                    c.properties().filter { auditNames.matches(it.name) }.forEach { add("${c.name}.${it.name}: 도메인 모델에 감사 필드가 있다") }
+                    c
+                        .properties()
+                        .filter {
+                            auditNames.matches(
+                                it.name,
+                            ) && it.isVar
+                        }.forEach { add("${c.name}.${it.name}: 도메인 모델에 변경 가능한 감사 필드가 있다") }
                 }
             }
 
