@@ -68,6 +68,7 @@ OMS·가맹점 서비스가 주문 가능 여부를 판단하도록 상품별 �
 - **가용 수량**: `NORMAL` 품질이고 할당 보류가 아닌 행의 (총 수량 − 예약 수량) 합이다. Lot, 유통기한, 위치는 노출하지 않는다.
 - **창고 선택**: 가맹점 기준으로 근처 창고 목록과 최적 창고 선택은 호출 서비스(OMS·Store) 소관이다. inventory는 창고별 수량을 주고 지정한 창고에서 예약한다. 전체 창고×전체 상품 목록은 채널용 조회에 두지 않고 관리자 재고 현황(4.2)이 맡는다.
 - **호출 권한**: `inventory:service`와 `inventory:admin`이다(창고 관리자는 창고 접근 제어(F-021) 이후).
+- **API**: `GET /api/v1/inventories/availability?productIds=1,2,3&warehouseIds=10,20`. 목록은 쉼표로 구분하고(반복 파라미터도 받는다) 중복 ID는 합친다. 응답의 상품은 ID 오름차순, 창고는 ID 오름차순이다. 조건 위반은 400 `INV_INVALID_AVAILABILITY_QUERY`, 파라미터 누락·형식 오류는 400 `VALIDATION_FAILED`이다.
 
 ### 상태 흐름
 
