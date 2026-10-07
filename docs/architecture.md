@@ -75,7 +75,7 @@ src/main/kotlin/com/dozycoffee/ims
 ## 도메인 모델과 영속성 엔티티
 
 - **도메인 모델**(`domain/model`)은 비즈니스 규칙과 불변식을 가진 순수 Kotlin 클래스이고 감사 필드(`createdAt` 등)를 모른다.
-- **영속성 엔티티**(`adapter/out/persistence`의 `XxxEntity`)는 `BaseEntity`(또는 `SoftDeletableEntity`)를 상속해 감사 컬럼을 자동으로 채운다. 비즈니스 로직을 두지 않는다.
+- **영속성 엔티티**(`adapter/out/persistence`의 `XxxEntity`)는 감사 기반 클래스를 상속해 감사 컬럼을 자동으로 채운다. 기반 클래스는 한 줄기다: `CreatedAuditEntity`(생성 정보만, 원장성 테이블) ← `BaseEntity`(+수정 정보) ← `SoftDeletableEntity`(+삭제 정보). 이 줄기에 맞지 않는 테이블(`outbox_event`는 `created_by`가 없다)은 기반 클래스 없이 `@CreatedDate` 필드를 직접 둔다. 비즈니스 로직을 두지 않는다.
 - 영속성 어댑터가 `XxxEntity.from(model)`과 `toDomain()`으로 둘을 변환한다. 갱신할 때는 기존 엔티티에서 생성 정보를 보존한다(`copyAuditFieldsFrom`).
 - 삭제 여부가 도메인 규칙에 필요하면 도메인 모델에 `deleted` 같은 필드를 명시한다. 삭제 시각·삭제자 같은 감사 정보는 영속성에만 둔다.
 - 응답에 생성·수정 시각이 필요하면 도메인 모델이 읽기 전용 값으로 명시해서 들고 있게 한다.
@@ -90,7 +90,7 @@ src/main/kotlin/com/dozycoffee/ims
 
 | 패키지 | 내용 |
 |--------|------|
-| `common` | `BaseEntity`(감사 컬럼), `SoftDeletableEntity` — 영속성 엔티티만 상속한다 |
+| `common` | `CreatedAuditEntity`, `BaseEntity`, `SoftDeletableEntity`(감사 컬럼 기반 클래스) — 영속성 엔티티만 상속한다 |
 | `config` | `Clock` 빈(Asia/Seoul), R2DBC Auditing 설정 |
 | `error` | `ErrorCode`, `BusinessException` 계층, `GlobalExceptionHandler`(Problem Details), `TraceIdWebFilter` |
 | `persistence` | `translatingDuplicateKey` (중복 키 위반 변환) |
@@ -110,7 +110,7 @@ src/main/kotlin/com/dozycoffee/ims
 | 테스트 | 검사 내용 |
 |--------|-----------|
 | `LayerDependencyTest` | 같은 도메인의 계층 간 import 방향, 다른 도메인은 `application/port/in`만 import, `global`은 도메인 import 금지, `domain`의 Spring·R2DBC·Reactor·jakarta·`global.error` 외 `global` import 금지, `application`·`adapter/in`의 웹·영속성 기술 import 금지 |
-| `NamingRuleTest` | 접미사(`UseCase`, `Command`, `Query`, `Result`, `Repository`, `R2dbcRepository`, `PersistenceAdapter`, `Entity`, `Service`, `Controller`, `Request`, `Response`, `ErrorCode`, `Exception`)별 종류·패키지, `Entity`의 `BaseEntity` 상속, `Controller`의 `@RestController`, 도메인 모델의 `data class`·변경 가능한(`var`) 감사 필드 금지(응답에 필요한 읽기 전용 `val`은 허용) |
+| `NamingRuleTest` | 접미사(`UseCase`, `Command`, `Query`, `Result`, `Repository`, `R2dbcRepository`, `PersistenceAdapter`, `Entity`, `Service`, `Controller`, `Request`, `Response`, `ErrorCode`, `Exception`)별 종류·패키지, `Entity`의 감사 기반 클래스(`CreatedAuditEntity`·`BaseEntity`·`SoftDeletableEntity`) 상속, `Controller`의 `@RestController`, 도메인 모델의 `data class`·변경 가능한(`var`) 감사 필드 금지(응답에 필요한 읽기 전용 `val`은 허용) |
 | `ConventionRuleTest` | `!!`, `@Autowired`, `now()` 직접 호출, `@Transactional` 위치, Reactor 타입 위치, 클래스 프로퍼티와 함수 반환 타입 명시([conventions.md](conventions.md)) |
 
 새 접미사나 패키지를 정할 때는 이 문서의 구조와 `NamingRuleTest`의 규칙표를 함께 고친다.

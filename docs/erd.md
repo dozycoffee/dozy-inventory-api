@@ -442,4 +442,4 @@ SELECT product_id, SUM(quantity - reserved_quantity) AS available
 
 - **결정**: `lot.lot_number`는 `utf8mb4_bin`으로 대소문자를 구분한다. `(product_id, lot_number)` 유니크도 이 비교를 따른다.
 - **이유**: IMS는 공급사 번호를 변형하지 않는다. 대소문자만 다른 서로 다른 Lot이 합쳐지면 유통기한이 섞이는 조용한 오류가 생긴다.
-- **감수하는 것**: 입력 실수(대소문자)가 다른 Lot으로 중복 등록될 수 있다. 눈에 보이는 오류라 수정할 수 있다.
+- **감수하는 것**: 입력 실수(대소문자)가 다른 Lot으로 중복 등록될 수 있다. 눈에 보이는 오류라 수정할 수 있다. `utf8mb4_bin`은 PAD SPACE 비교라 끝 공백만 다른 번호(`LOT-A`와 `LOT-A `)는 같은 Lot으로 취급한다(유니크 위반, 조회도 일치). 앞 공백이나 중간 공백은 구분한다.
