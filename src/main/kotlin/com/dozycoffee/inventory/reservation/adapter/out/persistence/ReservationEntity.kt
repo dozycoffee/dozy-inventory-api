@@ -29,7 +29,6 @@ class ReservationEntity(
     var idempotencyKey: String,
     var requesterService: String,
 ) : BaseEntity() {
-
     fun toDomain(items: List<ReservationItem>): Reservation =
         Reservation.reconstitute(
             reservationId = checkNotNull(reservationId) { "저장된 예약은 식별자가 있어야 한다" },
