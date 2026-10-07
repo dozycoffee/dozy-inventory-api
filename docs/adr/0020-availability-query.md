@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-08)
+Accepted (2026-10-08). 결정 7의 `V4` 인덱스는 [ADR-0021](0021-consolidate-migrations-before-deployment.md)에서 V2(인덱스 파일)로 합쳤다.
 
 ## 배경 (Context)
 
