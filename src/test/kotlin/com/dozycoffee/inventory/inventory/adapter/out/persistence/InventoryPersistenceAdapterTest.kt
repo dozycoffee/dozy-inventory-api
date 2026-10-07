@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.config.ClockConfig
 import com.dozycoffee.inventory.global.config.R2dbcConfig
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.global.security.LocalActorProvider
+import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
@@ -483,6 +484,164 @@ class InventoryPersistenceAdapterTest {
 
         @Test
         fun `출고 확정`() = runBlocking<Unit> { assertSame("ship", adapter::ship) { inventory, amount -> inventory.ship(amount) } }
+    }
+
+    @Nested
+    inner class `가용 재고 조회` {
+        private var otherProductId: Long = 0L
+        private var otherLotId: Long = 0L
+
+        @BeforeEach
+        fun seedOtherProduct() =
+            runBlocking<Unit> {
+                otherProductId = fixture.seedProduct("BEAN-002")
+                otherLotId = checkNotNull(fixture.seedLot(otherProductId, "LOT-B").lotId)
+            }
+
+        private suspend fun availability(
+            vararg products: Long,
+            warehouses: Set<Long>? = null,
+        ): List<AvailabilityRow> = adapter.findAvailability(products.toSet(), warehouses)
+
+        @Test
+        fun `정상 품질이고 보류가 아닌 행의 총 수량에서 예약을 뺀 값을 창고별로 합산한다`() =
+            runBlocking<Unit> {
+                row(quantity = 10, reserved = 3, warehouseId = 10L)
+                fixture.insertInventory(10L, productId, checkNotNull(fixture.seedLot(productId, "LOT-C").lotId), "NORMAL", 5, 0, false)
+                row(quantity = 7, reserved = 0, warehouseId = 20L)
+
+                val rows: List<AvailabilityRow> = availability(productId)
+
+                assertThat(rows).containsExactly(AvailabilityRow(10L, productId, 12L), AvailabilityRow(20L, productId, 7L))
+            }
+
+        @Test
+        fun `불량·폐기 예정과 보류 행은 가용에서 빼지만 재고 행이 있는 창고는 0으로 나온다`() =
+            runBlocking<Unit> {
+                row(quantity = 10, status = "DEFECTIVE", warehouseId = 10L)
+                row(quantity = 10, status = "DISPOSAL_SCHEDULED", warehouseId = 11L)
+                row(quantity = 10, hold = true, warehouseId = 12L)
+
+                val rows: List<AvailabilityRow> = availability(productId)
+
+                assertThat(rows).containsExactly(
+                    AvailabilityRow(10L, productId, 0L),
+                    AvailabilityRow(11L, productId, 0L),
+                    AvailabilityRow(12L, productId, 0L),
+                )
+            }
+
+        @Test
+        fun `같은 창고에서 정상 행과 불량 행이 섞여도 정상 행만 센다`() =
+            runBlocking<Unit> {
+                row(quantity = 10, reserved = 2, warehouseId = 10L)
+                row(quantity = 99, status = "DEFECTIVE", warehouseId = 10L)
+
+                assertThat(availability(productId)).containsExactly(AvailabilityRow(10L, productId, 8L))
+            }
+
+        @Test
+        fun `창고를 지정하면 그 창고만 센다`() =
+            runBlocking<Unit> {
+                row(quantity = 10, warehouseId = 10L)
+                row(quantity = 7, warehouseId = 20L)
+                row(quantity = 3, warehouseId = 30L)
+
+                val rows: List<AvailabilityRow> = availability(productId, warehouses = setOf(20L, 30L, 99L))
+
+                assertThat(rows).containsExactly(AvailabilityRow(20L, productId, 7L), AvailabilityRow(30L, productId, 3L))
+            }
+
+        @Test
+        fun `상품을 여러 개 지정하면 지정한 상품만 상품 ID와 창고 ID 순서로 센다`() =
+            runBlocking<Unit> {
+                row(quantity = 10, warehouseId = 20L)
+                row(quantity = 4, warehouseId = 10L)
+                fixture.insertInventory(10L, otherProductId, otherLotId, "NORMAL", 6, 1, false)
+                val third: Long = fixture.seedProduct("BEAN-003")
+                fixture.insertInventory(10L, third, checkNotNull(fixture.seedLot(third, "LOT-D").lotId), "NORMAL", 100, 0, false)
+
+                val rows: List<AvailabilityRow> = availability(productId, otherProductId)
+
+                assertThat(rows).containsExactly(
+                    AvailabilityRow(10L, productId, 4L),
+                    AvailabilityRow(20L, productId, 10L),
+                    AvailabilityRow(10L, otherProductId, 5L),
+                )
+            }
+
+        @Test
+        fun `재고 행이 없는 상품이나 빈 조건은 결과가 없다`() =
+            runBlocking<Unit> {
+                row(quantity = 10)
+
+                assertThat(availability(otherProductId)).isEmpty()
+                assertThat(adapter.findAvailability(emptySet(), null)).isEmpty()
+                assertThat(adapter.findAvailability(setOf(productId), emptySet())).isEmpty()
+            }
+
+        @Test
+        fun `수량 0인 행은 0으로 나온다`() =
+            runBlocking<Unit> {
+                row(quantity = 0, warehouseId = 10L)
+
+                assertThat(availability(productId)).containsExactly(AvailabilityRow(10L, productId, 0L))
+            }
+
+        @Test
+        fun `Int 범위를 넘는 합계도 정확하다`() =
+            runBlocking<Unit> {
+                row(quantity = Int.MAX_VALUE, warehouseId = 10L)
+                fixture.insertInventory(
+                    10L,
+                    productId,
+                    checkNotNull(fixture.seedLot(productId, "LOT-E").lotId),
+                    "NORMAL",
+                    Int.MAX_VALUE,
+                    0,
+                    false,
+                )
+
+                assertThat(availability(productId)).containsExactly(AvailabilityRow(10L, productId, Int.MAX_VALUE.toLong() * 2))
+            }
+
+        @Test
+        fun `SQL의 가용 계산이 도메인 모델의 할당 가능 규칙과 같다`() =
+            runBlocking<Unit> {
+                val mismatches: MutableList<String> = mutableListOf()
+                var warehouse = 2000L
+                listOf("NORMAL", "DEFECTIVE", "DISPOSAL_SCHEDULED").forEach { status: String ->
+                    listOf(false, true).forEach { hold: Boolean ->
+                        listOf(0 to 0, 5 to 0, 5 to 3, 5 to 5).forEach { (quantity: Int, reserved: Int) ->
+                            warehouse++
+                            val model: Inventory =
+                                Inventory.reconstitute(
+                                    1L,
+                                    warehouse,
+                                    productId,
+                                    lotId,
+                                    QualityStatus.valueOf(status),
+                                    quantity,
+                                    reserved,
+                                    hold,
+                                    if (hold) "x" else null,
+                                    if (hold) InventoryDbFixture.HELD_AT else null,
+                                )
+                            val expected: Long = if (model.isAllocatable) model.availableQuantity.toLong() else 0L
+                            row(quantity, reserved, status, hold, warehouseId = warehouse)
+
+                            val actual: Long = availability(productId, warehouses = setOf(warehouse)).single().availableQuantity
+                            if (actual !=
+                                expected
+                            ) {
+                                mismatches.add("$status hold=$hold qty=$quantity reserved=$reserved: SQL=$actual 모델=$expected")
+                            }
+                        }
+                    }
+                }
+
+                assertThat(mismatches).describedAs("SQL의 가용 계산과 도메인 모델이 달라지는 경우").isEmpty()
+            }
     }
 
     @Nested

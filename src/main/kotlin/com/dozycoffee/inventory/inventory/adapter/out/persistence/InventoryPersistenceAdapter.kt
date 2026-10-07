@@ -2,14 +2,17 @@ package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.error.DomainException
 import com.dozycoffee.inventory.global.security.CurrentActorProvider
+import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
+import kotlinx.coroutines.flow.toList
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.awaitRowsUpdated
+import org.springframework.r2dbc.core.flow
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDateTime
@@ -32,6 +35,25 @@ class InventoryPersistenceAdapter(
         inventoryR2dbcRepository
             .findByWarehouseIdAndLotIdAndQualityStatus(key.warehouseId, key.lotId, key.qualityStatus)
             ?.toDomain()
+
+    override suspend fun findAvailability(
+        productIds: Set<Long>,
+        warehouseIds: Set<Long>?,
+    ): List<AvailabilityRow> {
+        if (productIds.isEmpty() || warehouseIds?.isEmpty() == true) return emptyList()
+        val sql: String = if (warehouseIds == null) AVAILABILITY else AVAILABILITY_BY_WAREHOUSES
+        var spec: DatabaseClient.GenericExecuteSpec = databaseClient.sql(sql).bind("productIds", productIds.toList())
+        if (warehouseIds != null) spec = spec.bind("warehouseIds", warehouseIds.toList())
+        return spec
+            .map { row, _ ->
+                AvailabilityRow(
+                    warehouseId = checkNotNull(row.get("warehouse_id", Long::class.javaObjectType)),
+                    productId = checkNotNull(row.get("product_id", Long::class.javaObjectType)),
+                    availableQuantity = checkNotNull(row.get("available", Long::class.javaObjectType)),
+                )
+            }.flow()
+            .toList()
+    }
 
     override suspend fun increase(
         key: InventoryKey,
@@ -142,6 +164,27 @@ class InventoryPersistenceAdapter(
         bind("now", LocalDateTime.now(clock)).bind("actor", currentActorProvider.get().auditName)
 
     private companion object {
+        const val AVAILABILITY: String =
+            """
+            SELECT warehouse_id, product_id,
+                   CAST(SUM(CASE WHEN quality_status = 'NORMAL' AND allocation_hold = 0 THEN quantity - reserved_quantity ELSE 0 END) AS SIGNED) AS available
+              FROM inventory
+             WHERE product_id IN (:productIds)
+             GROUP BY warehouse_id, product_id
+             ORDER BY product_id, warehouse_id
+            """
+
+        const val AVAILABILITY_BY_WAREHOUSES: String =
+            """
+            SELECT warehouse_id, product_id,
+                   CAST(SUM(CASE WHEN quality_status = 'NORMAL' AND allocation_hold = 0 THEN quantity - reserved_quantity ELSE 0 END) AS SIGNED) AS available
+              FROM inventory
+             WHERE product_id IN (:productIds)
+               AND warehouse_id IN (:warehouseIds)
+             GROUP BY warehouse_id, product_id
+             ORDER BY product_id, warehouse_id
+            """
+
         const val INSERT_OR_INCREASE: String =
             """
             INSERT INTO inventory (warehouse_id, product_id, lot_id, quality_status, quantity, reserved_quantity, allocation_hold,
