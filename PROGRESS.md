@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0017), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
+- 설계 확정: 서비스 경계, 핵심 원칙, 시나리오 결정, 기술 결정(ADR-0001~0018), ERD(테이블 13개)가 확정됐다. 구현 기준 원본은 이 레포의 `docs/`이다.
 - 완료: F-001(골격), F-002(GitHub 저장소 설정), F-003(Flyway 마이그레이션 V1·V2), F-004(전역 공통 모듈), F-005(상품 마스터), F-006(Konsist 아키텍처 테스트), F-007(재고 모델), F-020(인증 연동), F-022(API 문서화).
 - 패키지 구조 확정(ADR-0010): 도메인 모델과 영속성 엔티티 분리(도메인은 감사 필드를 모름), 다른 도메인은 UseCase로만 호출, 도메인 패키지 6개, `/api/v1`. F-005(상품 마스터)는 사용자가 직접 구현한다.
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
@@ -36,6 +36,7 @@
 - F-006: Konsist 0.17.3으로 아키텍처 규칙을 테스트로 강제한다(ADR-0014). 레이어 의존 방향, 도메인 간 호출(다른 도메인은 `application/port/in`만), 이름·위치, 컨벤션(`!!`, `@Autowired`, `now()` 직접 호출, `@Transactional`·Reactor 위치, 프로퍼티·반환 타입 명시) 규칙을 `architecture` 패키지에 두었다. 규칙마다 일부러 위반 코드를 넣어 테스트가 실패하는 것을 확인했다.
 - F-007: 재고 도메인 계층을 구현했다(ADR-0015). `Lot`(상태 판정은 기준일·임박 일수를 인자로), `Inventory`(`increase`·`decrease`·`reserve`·`release`·`ship`·`hold`·`releaseHold`, 수량 불변식과 예약 불가 원인 판별), `InventoryHistory`(불변, 유형별 변동량 부호 규칙), `IdempotencyKey`, `InventoryKey`와 enum 4개, 예외·오류 코드. 무작위 연산으로 수량 불변식도 검증한다. Konsist 규칙은 도메인 모델의 읽기 전용 감사 값(`val createdAt`)을 허용하도록 조정했다. 영속성 어댑터는 별도 PR로 구현했다(ADR-0016): 출력 포트 3개(`LotRepository`, `InventoryRepository`, `InventoryHistoryRepository`), `INSERT ... ON DUPLICATE KEY UPDATE` 입고 upsert, 조건부 UPDATE(영향 행 0이면 도메인 모델로 원인 판별), 중복 멱등 키는 예외로 롤백, 감사 기반 클래스 한 줄기 상속(`CreatedAuditEntity` ← `BaseEntity` ← `SoftDeletableEntity`). 실제 MySQL로 SQL과 모델 규칙 일치, enum·CHECK 일치, 코루틴 50개 동시성 3개 시나리오를 검증한다. `utf8mb4_bin`은 PAD SPACE라 끝 공백만 다른 Lot 번호는 같은 Lot으로 취급된다(ERD-08에 기록).
 - F-008(진행 중): 입고 확정 반영의 application 계층을 구현했다(ADR-0017). `ConfirmInboundUseCase`/`InboundService`(상품 확인 → Lot 찾기·등록 → 재고 upsert → `INBOUND` 이력 → 이벤트, 한 트랜잭션), 멱등 재요청은 저장된 이력으로 처음 응답과 같은 결과를 반환, 같은 키에 다른 내용·Lot 날짜 불일치는 409, 같은 키·같은 Lot의 동시 50개 요청도 정확히 처리한다(실제 MySQL). 이벤트는 출력 포트와 로그 구현이다. 웹 어댑터(`POST /api/v1/inbound-receipts`, `inventory:service`만)와 API 문서화는 다음 PR이다.
+- 서비스 이름을 IMS에서 inventory로 바꿨다(ADR-0018): 패키지 루트 `com.dozycoffee.inventory`, 클래스 `Inventory*`, audience·role `inventory`·`inventory:service` 등, 설정 키 `inventory.*`, 오류 코드 접두사 `INV_`(WMS의 `INVENTORY_*`와 겹치지 않게), DB 컬럼 `ims_quantity`는 V3로 `inventory_quantity`. 문서의 "IMS"는 "inventory 서비스"로 바꿨고 채택한 ADR(0001~0017)의 본문과 머지된 커밋·PR·이슈 제목은 이력이라 그대로다. `dozy-auth`에는 `inventory` audience로 등록한다.
 
 ## 다음 세션에서 할 일
 
