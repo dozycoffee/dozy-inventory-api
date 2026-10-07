@@ -86,7 +86,16 @@ class InventoryDbFixture(
     }
 
     suspend fun cleanUp() {
-        listOf("inventory_history", "inventory", "lot", "product").forEach { table: String ->
+        listOf(
+            "reservation_event",
+            "reservation_allocation",
+            "reservation_item",
+            "reservation",
+            "inventory_history",
+            "inventory",
+            "lot",
+            "product",
+        ).forEach { table: String ->
             databaseClient
                 .sql("DELETE FROM $table")
                 .fetch()

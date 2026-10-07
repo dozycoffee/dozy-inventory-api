@@ -1,10 +1,11 @@
 package com.dozycoffee.inventory.inventory.domain.model
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -19,8 +20,9 @@ class InventoryHistoryModelTest {
         type: HistoryType = HistoryType.INBOUND,
         change: Int = 5,
         after: Int = 15,
-        requester: String? = "svc-wms",
-    ): InventoryHistory = InventoryHistory.create(1L, type, change, after, ReferenceType.INBOUND_ITEM, 77L, key, requester)
+        requester: String = "svc-wms",
+    ): InventoryHistory =
+        InventoryHistory.create(1L, type, change, after, ReferenceType.INBOUND_ITEM, 77L, key, RequesterService.of(requester))
 
     private fun assertError(
         code: InventoryErrorCode,
@@ -39,7 +41,7 @@ class InventoryHistoryModelTest {
         assertEquals(5, history.quantityChange)
         assertEquals(15, history.quantityAfter)
         assertEquals(key, history.idempotencyKey)
-        assertEquals("svc-wms", history.requesterService)
+        assertEquals("svc-wms", history.requesterService.value)
     }
 
     @Test
@@ -75,23 +77,47 @@ class InventoryHistoryModelTest {
     }
 
     @Test
-    fun `요청 서비스는 비어 있을 수 없고 50자를 넘을 수 없다`() {
-        listOf(null, "", "  ", "a".repeat(51)).forEach { requester: String? ->
-            assertError(InventoryErrorCode.INVALID_REQUESTER_SERVICE) { create(requester = requester) }
-        }
-        create(requester = "a".repeat(50))
-        create(requester = "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73")
-    }
-
-    @Test
     fun `복원한 이력은 생성 시각을 가지고 식별자로 동등성을 판단한다`() {
         val at: LocalDateTime = LocalDateTime.of(2026, 10, 7, 9, 0)
         val a: InventoryHistory =
-            InventoryHistory.reconstitute(1L, 1L, HistoryType.INBOUND, 5, 15, ReferenceType.INBOUND_ITEM, 77L, key, "svc-wms", at)
+            InventoryHistory.reconstitute(
+                1L,
+                1L,
+                HistoryType.INBOUND,
+                5,
+                15,
+                ReferenceType.INBOUND_ITEM,
+                77L,
+                key,
+                RequesterService.of("svc-wms"),
+                at,
+            )
         val b: InventoryHistory =
-            InventoryHistory.reconstitute(1L, 2L, HistoryType.RETURN, 1, 1, ReferenceType.RETURN_ITEM, 1L, key, "svc-oms", at)
+            InventoryHistory.reconstitute(
+                1L,
+                2L,
+                HistoryType.RETURN,
+                1,
+                1,
+                ReferenceType.RETURN_ITEM,
+                1L,
+                key,
+                RequesterService.of("svc-oms"),
+                at,
+            )
         val c: InventoryHistory =
-            InventoryHistory.reconstitute(2L, 1L, HistoryType.INBOUND, 5, 15, ReferenceType.INBOUND_ITEM, 77L, key, "svc-wms", at)
+            InventoryHistory.reconstitute(
+                2L,
+                1L,
+                HistoryType.INBOUND,
+                5,
+                15,
+                ReferenceType.INBOUND_ITEM,
+                77L,
+                key,
+                RequesterService.of("svc-wms"),
+                at,
+            )
 
         assertEquals(at, a.createdAt)
         assertEquals(a, b)

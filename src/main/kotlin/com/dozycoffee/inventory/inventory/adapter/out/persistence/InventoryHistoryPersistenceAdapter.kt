@@ -1,10 +1,10 @@
 package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.persistence.translatingDuplicateKey
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryHistoryRepository
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import kotlinx.coroutines.flow.toList
 import org.springframework.stereotype.Component
 

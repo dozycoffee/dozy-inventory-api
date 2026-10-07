@@ -67,17 +67,21 @@ class LayerDependencyTest {
     }
 
     @Test
-    fun `domain은 global error 외의 global과 기술 패키지를 import하지 않음`() {
+    fun `domain은 global error·domain 외의 global과 기술 패키지를 import하지 않음`() {
         val violations: List<String> =
             filesIn(Layer.DOMAIN).flatMap { file ->
                 file
                     .imports()
                     .filter { import ->
-                        import.startsWithAny(*DOMAIN_FORBIDDEN) || (isGlobal(import) && !import.startsWith("$GLOBAL.error."))
+                        import.startsWithAny(*DOMAIN_FORBIDDEN) ||
+                            (isGlobal(import) && !import.startsWith("$GLOBAL.error.") && !import.startsWith("$GLOBAL.domain."))
                     }.map { "${file.name} imports $it" }
             }
 
-        assertNoViolations("domain은 순수 Kotlin이다. Spring·R2DBC·Reactor·jakarta와 global.error 외 global을 import하지 않는다", violations)
+        assertNoViolations(
+            "domain은 순수 Kotlin이다. Spring·R2DBC·Reactor·jakarta와 global.error·global.domain 외 global을 import하지 않는다",
+            violations,
+        )
     }
 
     @Test

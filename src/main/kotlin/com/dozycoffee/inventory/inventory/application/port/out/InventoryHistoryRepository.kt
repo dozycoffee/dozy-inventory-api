@@ -1,7 +1,7 @@
 package com.dozycoffee.inventory.inventory.application.port.out
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 
 interface InventoryHistoryRepository {
     /**

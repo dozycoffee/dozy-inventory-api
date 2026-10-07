@@ -1,10 +1,11 @@
 package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.common.CreatedAuditEntity
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
@@ -34,7 +35,7 @@ class InventoryHistoryEntity(
             referenceType = referenceType,
             referenceId = referenceId,
             idempotencyKey = IdempotencyKey.of(idempotencyKey),
-            requesterService = requesterService,
+            requesterService = RequesterService.of(requesterService),
             createdAt = checkNotNull(createdAt) { "저장된 이력은 생성 시각이 있어야 한다" },
         )
 
@@ -49,7 +50,7 @@ class InventoryHistoryEntity(
                 referenceType = history.referenceType,
                 referenceId = history.referenceId,
                 idempotencyKey = history.idempotencyKey.value,
-                requesterService = history.requesterService,
+                requesterService = history.requesterService.value,
             )
     }
 }

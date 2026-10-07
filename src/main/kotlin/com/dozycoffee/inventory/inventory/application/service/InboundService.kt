@@ -1,5 +1,7 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.ConfirmInboundUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ConfirmInboundCommand
@@ -20,7 +22,6 @@ import com.dozycoffee.inventory.inventory.domain.exception.LotMismatchException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
 import com.dozycoffee.inventory.inventory.domain.model.Lot
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
 import com.dozycoffee.inventory.product.application.port.`in`.GetProductUseCase
 import org.springframework.beans.factory.annotation.Value
@@ -60,6 +61,7 @@ class InboundService(
 
     private fun validate(command: ConfirmInboundCommand) {
         Inventory.requireValidAmount(command.quantity)
+        RequesterService.of(command.requesterService)
         if (!command.qualityStatus.isInspectionResult) {
             throw InvalidDomainValueException(InventoryErrorCode.INVALID_INBOUND_QUALITY_STATUS)
         }
@@ -99,7 +101,7 @@ class InboundService(
                     referenceType = ReferenceType.INBOUND_ITEM,
                     referenceId = command.referenceId,
                     idempotencyKey = key,
-                    requesterService = command.requesterService,
+                    requesterService = RequesterService.of(command.requesterService),
                 ),
             )
         inventoryEventPublisher.publish(

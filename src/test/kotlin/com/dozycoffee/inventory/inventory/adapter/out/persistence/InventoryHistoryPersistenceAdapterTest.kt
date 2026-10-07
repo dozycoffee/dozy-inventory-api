@@ -2,12 +2,13 @@ package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.config.ClockConfig
 import com.dozycoffee.inventory.global.config.R2dbcConfig
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -69,7 +70,8 @@ class InventoryHistoryPersistenceAdapterTest {
         change: Int = 5,
         after: Int = 15,
         reference: ReferenceType = ReferenceType.INBOUND_ITEM,
-    ): InventoryHistory = InventoryHistory.create(inventoryId, type, change, after, reference, 77L, IdempotencyKey.of(key), "svc-wms")
+    ): InventoryHistory =
+        InventoryHistory.create(inventoryId, type, change, after, reference, 77L, IdempotencyKey.of(key), RequesterService.of("svc-wms"))
 
     @Nested
     inner class `저장과 조회` {
@@ -87,7 +89,7 @@ class InventoryHistoryPersistenceAdapterTest {
                 assertThat(found?.quantityAfter).isEqualTo(15)
                 assertThat(found?.referenceType).isEqualTo(ReferenceType.INBOUND_ITEM)
                 assertThat(found?.referenceId).isEqualTo(77L)
-                assertThat(found?.requesterService).isEqualTo("svc-wms")
+                assertThat(found?.requesterService?.value).isEqualTo("svc-wms")
             }
 
         @Test

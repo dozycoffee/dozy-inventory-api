@@ -1,10 +1,11 @@
 package com.dozycoffee.inventory.inventory.domain.model
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import java.time.LocalDateTime
 
 /**
@@ -20,7 +21,7 @@ class InventoryHistory private constructor(
     val referenceType: ReferenceType,
     val referenceId: Long,
     val idempotencyKey: IdempotencyKey,
-    val requesterService: String,
+    val requesterService: RequesterService,
     val createdAt: LocalDateTime?,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -32,8 +33,6 @@ class InventoryHistory private constructor(
     override fun hashCode(): Int = inventoryHistoryId?.hashCode() ?: System.identityHashCode(this)
 
     companion object {
-        private const val MAX_REQUESTER_LENGTH: Int = 50
-
         fun create(
             inventoryId: Long,
             historyType: HistoryType,
@@ -42,13 +41,10 @@ class InventoryHistory private constructor(
             referenceType: ReferenceType,
             referenceId: Long,
             idempotencyKey: IdempotencyKey,
-            requesterService: String?,
+            requesterService: RequesterService,
         ): InventoryHistory {
             if (!isValidChange(historyType, quantityChange)) throw InvalidDomainValueException(InventoryErrorCode.INVALID_HISTORY_CHANGE)
             if (quantityAfter < 0) throw InvalidDomainValueException(InventoryErrorCode.INVALID_HISTORY_AFTER)
-            if (requesterService.isNullOrBlank() || requesterService.length > MAX_REQUESTER_LENGTH) {
-                throw InvalidDomainValueException(InventoryErrorCode.INVALID_REQUESTER_SERVICE)
-            }
             return InventoryHistory(
                 null,
                 inventoryId,
@@ -72,7 +68,7 @@ class InventoryHistory private constructor(
             referenceType: ReferenceType,
             referenceId: Long,
             idempotencyKey: IdempotencyKey,
-            requesterService: String,
+            requesterService: RequesterService,
             createdAt: LocalDateTime,
         ): InventoryHistory =
             InventoryHistory(
