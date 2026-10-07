@@ -35,6 +35,12 @@ class Lot private constructor(
         return true
     }
 
+    /** 제조일자와 유통기한이 모두 같은지. 한쪽이 없는 것과 있는 것은 다르다 */
+    fun hasSameDates(
+        manufactureDate: LocalDate?,
+        expirationDate: LocalDate?,
+    ): Boolean = this.manufactureDate == manufactureDate && this.expirationDate == expirationDate
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Lot) return false
