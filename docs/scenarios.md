@@ -70,6 +70,17 @@ OMS·가맹점 서비스가 주문 가능 여부를 판단하도록 상품별 �
 - **호출 권한**: `inventory:service`와 `inventory:admin`이다(창고 관리자는 창고 접근 제어(F-021) 이후).
 - **API**: `GET /api/v1/inventories/availability?productIds=1,2,3&warehouseIds=10,20`. 목록은 쉼표로 구분하고(반복 파라미터도 받는다) 중복 ID는 합친다. 응답의 상품은 ID 오름차순, 창고는 ID 오름차순이다. 조건 위반은 400 `INV_INVALID_AVAILABILITY_QUERY`, 파라미터 누락·형식 오류는 400 `VALIDATION_FAILED`이다.
 
+### 예약 생성 (5.1)
+
+OMS·가맹점 서비스가 주문의 상품을 한 창고에서 예약한다. 결정 배경은 [ADR-0022](adr/0022-reservation-and-allocation.md)이다.
+
+- **요청 단위**: 주문 하나 = 요청 하나. 호출 서비스가 확정한 창고(`warehouseId`) 하나와 채널, 주문 ID, 만료 시각, 상품별 수량(1~100개, 중복 불가)을 담는다. 후보 창고 목록은 받지 않는다.
+- **할당**: 유통기한이 이른 Lot부터 잡는다(유통기한 없는 Lot은 마지막, 지난 Lot 제외). 하나라도 모자라면 전체 실패(`INV_INSUFFICIENT_AVAILABLE_QUANTITY`, 409)이다.
+- **만료**: 요청이 만료 시각을 정하고 채널 상한(설정 `inventory.reservation.max-ttl`)을 넘을 수 없다(`INV_INVALID_RESERVATION_EXPIRY`, 400).
+- **거부**: 같은 채널의 같은 주문에 살아 있는 예약이 있으면 `INV_DUPLICATE_ORDER_RESERVATION`, 비활성 상품은 `INV_PRODUCT_NOT_RESERVABLE`(둘 다 409), 없는 상품은 404이다.
+- **멱등**: 같은 멱등 키의 재요청은 새로 잡지 않고 저장된 예약의 현재 상태를 반환한다. 같은 키에 다른 내용이면 `INV_IDEMPOTENCY_KEY_CONFLICT`(409)이다.
+- **API**: `POST /api/v1/reservations`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `channel`, `externalOrderId`, `expiresAt`(시간대 오프셋을 포함한 ISO-8601, 예: `2026-10-07T21:30:00+09:00`), `items[{productId, quantity}]`이다. 처음과 재요청 모두 200이고 응답은 예약 ID, 상태, 만료 시각, 항목별 할당(재고 행 ID, 수량)이다.
+
 ### 상태 흐름
 
 - 예약: `RESERVED` → `CONFIRMED` → `FULFILLED`, `RESERVED` → `RELEASED`/`EXPIRED`, `CONFIRMED` → `RELEASED`(WMS 취소 확정 후)
