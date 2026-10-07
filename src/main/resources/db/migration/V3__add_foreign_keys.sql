@@ -1,3 +1,5 @@
+-- 외래키. 외래키를 뒷받침하는 인덱스는 V2에서 먼저 만든다
+
 ALTER TABLE lot
     ADD CONSTRAINT fk_lot_product
         FOREIGN KEY (product_id) REFERENCES product (product_id);

@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-05). PR 머지 방식과 선형 이력 규칙은 [ADR-0012](0012-merge-commit-strategy.md)로 대체했다.
+Accepted (2026-10-05). 마이그레이션 수정 규칙("적용된 파일은 수정하지 않는다")은 배포 전까지 [ADR-0021](0021-consolidate-migrations-before-deployment.md)로 완화했다.. PR 머지 방식과 선형 이력 규칙은 [ADR-0012](0012-merge-commit-strategy.md)로 대체했다.
 
 ## 배경 (Context)
 

@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-07)
+Accepted (2026-10-07). 결정 4의 `V3` 컬럼 이름 변경은 [ADR-0021](0021-consolidate-migrations-before-deployment.md)에서 V1의 컬럼 정의로 합쳤다.
 
 ## 배경 (Context)
 

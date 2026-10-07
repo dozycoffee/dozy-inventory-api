@@ -1,7 +1,7 @@
 # ERD
 
 inventory 서비스 데이터 모델이다. 공통 규칙과 컬럼 표기는 WMS(`dozy-wms-api`)의 DDL을 따른다.
-DDL 원본은 `src/main/resources/db/migration`이다(`V1__create_schema.sql`은 테이블·유니크·CHECK·인덱스, `V2__add_foreign_keys.sql`은 외래키). 이 문서는 설명과 설계 결정을 맡는다.
+DDL 원본은 `src/main/resources/db/migration`이다(`V1__create_schema.sql`은 테이블·유니크·CHECK, `V2__add_indexes.sql`은 인덱스, `V3__add_foreign_keys.sql`은 외래키). 이 문서는 설명과 설계 결정을 맡는다.
 
 ## 1. 설계 규칙
 
@@ -16,7 +16,7 @@ DDL 원본은 `src/main/resources/db/migration`이다(`V1__create_schema.sql`은
 | 설정값 | 예약 TTL 상한(채널별), 조정 승인 임계치는 테이블이 아니라 애플리케이션 설정으로 둔다. |
 | 수량 검증 | 수량 불변식은 도메인 모델이 지키고 DB `CHECK`가 마지막 안전망이다. |
 | DB | MySQL 8.0, 스키마 `dozy_inventory` |
-| 마이그레이션 | 적용된 파일은 수정하지 않고 새 버전 파일을 추가한다. 테이블은 V1, 외래키는 V2에 둔다. |
+| 마이그레이션 | 서비스를 처음 배포하기 전까지는 파일을 합치거나 고칠 수 있고, 첫 배포 이후에는 적용된 파일을 수정하지 않고 새 버전 파일을 추가한다([ADR-0021](adr/0021-consolidate-migrations-before-deployment.md)). 테이블은 V1, 인덱스는 V2, 외래키는 V3에 둔다. |
 
 ## 2. ERD 다이어그램
 
