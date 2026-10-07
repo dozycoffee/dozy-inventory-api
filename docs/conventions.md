@@ -60,7 +60,7 @@ WMS(`dozy-wms-api`)의 Kotlin 컨벤션을 이어받는다. 전체 코드베이�
 
 - 비즈니스 오류는 `BusinessException` 계층(`DomainException`, `ApplicationException`)으로 던진다. 응답 변환은 `GlobalExceptionHandler`가 맡고 Controller에서 오류 응답을 직접 만들지 않는다.
 - 필드 값의 단순 검증(null, 빈 값, 범위)은 `ErrorCode`만 등록하고 `InvalidDomainValueException`으로 던진다. 호출부나 테스트가 타입으로 구분할 규칙 위반(상태 전이, 수량 부족, NotFound, Duplicate 등)은 전용 예외 클래스를 만든다.
-- `ErrorCode.code`는 범용 코드는 `dozy-auth` 에러 코드 표의 이름을, 도메인 코드는 `IMS_` 접두사를 붙인다(`IMS_PRODUCT_NOT_FOUND`). 새 코드를 추가할 때 다른 서비스와 겹치지 않는지 확인한다.
+- `ErrorCode.code`는 범용 코드는 `dozy-auth` 에러 코드 표의 이름을, 도메인 코드는 `INV_` 접두사를 붙인다(`INV_PRODUCT_NOT_FOUND`). 새 코드를 추가할 때 다른 서비스와 겹치지 않는지 확인한다.
 - 500 응답에는 내부 정보(스택, SQL, 클래스명)를 싣지 않는다.
 - 유니크 제약이 있는 저장은 `translatingDuplicateKey`로 감싸 중복 키 위반(MySQL 1062)만 도메인 예외로 바꾼다. FK·CHECK 위반은 그대로 둔다. 멱등 키 중복은 오류가 아니라 이전 결과를 반환하는 흐름이다.
 

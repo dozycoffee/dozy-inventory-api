@@ -35,7 +35,7 @@ object ApiDoc {
                 fieldWithPath("status").type(JsonFieldType.NUMBER).description("HTTP 상태 코드"),
                 fieldWithPath("detail").type(JsonFieldType.STRING).description("오류 설명"),
                 fieldWithPath("instance").type(JsonFieldType.STRING).description("요청 경로"),
-                fieldWithPath("code").type(JsonFieldType.STRING).description("오류 코드(예: VALIDATION_FAILED, IMS_PRODUCT_NOT_FOUND)"),
+                fieldWithPath("code").type(JsonFieldType.STRING).description("오류 코드(예: VALIDATION_FAILED, INV_PRODUCT_NOT_FOUND)"),
                 fieldWithPath("traceId").type(JsonFieldType.STRING).description("추적 ID. 응답 헤더 X-Trace-Id와 같다"),
                 if (withErrors) {
                     subsectionWithPath("errors").type(JsonFieldType.ARRAY).description("필드별 검증 오류(field, code, message)")

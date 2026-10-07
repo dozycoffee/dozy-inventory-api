@@ -23,7 +23,7 @@
   {
     "id": "F-004",
     "name": "전역 공통 모듈",
-    "description": "global 패키지: BaseEntity와 감사(Clock, Actor, ActorContext), 오류 타입·IMS_ 코드·오류 응답(dozy-auth Problem Details, X-Trace-Id), 중복 키 위반 변환. 결정은 ADR-0009. Spring Security와 401/403 처리는 F-020에서 추가한다.",
+    "description": "global 패키지: BaseEntity와 감사(Clock, Actor, ActorContext), 오류 타입·INV_ 코드·오류 응답(dozy-auth Problem Details, X-Trace-Id), 중복 키 위반 변환. 결정은 ADR-0009. Spring Security와 401/403 처리는 F-020에서 추가한다.",
     "status": "completed",
     "dependencies": ["F-003"]
   },

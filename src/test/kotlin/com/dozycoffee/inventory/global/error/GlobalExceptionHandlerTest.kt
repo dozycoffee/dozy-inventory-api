@@ -29,9 +29,9 @@ class GlobalExceptionHandlerTest {
             .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
             .expectBody()
             .jsonPath("$.type")
-            .isEqualTo("https://docs.dozycoffee.com/errors/ims-sample-not-found")
+            .isEqualTo("https://docs.dozycoffee.com/errors/inv-sample-not-found")
             .jsonPath("$.title")
-            .isEqualTo("Ims sample not found")
+            .isEqualTo("Inv sample not found")
             .jsonPath("$.status")
             .isEqualTo(404)
             .jsonPath("$.detail")
@@ -39,7 +39,7 @@ class GlobalExceptionHandlerTest {
             .jsonPath("$.instance")
             .isEqualTo("/test/errors/not-found")
             .jsonPath("$.code")
-            .isEqualTo("IMS_SAMPLE_NOT_FOUND")
+            .isEqualTo("INV_SAMPLE_NOT_FOUND")
     }
 
     @Test

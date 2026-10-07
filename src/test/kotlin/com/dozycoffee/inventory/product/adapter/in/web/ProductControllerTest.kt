@@ -139,7 +139,7 @@ class ProductControllerTest {
     }
 
     @Test
-    fun `이미 있는 상품 코드는 409 IMS_DUPLICATE_PRODUCT_CODE`() =
+    fun `이미 있는 상품 코드는 409 INV_DUPLICATE_PRODUCT_CODE`() =
         runBlocking<Unit> {
             whenever(registerProductUseCase.register(any())).thenThrow(DuplicateProductCodeException())
 
@@ -148,7 +148,7 @@ class ProductControllerTest {
                 .isEqualTo(409)
                 .expectBody()
                 .jsonPath("$.code")
-                .isEqualTo("IMS_DUPLICATE_PRODUCT_CODE")
+                .isEqualTo("INV_DUPLICATE_PRODUCT_CODE")
                 .consumeWith(ProductApiDocs.registerDuplicate())
         }
 
@@ -220,7 +220,7 @@ class ProductControllerTest {
         }
 
     @Test
-    fun `없는 상품은 404 IMS_PRODUCT_NOT_FOUND`() =
+    fun `없는 상품은 404 INV_PRODUCT_NOT_FOUND`() =
         runBlocking<Unit> {
             whenever(getProductUseCase.getById(9L)).thenThrow(ProductNotFoundException())
 
@@ -233,7 +233,7 @@ class ProductControllerTest {
                 .isNotFound
                 .expectBody()
                 .jsonPath("$.code")
-                .isEqualTo("IMS_PRODUCT_NOT_FOUND")
+                .isEqualTo("INV_PRODUCT_NOT_FOUND")
                 .consumeWith(ProductApiDocs.getNotFound())
         }
 
@@ -279,6 +279,6 @@ class ProductControllerTest {
             .isBadRequest
             .expectBody()
             .jsonPath("$.code")
-            .isEqualTo("IMS_INVALID_PAGE_REQUEST")
+            .isEqualTo("INV_INVALID_PAGE_REQUEST")
     }
 }

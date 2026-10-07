@@ -20,7 +20,7 @@ internal enum class DuplicateErrorCode(
     override val code: String,
     override val message: String,
 ) : ErrorCode {
-    DUPLICATED(ErrorType.CONFLICT, "IMS_SAMPLE_DUPLICATED", "이미 존재합니다."),
+    DUPLICATED(ErrorType.CONFLICT, "INV_SAMPLE_DUPLICATED", "이미 존재합니다."),
 }
 
 internal class DuplicatedException : DomainException(DuplicateErrorCode.DUPLICATED)

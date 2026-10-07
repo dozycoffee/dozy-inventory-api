@@ -14,9 +14,9 @@ enum class SampleErrorCode(
     override val code: String,
     override val message: String,
 ) : ErrorCode {
-    NOT_FOUND(ErrorType.NOT_FOUND, "IMS_SAMPLE_NOT_FOUND", "샘플을 찾을 수 없습니다."),
-    CONFLICT(ErrorType.CONFLICT, "IMS_SAMPLE_CONFLICT", "샘플이 충돌합니다."),
-    FORBIDDEN(ErrorType.FORBIDDEN, "IMS_SAMPLE_FORBIDDEN", "샘플에 접근할 수 없습니다."),
+    NOT_FOUND(ErrorType.NOT_FOUND, "INV_SAMPLE_NOT_FOUND", "샘플을 찾을 수 없습니다."),
+    CONFLICT(ErrorType.CONFLICT, "INV_SAMPLE_CONFLICT", "샘플이 충돌합니다."),
+    FORBIDDEN(ErrorType.FORBIDDEN, "INV_SAMPLE_FORBIDDEN", "샘플에 접근할 수 없습니다."),
 }
 
 class SampleException(

@@ -21,7 +21,7 @@
 
 ### 2026-10-06
 
-- F-004: `global` 모듈(오류 응답, `Clock`, 감사, `Actor`, 중복 키 변환)을 구현했다. 결정은 ADR-0009: `Clock` 주입, `IMS_` 오류 코드 접두사, `local` 프로필 전용 `Actor`(그 외 프로필은 기동 실패), Spring Data Auditing.
+- F-004: `global` 모듈(오류 응답, `Clock`, 감사, `Actor`, 중복 키 변환)을 구현했다. 결정은 ADR-0009: `Clock` 주입, `INV_` 오류 코드 접두사, `local` 프로필 전용 `Actor`(그 외 프로필은 기동 실패), Spring Data Auditing.
 - `Actor`를 Reactor Context로 전달하는 `ActorContext`를 추가했다. 스케줄러는 `ActorContext.with(SystemActor)`로 감싸 실행한다.
 - 테스트 28개를 추가했다(오류 응답 12, 감사 5, `Actor` 6, 중복 키 3, 프로필 가드 2). 시각·`Actor` 처리를 일부러 고장 내 테스트가 실패하는 것을 확인했다.
 - 패키지 구조를 확정하고(ADR-0010) `docs/architecture.md`를 갱신했다. WMS와 달라진 점은 도메인 모델이 `BaseEntity`를 상속하지 않는 것이다.
