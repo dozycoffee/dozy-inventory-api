@@ -233,7 +233,7 @@ erDiagram
 |------|------|------|------|
 | reservation_id | BIGINT PK | N | |
 | warehouse_id | BIGINT | N | 외부(WMS) 창고 ID |
-| channel | VARCHAR(50) | N | 🔶 미정. 호출 채널을 식별하는 값이며 채널 종류와 값이 확정되기 전이라 `CHECK` 제약 없이 둔다(`OMS`, `STORE`는 가정). 채널별 TTL 상한 적용 기준 |
+| channel | VARCHAR(50) | N | 호출 채널을 식별하는 자유 문자열. 값을 확정하지 않으므로 `CHECK` 제약 없이 둔다(ADR-0022). 채널별 TTL 상한 적용 기준이며 설정에 없는 채널은 `default` 상한을 쓴다 |
 | external_order_id | VARCHAR(100) | N | 호출 채널의 주문 ID |
 | status | VARCHAR(50) | N | `RESERVED`, `CONFIRMED`, `RELEASED`, `EXPIRED`, `FULFILLED` |
 | expires_at | DATETIME(6) | Y | 확정 전 만료 시각. 확정 후에는 NULL |
