@@ -66,6 +66,7 @@ docker compose up -d                    # 로컬 MySQL (호스트 포트 3307)
 - 예약은 DB 원자적 조건부 갱신으로 처리한다(읽고-계산하고-쓰기 금지). 여러 행은 `inventory_id` 오름차순으로 갱신한다.
 - 다른 서비스의 데이터는 ID로만 참조한다. 다른 서비스 DB를 읽거나 JOIN하지 않는다.
 - `domain` 패키지는 Spring·R2DBC를 import하지 않는다. 다른 도메인은 그 도메인의 `application/port/in`(UseCase)로만 호출한다.
+- 아키텍처 규칙(레이어 의존, 도메인 간 호출, 이름·위치, 컨벤션)은 `architecture` 패키지의 Konsist 테스트가 검사한다. 새 접미사·패키지를 정하면 `NamingRuleTest`도 고친다(`docs/architecture.md`).
 - 문서의 `🔶` 표시는 미확정 항목이다. 임의로 정하지 말고 사용자에게 묻는다.
 
 ## 작업 흐름

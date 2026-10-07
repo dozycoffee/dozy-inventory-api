@@ -39,6 +39,7 @@ repositories {
 
 val dozyAuthVersion: String = "0.2.1"
 val restdocsApiSpecVersion: String = "0.20.1"
+val konsistVersion: String = "0.17.3"
 
 configurations.testImplementation {
     // restdocs-api-spec이 끌어오는 servlet(Spring MVC, Tomcat) 스택이 있으면 테스트 컨텍스트가 reactive가 아니게 된다
@@ -65,6 +66,7 @@ dependencies {
     testImplementation("org.springframework.restdocs:spring-restdocs-webtestclient")
     testImplementation("com.epages:restdocs-api-spec:$restdocsApiSpecVersion")
     testImplementation("com.epages:restdocs-api-spec-webtestclient:$restdocsApiSpecVersion")
+    testImplementation("com.lemonappdev:konsist:$konsistVersion")
     testImplementation("org.testcontainers:testcontainers-mysql")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

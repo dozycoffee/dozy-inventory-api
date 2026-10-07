@@ -12,6 +12,7 @@
 | `*ServiceTest` | `@ExtendWith(MockitoExtension::class)` | 없음 | Mock Repository로 서비스 로직 검증 |
 | `*ControllerTest` | `@WebFluxTest` | 슬라이스 | API 계약 (`WebTestClient`) |
 | `*PersistenceAdapterTest` | `@DataR2dbcTest` | 슬라이스 | Testcontainers MySQL로 실제 쿼리와 `XxxEntity` ↔ 도메인 모델 변환 검증 |
+| `architecture` 패키지(`*RuleTest` 등) | 없음 | 없음 | 레이어·이름·컨벤션 규칙(Konsist, [architecture.md](architecture.md)) |
 
 - 예약 동시성(조건부 UPDATE)과 멱등(유니크 제약)처럼 DB가 보장하는 규칙은 `*PersistenceAdapterTest`나 통합 테스트에서 **실제 MySQL로** 검증한다. Mock으로는 검증할 수 없다.
 - 동시 요청 시나리오(같은 재고 행에 여러 예약, 같은 멱등 키 동시 요청)는 코루틴으로 병렬 실행해 한쪽만 성공하는지 확인한다.
