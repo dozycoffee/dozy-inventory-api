@@ -6,6 +6,11 @@ import org.junit.jupiter.api.Test
 
 /** 이름 접미사와 패키지 위치 규칙 (docs/architecture.md "이름 규칙", ADR-0010). 도메인 패키지 안의 선언만 검사한다 */
 class NamingRuleTest {
+    private companion object {
+        /** 영속성 엔티티의 감사 컬럼 기반 클래스. 생성만 → +수정 → +삭제 순으로 한 줄기로 상속한다 */
+        val AUDIT_BASES: Array<String> = arrayOf("CreatedAuditEntity", "BaseEntity", "SoftDeletableEntity")
+    }
+
     /** 도메인 패키지 안의 클래스·인터페이스·enum·object. (이름, 도메인 패키지 이름, 종류) */
     private data class Declaration(
         val name: String,
@@ -107,7 +112,7 @@ class NamingRuleTest {
     }
 
     @Test
-    fun `PersistenceAdapter는 출력 포트를 구현하고 Entity는 BaseEntity를 상속하며 Controller는 RestController`() {
+    fun `PersistenceAdapter는 출력 포트를 구현하고 Entity는 감사 기반 클래스를 상속하며 Controller는 RestController`() {
         val violations: List<String> =
             declarations
                 .filter { it.kind == Kind.CLASS }
@@ -120,8 +125,8 @@ class NamingRuleTest {
                             "${d.name}은(는) application/port/out의 포트를 구현해야 한다"
                         }
 
-                        d.name.endsWith("Entity") && !c.hasParentWithName("BaseEntity", "SoftDeletableEntity") -> {
-                            "${d.name}은(는) BaseEntity(또는 SoftDeletableEntity)를 상속해야 한다"
+                        d.name.endsWith("Entity") && !c.hasParentWithName(AUDIT_BASES.toList()) -> {
+                            "${d.name}은(는) 감사 기반 클래스(CreatedAuditEntity, BaseEntity, SoftDeletableEntity)를 상속해야 한다"
                         }
 
                         d.name.endsWith("Controller") && !c.hasAnnotationWithName("RestController") -> {
@@ -151,7 +156,7 @@ class NamingRuleTest {
             models.flatMap { c ->
                 buildList {
                     if (c.hasDataModifier) add("${c.name}은(는) data class이다. copy()가 create()의 검증을 우회한다")
-                    if (c.hasParentWithName("BaseEntity", "SoftDeletableEntity")) add("${c.name}은(는) BaseEntity를 상속한다. 도메인 모델은 감사 필드를 모른다")
+                    if (c.hasParentWithName(AUDIT_BASES.toList())) add("${c.name}은(는) 감사 기반 클래스를 상속한다. 도메인 모델은 감사 필드를 모른다")
                     c
                         .properties()
                         .filter {
