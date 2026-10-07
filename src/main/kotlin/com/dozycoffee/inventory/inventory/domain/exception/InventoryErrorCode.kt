@@ -36,6 +36,16 @@ enum class InventoryErrorCode(
     ),
     LOT_MISMATCH(ErrorType.CONFLICT, "INV_LOT_MISMATCH", "이미 등록된 Lot과 제조일자 또는 유통기한이 다릅니다."),
     IDEMPOTENCY_KEY_CONFLICT(ErrorType.CONFLICT, "INV_IDEMPOTENCY_KEY_CONFLICT", "이미 처리한 멱등 키가 다른 내용으로 다시 요청되었습니다."),
+    ALLOCATION_CONFLICT(
+        ErrorType.CONFLICT,
+        "INV_ALLOCATION_CONFLICT",
+        "다른 요청이 같은 재고를 동시에 예약해 할당하지 못했습니다. 다시 시도해 주세요.",
+    ),
+    INVALID_ALLOCATION_REQUEST(
+        ErrorType.VALIDATION,
+        "INV_INVALID_ALLOCATION_REQUEST",
+        "창고 ID는 양수이고 상품은 1개 이상 100개 이하이며 상품 ID는 양수이고 중복이 없어야 하며 수량은 1 이상이어야 합니다.",
+    ),
     INVALID_AVAILABILITY_QUERY(
         ErrorType.VALIDATION,
         "INV_INVALID_AVAILABILITY_QUERY",
