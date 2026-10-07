@@ -19,7 +19,7 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 | Language | Kotlin 2.3 (JVM 21) |
 | Framework | Spring Boot 4.1 (WebFlux), Kotlin Coroutines |
 | DB | MySQL 8.0, Spring Data R2DBC, Flyway (스키마 `dozy_inventory`) |
-| Architecture | 헥사고날 (패키지 루트 `com.dozycoffee.ims`) |
+| Architecture | 헥사고날 (패키지 루트 `com.dozycoffee.inventory`) |
 | Messaging | Kafka + Outbox (구현 예정) |
 | Auth | `dozy-auth` 스타터 0.2.1 (WebFlux, `auth-test`) |
 | Build / Lint / Test | Gradle (Kotlin DSL), Spotless(ktlint), JUnit + Testcontainers(MySQL) |
@@ -30,7 +30,7 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 ```bash
 ./scripts/verify.sh                     # 서식 검사 + 빌드 + 테스트. 작업 완료 전 반드시 통과해야 한다 (Docker, GPR_USER·GPR_TOKEN 필요)
 ./gradlew test                          # 전체 테스트
-./gradlew test --tests "com.dozycoffee.ims.SomeTest"   # 특정 테스트
+./gradlew test --tests "com.dozycoffee.inventory.SomeTest"   # 특정 테스트
 ./gradlew spotlessApply                 # 서식 자동 정렬
 ./gradlew openapi3                      # 컨트롤러 테스트로 API 명세 생성 (build/api-spec/openapi3.yaml)
 

@@ -4,10 +4,10 @@ WMS(`dozy-wms-api`)의 헥사고날(Ports & Adapters) 구조를 따른다. 결�
 
 ## 패키지 구조
 
-패키지 루트는 `com.dozycoffee.ims`이다. 최상위는 `global`(공통 모듈)과 업무 도메인 패키지로 나눈다.
+패키지 루트는 `com.dozycoffee.inventory`이다. 최상위는 `global`(공통 모듈)과 업무 도메인 패키지로 나눈다.
 
 ```
-src/main/kotlin/com/dozycoffee/ims
+src/main/kotlin/com/dozycoffee/inventory
 ├── global                       // 전역 설정·공통 모듈 (아래 "global 패키지")
 ├── product                      // 상품 마스터
 ├── inventory                    // 재고(Inventory), Lot, 재고 이력(InventoryHistory)
@@ -94,7 +94,7 @@ src/main/kotlin/com/dozycoffee/ims
 | `config` | `Clock` 빈(Asia/Seoul), R2DBC Auditing 설정 |
 | `error` | `ErrorCode`, `BusinessException` 계층, `GlobalExceptionHandler`(Problem Details), `TraceIdWebFilter` |
 | `persistence` | `translatingDuplicateKey` (중복 키 위반 변환) |
-| `security` | `Actor`, `CurrentActorProvider`, `ActorContext`, `SecurityConfig`(보안 체인), `SecurityContextActorProvider`(토큰 기반, `local` 외), `LocalActorProvider`(`local` 전용), `ImsRole`·`ImsAuthorize`(role과 `@PreAuthorize` 식) |
+| `security` | `Actor`, `CurrentActorProvider`, `ActorContext`, `SecurityConfig`(보안 체인), `SecurityContextActorProvider`(토큰 기반, `local` 외), `LocalActorProvider`(`local` 전용), `InventoryRole`·`InventoryAuthorize`(role과 `@PreAuthorize` 식) |
 
 결정 배경은 [ADR-0009](adr/0009-global-module-decisions.md)에 있다.
 
@@ -105,7 +105,7 @@ src/main/kotlin/com/dozycoffee/ims
 
 ## 아키텍처 테스트
 
-위 규칙은 Konsist로 검사하고 위반하면 빌드(`./gradlew test`)가 실패한다. 테스트는 `src/test/kotlin/com/dozycoffee/ims/architecture`에 있고 production 소스만 검사한다. 결정 배경은 [ADR-0014](adr/0014-konsist-architecture-tests.md)이다.
+위 규칙은 Konsist로 검사하고 위반하면 빌드(`./gradlew test`)가 실패한다. 테스트는 `src/test/kotlin/com/dozycoffee/inventory/architecture`에 있고 production 소스만 검사한다. 결정 배경은 [ADR-0014](adr/0014-konsist-architecture-tests.md)이다.
 
 | 테스트 | 검사 내용 |
 |--------|-----------|

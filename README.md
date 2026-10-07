@@ -67,10 +67,10 @@ IMS는 재고의 단일 진실 공급원(SSOT)으로, "무엇이 몇 개 있고,
 ├── feature_list.json / PROGRESS.md      // 작업 목록과 진행 기록
 └── src
     ├── main
-    │   ├── kotlin/com/dozycoffee/ims    // 애플리케이션 (도메인별 헥사고날 구조는 docs/architecture.md)
+    │   ├── kotlin/com/dozycoffee/inventory    // 애플리케이션 (도메인별 헥사고날 구조는 docs/architecture.md)
     │   └── resources                    // application.yaml, db/migration (Flyway)
     └── test
-        └── kotlin/com/dozycoffee/ims    // 테스트 (support: Testcontainers 초기화)
+        └── kotlin/com/dozycoffee/inventory    // 테스트 (support: Testcontainers 초기화)
 ```
 
 <br>

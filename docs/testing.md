@@ -18,7 +18,7 @@
 - 동시 요청 시나리오(같은 재고 행에 여러 예약, 같은 멱등 키 동시 요청)는 코루틴으로 병렬 실행해 한쪽만 성공하는지 확인한다.
 - 스키마 제약(수량 CHECK, 유니크, 복합 FK 등)은 `SchemaConstraintTest`가 실제 MySQL에서 위반이 거부되는지 검증한다. 마이그레이션에 제약을 추가·변경하면 이 테스트도 함께 고친다.
 
-- 전체 컨텍스트를 올리는 테스트는 `@ImsIntegrationTest`를 쓴다. 인증을 거치지 않도록 이 어노테이션이 `local` 프로필(고정 개발 사용자)을 켠다. 보안 체인(401·403·role)은 `@WebFluxTest`와 `auth-test`의 `DozyTestTokens`로 별도 검증한다.
+- 전체 컨텍스트를 올리는 테스트는 `@InventoryIntegrationTest`를 쓴다. 인증을 거치지 않도록 이 어노테이션이 `local` 프로필(고정 개발 사용자)을 켠다. 보안 체인(401·403·role)은 `@WebFluxTest`와 `auth-test`의 `DozyTestTokens`로 별도 검증한다.
 - 오류 응답 형식은 `@WebFluxTest`와 테스트 전용 Controller로 검증한다. 감사 컬럼은 테스트 전용 Entity로 실제 MySQL에서 검증하고, 시간은 `MutableClock`으로 조작한다.
 
 ## 테스트 DB
