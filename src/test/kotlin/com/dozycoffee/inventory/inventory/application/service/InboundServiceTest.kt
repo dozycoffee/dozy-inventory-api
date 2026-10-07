@@ -1,5 +1,9 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.RequesterService
+import com.dozycoffee.inventory.global.error.CommonErrorCode
+import com.dozycoffee.inventory.global.error.ErrorCode
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ConfirmInboundCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InboundResult
@@ -21,7 +25,6 @@ import com.dozycoffee.inventory.inventory.domain.exception.LotMismatchException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.model.InventoryHistory
 import com.dozycoffee.inventory.inventory.domain.model.Lot
-import com.dozycoffee.inventory.inventory.domain.valueobject.IdempotencyKey
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
 import com.dozycoffee.inventory.inventory.fixture.DirectTransactionalOperator
 import com.dozycoffee.inventory.product.application.port.`in`.GetProductUseCase
@@ -103,7 +106,7 @@ class InboundServiceTest {
             ReferenceType.INBOUND_ITEM,
             referenceId,
             key,
-            "svc-wms",
+            RequesterService.of("svc-wms"),
             LocalDateTime.of(2026, 10, 7, 9, 0),
         )
 
@@ -150,7 +153,7 @@ class InboundServiceTest {
                 assertEquals(ReferenceType.INBOUND_ITEM, history.firstValue.referenceType)
                 assertEquals(77L, history.firstValue.referenceId)
                 assertEquals(key, history.firstValue.idempotencyKey)
-                assertEquals("svc-wms", history.firstValue.requesterService)
+                assertEquals("svc-wms", history.firstValue.requesterService.value)
                 val event = argumentCaptor<InventoryEvent>()
                 verifyBlocking(inventoryEventPublisher) { publish(event.capture()) }
                 assertEquals(
@@ -339,7 +342,7 @@ class InboundServiceTest {
     inner class `반려` {
         private suspend fun assertRejected(
             invalid: ConfirmInboundCommand,
-            code: InventoryErrorCode,
+            code: ErrorCode,
         ) {
             val e: InvalidDomainValueException = assertThrows { service.confirm(invalid) }
             assertEquals(code, e.errorCode)
@@ -366,8 +369,10 @@ class InboundServiceTest {
         @Test
         fun `멱등 키가 올바르지 않으면 반려한다`() =
             runBlocking<Unit> {
-                assertRejected(command.copy(idempotencyKey = " "), InventoryErrorCode.INVALID_IDEMPOTENCY_KEY)
-                assertRejected(command.copy(idempotencyKey = "a".repeat(101)), InventoryErrorCode.INVALID_IDEMPOTENCY_KEY)
+                assertRejected(command.copy(idempotencyKey = " "), CommonErrorCode.INVALID_IDEMPOTENCY_KEY)
+                assertRejected(command.copy(idempotencyKey = "a".repeat(101)), CommonErrorCode.INVALID_IDEMPOTENCY_KEY)
+                assertRejected(command.copy(requesterService = " "), CommonErrorCode.INVALID_REQUESTER_SERVICE)
+                assertRejected(command.copy(requesterService = "a".repeat(51)), CommonErrorCode.INVALID_REQUESTER_SERVICE)
             }
 
         @Test

@@ -1,7 +1,7 @@
-package com.dozycoffee.inventory.inventory.domain.valueobject
+package com.dozycoffee.inventory.global.domain
 
+import com.dozycoffee.inventory.global.error.CommonErrorCode
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
-import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 
 /** 수량을 바꾸는 요청의 멱등 키. ASCII 문자열이며 대소문자를 구분하고 100자를 넘을 수 없다(ERD-07) */
 @JvmInline
@@ -13,7 +13,7 @@ value class IdempotencyKey private constructor(
 
         fun of(value: String?): IdempotencyKey {
             if (value.isNullOrBlank() || value.length > MAX_LENGTH || value.any { it.code !in ASCII_PRINTABLE }) {
-                throw InvalidDomainValueException(InventoryErrorCode.INVALID_IDEMPOTENCY_KEY)
+                throw InvalidDomainValueException(CommonErrorCode.INVALID_IDEMPOTENCY_KEY)
             }
             return IdempotencyKey(value)
         }

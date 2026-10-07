@@ -1,7 +1,7 @@
-package com.dozycoffee.inventory.inventory.domain.valueobject
+package com.dozycoffee.inventory.global.domain
 
+import com.dozycoffee.inventory.global.error.CommonErrorCode
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
-import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
@@ -26,7 +26,7 @@ class IdempotencyKeyTest {
     fun `null, 빈 값, 공백, 제어 문자, 비ASCII 문자는 거부한다`() {
         listOf(null, "", "  ", "a b", "key\n", "키-1", "é").forEach { value: String? ->
             val e: InvalidDomainValueException = assertThrows { IdempotencyKey.of(value) }
-            assertEquals(InventoryErrorCode.INVALID_IDEMPOTENCY_KEY, e.errorCode)
+            assertEquals(CommonErrorCode.INVALID_IDEMPOTENCY_KEY, e.errorCode)
         }
     }
 }
