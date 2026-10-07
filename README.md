@@ -85,7 +85,7 @@ inventory 서비스는 재고의 단일 진실 공급원(SSOT)으로, "무엇이
 
 ```bash
 cp .env.example .env        # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
-docker compose up -d        # MySQL (호스트 포트 3307)
+docker compose up -d        # MySQL (호스트 포트 3307). 마이그레이션 체크섬 오류가 나면 docker compose down -v 로 볼륨을 지우고 다시 만든다
 ./gradlew bootRun           # 애플리케이션 (포트 8082). local 프로필은 토큰 없이 개발 사용자로 동작한다
 ```
 
