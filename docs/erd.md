@@ -202,7 +202,7 @@ erDiagram
 | (감사 컬럼 4개) | | N | |
 
 - 제약: `uq_inventory_row (warehouse_id, lot_id, quality_status)`, `chk_inventory_quantity (quantity >= 0)`, `chk_inventory_reserved (reserved_quantity >= 0 AND reserved_quantity <= quantity)`, `chk_inventory_hold (allocation_hold = 0 OR held_at IS NOT NULL)`, FK `(lot_id, product_id)` → `lot`
-- 인덱스: `idx_inventory_available (warehouse_id, product_id, quality_status)` — 가용 조회, Lot 할당 후보 조회
+- 인덱스: `idx_inventory_available (warehouse_id, product_id, quality_status)` — 창고를 지정한 가용 조회, Lot 할당 후보 조회. `idx_inventory_product (product_id, warehouse_id)` — 창고 없이 상품으로 조회(V4)
 - 가용 수량 = `quantity - reserved_quantity` (파생). `quality_status = NORMAL` 이고 `allocation_hold = 0` 인 행만 가용에 포함한다.
 - 수량이 0이 되어도 행을 삭제하지 않는다 (ERD-03).
 

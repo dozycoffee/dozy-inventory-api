@@ -59,6 +59,16 @@ WMS에서 검수·적재가 끝난 입고분을 재고로 반영한다. 입고 �
 - **이벤트**: `재고 증가` 이벤트를 발행한다(Outbox 구현 전에는 로그만 남긴다).
 - **API**: `POST /api/v1/inbound-receipts`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `productId`, `quantity`, `qualityStatus`, `lotNumber`, `manufactureDate`, `expirationDate`, `inboundItemId`이다. 처음 반영과 재요청 모두 200이다([ADR-0019](adr/0019-inbound-receipt-api.md)).
 
+### 가용 재고 조회 (4.1, 채널용)
+
+OMS·가맹점 서비스가 주문 가능 여부를 판단하도록 상품별 가용 수량을 준다. 결정 배경은 [ADR-0020](adr/0020-availability-query.md)이다.
+
+- **조회 조건**: `productIds`(필수, 1~100개)와 `warehouseIds`(선택, 지정하면 1~100개)다. 창고를 생략하면 그 상품의 재고 행이 있는 모든 창고를 보여 준다.
+- **응답**: 상품별로 묶고 창고별 가용 수량과 합계(`totalAvailableQuantity`)를 준다. 재고가 없는 상품은 합계 0이고, 창고를 지정했는데 재고 행이 없는 창고는 0으로 채운다.
+- **가용 수량**: `NORMAL` 품질이고 할당 보류가 아닌 행의 (총 수량 − 예약 수량) 합이다. Lot, 유통기한, 위치는 노출하지 않는다.
+- **창고 선택**: 가맹점 기준으로 근처 창고 목록과 최적 창고 선택은 호출 서비스(OMS·Store) 소관이다. inventory는 창고별 수량을 주고 지정한 창고에서 예약한다. 전체 창고×전체 상품 목록은 채널용 조회에 두지 않고 관리자 재고 현황(4.2)이 맡는다.
+- **호출 권한**: `inventory:service`와 `inventory:admin`이다(창고 관리자는 창고 접근 제어(F-021) 이후).
+
 ### 상태 흐름
 
 - 예약: `RESERVED` → `CONFIRMED` → `FULFILLED`, `RESERVED` → `RELEASED`/`EXPIRED`, `CONFIRMED` → `RELEASED`(WMS 취소 확정 후)

@@ -15,6 +15,15 @@ interface InventoryRepository {
 
     suspend fun findByKey(key: InventoryKey): Inventory?
 
+    /**
+     * 상품별, 창고별 가용 수량. [warehouseIds]가 null이면 해당 상품의 재고 행이 있는 모든 창고를 포함하고,
+     * 주어지면 그 창고의 행만 센다. 재고 행이 없는 (창고, 상품) 조합은 결과에 없다.
+     */
+    suspend fun findAvailability(
+        productIds: Set<Long>,
+        warehouseIds: Set<Long>?,
+    ): List<AvailabilityRow>
+
     /** 같은 키(창고 × Lot × 품질 상태)의 행이 있으면 총 수량을 더하고 없으면 수량이 [amount]인 행을 만든다 */
     suspend fun increase(
         key: InventoryKey,
