@@ -1,11 +1,11 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.error.IdempotencyKeyConflictException
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.application.port.`in`.ConfirmInboundUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ConfirmInboundCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InboundResult
 import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
-import com.dozycoffee.inventory.inventory.domain.exception.IdempotencyKeyConflictException
 import com.dozycoffee.inventory.inventory.domain.exception.LotMismatchException
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.product.domain.exception.ProductNotFoundException

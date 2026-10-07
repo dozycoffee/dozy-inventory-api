@@ -1,10 +1,10 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.error.AllocationConflictException
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.application.port.`in`.AllocateInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AllocateInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AllocationResult
-import com.dozycoffee.inventory.inventory.domain.exception.AllocationConflictException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.support.InventoryIntegrationTest

@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.CommonErrorCode
 import com.dozycoffee.inventory.global.error.ErrorCode
+import com.dozycoffee.inventory.global.error.IdempotencyKeyConflictException
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ConfirmInboundCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InboundResult
@@ -19,7 +20,6 @@ import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateLotException
-import com.dozycoffee.inventory.inventory.domain.exception.IdempotencyKeyConflictException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import com.dozycoffee.inventory.inventory.domain.exception.LotMismatchException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
