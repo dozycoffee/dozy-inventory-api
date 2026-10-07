@@ -1,20 +1,11 @@
 package com.dozycoffee.ims.global.common
 
-import org.springframework.data.annotation.CreatedBy
-import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedBy
 import org.springframework.data.annotation.LastModifiedDate
 import java.time.LocalDateTime
 
-abstract class BaseEntity {
-    @CreatedDate
-    var createdAt: LocalDateTime? = null
-        private set
-
-    @CreatedBy
-    var createdBy: String? = null
-        private set
-
+/** 생성 정보에 수정 정보(`updated_at`, `updated_by`)를 더한 엔티티. 대부분의 테이블이 상속한다 */
+abstract class BaseEntity : CreatedAuditEntity() {
     @LastModifiedDate
     var updatedAt: LocalDateTime? = null
         private set
@@ -28,7 +19,6 @@ abstract class BaseEntity {
      * 저장 전에 기존 엔티티에서 복사해 보존한다. updatedAt/updatedBy는 저장할 때마다 Auditing이 갱신한다.
      */
     open fun copyAuditFieldsFrom(existing: BaseEntity) {
-        this.createdAt = existing.createdAt
-        this.createdBy = existing.createdBy
+        copyCreatedFieldsFrom(existing)
     }
 }

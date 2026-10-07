@@ -19,6 +19,7 @@
 | [0013](0013-api-docs-with-rest-docs.md) | API 명세는 REST Docs로 만든 OpenAPI 파일로 관리 | Accepted |
 | [0014](0014-konsist-architecture-tests.md) | 아키텍처 규칙은 Konsist 테스트로 강제 | Accepted |
 | [0015](0015-inventory-domain-model.md) | 재고 도메인 모델 규칙 | Accepted |
+| [0016](0016-inventory-persistence.md) | 재고 영속성 규칙 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
