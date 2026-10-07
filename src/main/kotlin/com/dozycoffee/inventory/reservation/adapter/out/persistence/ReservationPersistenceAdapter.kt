@@ -7,8 +7,11 @@ import com.dozycoffee.inventory.reservation.domain.exception.DuplicateReservatio
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationAllocation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationItem
+import com.dozycoffee.inventory.reservation.domain.valueobject.ExternalOrderId
+import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationChannel
 import kotlinx.coroutines.flow.toList
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 /**
  * 예약, 항목, 할당은 테이블이 셋이고 R2DBC에는 cascade가 없어 저장 순서를 직접 처리한다(예약 → 항목 → 할당).
@@ -42,6 +45,12 @@ class ReservationPersistenceAdapter(
     }
 
     override suspend fun findById(reservationId: Long): Reservation? = reservationR2dbcRepository.findById(reservationId)?.let { load(it) }
+
+    override suspend fun existsActive(
+        channel: ReservationChannel,
+        externalOrderId: ExternalOrderId,
+        now: LocalDateTime,
+    ): Boolean = reservationR2dbcRepository.countActive(channel.value, externalOrderId.value, now) > 0
 
     override suspend fun findByIdempotencyKey(idempotencyKey: IdempotencyKey): Reservation? =
         reservationR2dbcRepository.findByIdempotencyKey(idempotencyKey.value)?.let { load(it) }

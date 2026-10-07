@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.reactive.awaitFirst
+import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -175,6 +176,76 @@ class ReservationPersistenceAdapterTest {
                 val saved: Reservation = adapter.save(reservation())
 
                 assertThrows<IllegalStateException> { adapter.save(saved) }
+            }
+    }
+
+    @Nested
+    inner class `살아 있는 예약 확인` {
+        private suspend fun changeTo(
+            status: String,
+            expiresAt: LocalDateTime?,
+        ) {
+            databaseClient
+                .sql("UPDATE reservation SET status = :status, expires_at = :expiresAt")
+                .bind("status", status)
+                .let { spec ->
+                    if (expiresAt ==
+                        null
+                    ) {
+                        spec.bindNull("expiresAt", LocalDateTime::class.java)
+                    } else {
+                        spec.bind("expiresAt", expiresAt)
+                    }
+                }.fetch()
+                .rowsUpdated()
+                .awaitSingle()
+        }
+
+        private suspend fun active(
+            channel: String = "OMS",
+            orderId: String = "ORDER-1",
+        ): Boolean = adapter.existsActive(ReservationChannel.of(channel), ExternalOrderId.of(orderId), now)
+
+        @Test
+        fun `만료 전의 확정 전 예약과 확정된 예약은 살아 있다`() =
+            runBlocking<Unit> {
+                adapter.save(reservation())
+                assertThat(active()).isTrue()
+
+                changeTo("CONFIRMED", null)
+                assertThat(active()).isTrue()
+            }
+
+        @Test
+        fun `만료 시각이 지난 확정 전 예약은 살아 있지 않다`() =
+            runBlocking<Unit> {
+                adapter.save(reservation())
+
+                changeTo("RESERVED", now.minusMinutes(1))
+                assertThat(active()).isFalse()
+
+                changeTo("RESERVED", now)
+                assertThat(active()).isFalse()
+            }
+
+        @Test
+        fun `해제, 만료, 출고 완료된 예약은 살아 있지 않다`() =
+            runBlocking<Unit> {
+                adapter.save(reservation())
+
+                listOf("RELEASED", "EXPIRED", "FULFILLED").forEach { status: String ->
+                    changeTo(status, null)
+                    assertThat(active()).describedAs(status).isFalse()
+                }
+            }
+
+        @Test
+        fun `다른 채널이거나 다른 주문이면 살아 있지 않다`() =
+            runBlocking<Unit> {
+                adapter.save(reservation())
+
+                assertThat(active(channel = "STORE")).isFalse()
+                assertThat(active(orderId = "ORDER-2")).isFalse()
             }
     }
 
