@@ -315,7 +315,7 @@ erDiagram
 | lot_id | BIGINT FK | N | |
 | quality_status | VARCHAR(50) | N | 대상 품질 상태 |
 | quantity_change | INT | N | 0이 아닌 변동량 |
-| ims_quantity, wms_quantity | INT | Y | `RECONCILIATION`: 보정안 생성 시점의 양쪽 수량 |
+| inventory_quantity, wms_quantity | INT | Y | `RECONCILIATION`: 보정안 생성 시점의 양쪽 수량 |
 | (감사 컬럼 4개) | | N | |
 
 제약: `uq_adjustment_item (stock_adjustment_id, lot_id, quality_status)`, `chk_adjustment_item_change (quantity_change <> 0)`
