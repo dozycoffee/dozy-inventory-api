@@ -22,6 +22,7 @@
 | [0016](0016-inventory-persistence.md) | 재고 영속성 규칙 | Accepted |
 | [0017](0017-inbound-confirmation.md) | 입고 확정 반영 규칙 | Accepted |
 | [0018](0018-rename-ims-to-inventory.md) | 서비스 이름을 IMS에서 inventory로 변경 | Accepted |
+| [0019](0019-inbound-receipt-api.md) | 입고 확정 API 형태 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
