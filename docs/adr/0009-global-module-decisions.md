@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-06). 결정 5의 `CurrentActorProvider` `local` 전용 구성과 "알려진 이슈"는 [ADR-0011](0011-auth-integration.md)로 대체했다.
+Accepted (2026-10-06). 결정 2의 오류 코드 접두사 `IMS_`는 [ADR-0018](0018-rename-ims-to-inventory.md)에서 `INV_`로 바꿨다. 결정 5의 `CurrentActorProvider` `local` 전용 구성과 "알려진 이슈"는 [ADR-0011](0011-auth-integration.md)로 대체했다.
 
 ## 배경 (Context)
 

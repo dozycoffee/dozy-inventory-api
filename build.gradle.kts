@@ -109,8 +109,8 @@ tasks.bootRun {
 
 openapi3 {
     setServer("http://localhost:8082")
-    title = "DOZY COFFEE IMS API"
-    description = "재고 관리 시스템(IMS) API"
+    title = "DOZY COFFEE Inventory API"
+    description = "재고 관리(inventory) API"
     version = project.version.toString()
     format = "yaml"
 }

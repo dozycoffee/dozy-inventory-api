@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-06)
+Accepted (2026-10-06). audience·role 이름 `ims`는 [ADR-0018](0018-rename-ims-to-inventory.md)에서 `inventory`로 바꿨다
 
 ## 배경 (Context)
 

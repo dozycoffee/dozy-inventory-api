@@ -1,6 +1,6 @@
 # 예약 동시성과 멱등성
 
-IMS의 핵심 약속은 "같은 재고를 여러 채널이 동시에 잡아도 초과 판매가 나지 않는다"이다. 결정 배경은 [ADR-0003](adr/0003-reservation-concurrency-conditional-update.md)에 있다.
+inventory 서비스의 핵심 약속은 "같은 재고를 여러 채널이 동시에 잡아도 초과 판매가 나지 않는다"이다. 결정 배경은 [ADR-0003](adr/0003-reservation-concurrency-conditional-update.md)에 있다.
 
 ## 1. 예약 동시성: DB 원자적 조건부 갱신
 

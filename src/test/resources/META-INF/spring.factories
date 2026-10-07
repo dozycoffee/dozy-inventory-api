@@ -1,2 +1,2 @@
 org.springframework.context.ApplicationContextInitializer=\
-com.dozycoffee.ims.support.MySqlTestContainerInitializer
+com.dozycoffee.inventory.support.MySqlTestContainerInitializer
