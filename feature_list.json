@@ -65,8 +65,8 @@
   {
     "id": "F-010",
     "name": "예약 생성과 Lot 할당",
-    "description": "주문 단위 전체 성공·전체 실패 예약, 유통기한 오름차순 Lot 할당, 조건부 UPDATE와 행 ID 순서 갱신, 멱등 키, 채널별 TTL 상한. 시나리오 5.1. reservation.channel 값 확정 필요.",
-    "status": "pending",
+    "description": "주문 단위 전체 성공·전체 실패 예약, 유통기한 오름차순 Lot 할당, 조건부 UPDATE와 행 ID 순서 갱신, 멱등 키, 채널별 TTL 상한(설정 맵+default). 결정은 ADR-0022. 단계: (1) inventory의 Lot 할당(AllocateInventoryUseCase), (2) reservation 도메인 모델·영속성, (3) 예약 생성 application(멱등, TTL, 경합 재시도), (4) 웹 어댑터.",
+    "status": "in_progress",
     "dependencies": ["F-007", "F-020"]
   },
   {
