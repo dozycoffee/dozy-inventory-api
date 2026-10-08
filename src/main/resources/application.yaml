@@ -38,6 +38,11 @@ inventory:
     max-ttl:
       default: 1h
       channels: {}
+    # 만료 시각이 지난 확정 전 예약을 만료 처리하는 스케줄러. 테스트에서는 끈다
+    expiry-scan:
+      enabled: true
+      interval: PT1M
+      batch-size: 100
 
 server:
   port: ${SERVER_PORT:8082}
