@@ -27,6 +27,11 @@ enum class ReservationErrorCode(
         "예약의 현재 상태에서는 요청한 작업을 할 수 없습니다.",
     ),
     RESERVATION_EXPIRED(ErrorType.CONFLICT, "INV_RESERVATION_EXPIRED", "만료 시각이 지난 예약입니다."),
+    INVALID_FULFILLMENT(
+        ErrorType.VALIDATION,
+        "INV_INVALID_FULFILLMENT",
+        "출고 수량은 예약의 모든 할당 재고 행에 대해 한 번씩, 0 이상 할당 수량 이하로 보내야 합니다.",
+    ),
     RESERVATION_NOT_FOUND(ErrorType.NOT_FOUND, "INV_RESERVATION_NOT_FOUND", "예약을 찾을 수 없습니다."),
     RESERVATION_CHANGED_CONCURRENTLY(
         ErrorType.CONFLICT,

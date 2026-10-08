@@ -257,6 +257,72 @@ class ReservationTest {
         }
 
         @Nested
+        inner class `출고 확정` {
+            private fun confirmed(): Reservation = restored(ReservationStatus.CONFIRMED, null, now.minusMinutes(5))
+
+            private val full: Map<Long, Int> = mapOf(5L to 6, 7L to 4)
+
+            @Test
+            fun `확정된 예약은 모든 할당 행의 출고 수량을 기록하고 FULFILLED가 된다`() {
+                val reservation: Reservation = confirmed()
+
+                assertEquals(true, reservation.fulfill(full))
+
+                assertEquals(ReservationStatus.FULFILLED, reservation.status)
+                val allocations: List<ReservationAllocation> = reservation.items.flatMap { it.allocations }
+                assertEquals(listOf(6, 4), allocations.map { it.fulfilledQuantity })
+                assertEquals(listOf(0, 0), allocations.map { it.shortageQuantity })
+            }
+
+            @Test
+            fun `결품이 있으면 출고 수량만 기록하고 결품은 할당에서 뺀 값이다`() {
+                val reservation: Reservation = confirmed()
+
+                reservation.fulfill(mapOf(5L to 4, 7L to 0))
+
+                val allocations: List<ReservationAllocation> = reservation.items.flatMap { it.allocations }
+                assertEquals(listOf(4, 0), allocations.map { it.fulfilledQuantity })
+                assertEquals(listOf(2, 4), allocations.map { it.shortageQuantity })
+                assertEquals(ReservationStatus.FULFILLED, reservation.status)
+            }
+
+            @Test
+            fun `출고 수량이 할당을 넘거나 음수이면 입력 오류이고 아무것도 바뀌지 않는다`() {
+                val reservation: Reservation = confirmed()
+
+                listOf(mapOf(5L to 7, 7L to 4), mapOf(5L to -1, 7L to 4)).forEach { shipments ->
+                    assertRejected(ReservationErrorCode.INVALID_FULFILLMENT) { reservation.fulfill(shipments) }
+                }
+                assertEquals(ReservationStatus.CONFIRMED, reservation.status)
+                assertEquals(listOf(0, 0), reservation.items.flatMap { it.allocations }.map { it.fulfilledQuantity })
+            }
+
+            @Test
+            fun `할당 행이 빠지거나 모르는 행이 있으면 입력 오류이다`() {
+                assertRejected(ReservationErrorCode.INVALID_FULFILLMENT) { confirmed().fulfill(mapOf(5L to 6)) }
+                assertRejected(ReservationErrorCode.INVALID_FULFILLMENT) { confirmed().fulfill(mapOf(5L to 6, 7L to 4, 9L to 1)) }
+                assertRejected(ReservationErrorCode.INVALID_FULFILLMENT) { confirmed().fulfill(emptyMap()) }
+            }
+
+            @Test
+            fun `이미 출고 확정된 예약은 같은 수량이면 바꾸지 않고 다르면 상태 오류다`() {
+                val reservation: Reservation = confirmed()
+                reservation.fulfill(mapOf(5L to 4, 7L to 0))
+
+                assertEquals(false, reservation.fulfill(mapOf(5L to 4, 7L to 0)))
+                assertState { reservation.fulfill(full) }
+                assertState { reservation.fulfill(mapOf(5L to 4)) }
+            }
+
+            @Test
+            fun `확정 전, 해제, 만료된 예약은 출고 확정할 수 없다`() {
+                listOf(ReservationStatus.RESERVED, ReservationStatus.RELEASED, ReservationStatus.EXPIRED).forEach { status ->
+                    assertState { restored(status).fulfill(full) }
+                }
+            }
+        }
+
+        @Nested
         inner class `만료` {
             @Test
             fun `만료 시각이 지난 확정 전 예약은 EXPIRED가 되고 만료 시각은 남는다`() {

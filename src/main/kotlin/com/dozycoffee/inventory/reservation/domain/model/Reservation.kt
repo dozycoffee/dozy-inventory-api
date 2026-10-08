@@ -99,6 +99,41 @@ class Reservation private constructor(
         return true
     }
 
+    /**
+     * 확정된 예약의 출고를 확정한다(ADR-0024). [shipments]는 재고 행 ID별 실제 출고 수량이며 예약의 모든 할당 재고 행을 한 번씩 담아야 하고
+     * 각 수량은 0 이상 할당 수량 이하여야 한다(어기면 입력 오류). 결품(할당 − 출고)은 [ReservationAllocation.shortageQuantity]로 남는다.
+     * 이미 출고 확정된 예약은 같은 수량이면 바꾸지 않고 false를 반환하고 다르면 [InvalidReservationStateException]이다.
+     * 확정 전·해제·만료된 예약은 [InvalidReservationStateException]이다.
+     */
+    fun fulfill(shipments: Map<Long, Int>): Boolean {
+        val allocations: List<ReservationAllocation> = items.flatMap(ReservationItem::allocations)
+        if (status == ReservationStatus.FULFILLED) {
+            if (!matches(allocations, shipments)) throw InvalidReservationStateException()
+            return false
+        }
+        if (status != ReservationStatus.CONFIRMED) throw InvalidReservationStateException()
+        if (shipments.keys != allocations.map(ReservationAllocation::inventoryId).toSet()) {
+            throw InvalidDomainValueException(ReservationErrorCode.INVALID_FULFILLMENT)
+        }
+        if (shipments.any { (inventoryId: Long, shipped: Int) ->
+                shipped < 0 ||
+                    shipped > allocations.first { it.inventoryId == inventoryId }.quantity
+            }
+        ) {
+            throw InvalidDomainValueException(ReservationErrorCode.INVALID_FULFILLMENT)
+        }
+        allocations.forEach { it.fulfill(shipments.getValue(it.inventoryId)) }
+        status = ReservationStatus.FULFILLED
+        return true
+    }
+
+    private fun matches(
+        allocations: List<ReservationAllocation>,
+        shipments: Map<Long, Int>,
+    ): Boolean =
+        shipments.keys == allocations.map(ReservationAllocation::inventoryId).toSet() &&
+            allocations.all { shipments[it.inventoryId] == it.fulfilledQuantity }
+
     /** 만료 시각이 지난 확정 전 예약을 만료 처리한다. 대상이 아니면 바꾸지 않고 false를 반환한다 */
     fun expire(now: LocalDateTime): Boolean {
         if (status != ReservationStatus.RESERVED || !expiry.isExpiredAt(now)) return false

@@ -30,6 +30,15 @@ interface ReservationRepository {
         expectedStatus: ReservationStatus,
     ): Boolean
 
+    /**
+     * 출고 확정을 저장한다. [updateState]와 같은 조건부 UPDATE로 상태를 바꾼 뒤 할당별 출고 수량을 저장한다.
+     * 그 사이 다른 요청이 상태를 바꿨으면 아무것도 바꾸지 않고 false를 반환한다. 호출한 서비스의 트랜잭션 안에서 실행한다.
+     */
+    suspend fun updateFulfillment(
+        reservation: Reservation,
+        expectedStatus: ReservationStatus,
+    ): Boolean
+
     /** 만료 시각이 [now] 이하인 확정 전 예약의 ID를 만료 시각이 이른 순으로 최대 [limit]개 반환한다 */
     suspend fun findExpiredIds(
         now: LocalDateTime,

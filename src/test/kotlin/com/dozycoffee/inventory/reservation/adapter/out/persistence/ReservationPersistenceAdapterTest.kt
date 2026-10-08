@@ -351,6 +351,98 @@ class ReservationPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `출고 확정 저장` {
+        private suspend fun confirmedReservation(): Reservation {
+            val saved: Reservation = adapter.save(reservation())
+            saved.confirm(now.plusMinutes(1))
+            assertThat(adapter.updateState(saved, ReservationStatus.RESERVED)).isTrue()
+            return checkNotNull(adapter.findById(checkNotNull(saved.reservationId)))
+        }
+
+        @Test
+        fun `상태와 할당별 출고 수량을 함께 저장한다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val allocations: List<ReservationAllocation> = reservation.items.first().allocations
+                reservation.fulfill(
+                    reservation.items.flatMap { it.allocations }.associate {
+                        it.inventoryId to
+                            (if (it.inventoryId == allocations.first().inventoryId) it.quantity else 0)
+                    },
+                )
+
+                assertThat(adapter.updateFulfillment(reservation, ReservationStatus.CONFIRMED)).isTrue()
+
+                val loaded: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                assertThat(loaded.status).isEqualTo(ReservationStatus.FULFILLED)
+                val loadedAllocations: List<ReservationAllocation> = loaded.items.flatMap { it.allocations }
+                assertThat(loadedAllocations.map { it.fulfilledQuantity }).containsExactly(6, 0, 0)
+                assertThat(loadedAllocations.map { it.shortageQuantity }).containsExactly(0, 4, 3)
+            }
+
+        @Test
+        fun `그 사이 상태가 바뀌었으면 아무것도 바꾸지 않고 false다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val other: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                other.release()
+                assertThat(adapter.updateState(other, ReservationStatus.CONFIRMED)).isTrue()
+                reservation.fulfill(reservation.items.flatMap { it.allocations }.associate { it.inventoryId to it.quantity })
+
+                assertThat(adapter.updateFulfillment(reservation, ReservationStatus.CONFIRMED)).isFalse()
+
+                val loaded: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                assertThat(loaded.status).isEqualTo(ReservationStatus.RELEASED)
+                assertThat(loaded.items.flatMap { it.allocations }.map { it.fulfilledQuantity }).containsOnly(0)
+            }
+
+        @Test
+        fun `같은 예약을 50개가 동시에 출고 확정하려 하면 정확히 하나만 성공한다`() =
+            runBlocking<Unit> {
+                val id: Long = checkNotNull(confirmedReservation().reservationId)
+
+                val results: List<Boolean> =
+                    (1..50)
+                        .map {
+                            async(Dispatchers.Default) {
+                                val reservation: Reservation = checkNotNull(adapter.findById(id))
+                                reservation.fulfill(
+                                    reservation.items.flatMap { it.allocations }.associate { it.inventoryId to it.quantity },
+                                )
+                                adapter.updateFulfillment(reservation, ReservationStatus.CONFIRMED)
+                            }
+                        }.awaitAll()
+
+                assertThat(results.count { it }).isEqualTo(1)
+                assertThat(checkNotNull(adapter.findById(id)).status).isEqualTo(ReservationStatus.FULFILLED)
+            }
+
+        @Test
+        fun `출고 수량 갱신에도 수정 시각과 수정자가 기록된다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                databaseClient
+                    .sql("UPDATE reservation_allocation SET updated_by = 'before'")
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+                reservation.fulfill(reservation.items.flatMap { it.allocations }.associate { it.inventoryId to it.quantity })
+
+                adapter.updateFulfillment(reservation, ReservationStatus.CONFIRMED)
+
+                assertThat(
+                    databaseClient
+                        .sql(
+                            "SELECT COUNT(*) AS c FROM reservation_allocation WHERE updated_by = 'before'",
+                        ).fetch()
+                        .one()
+                        .awaitFirst()["c"]
+                        .toString(),
+                ).isEqualTo("0")
+            }
+    }
+
+    @Nested
     inner class `만료된 예약 조회` {
         private suspend fun saveExpiring(
             orderId: String,

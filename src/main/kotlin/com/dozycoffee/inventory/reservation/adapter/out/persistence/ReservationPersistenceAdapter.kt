@@ -98,6 +98,24 @@ class ReservationPersistenceAdapter(
         return updated > 0
     }
 
+    override suspend fun updateFulfillment(
+        reservation: Reservation,
+        expectedStatus: ReservationStatus,
+    ): Boolean {
+        if (!updateState(reservation, expectedStatus)) return false
+        reservation.items.flatMap(ReservationItem::allocations).forEach { allocation: ReservationAllocation ->
+            databaseClient
+                .sql(UPDATE_FULFILLED_QUANTITY)
+                .bind("fulfilledQuantity", allocation.fulfilledQuantity)
+                .bind("now", LocalDateTime.now(clock))
+                .bind("actor", currentActorProvider.get().auditName)
+                .bind("allocationId", checkNotNull(allocation.reservationAllocationId) { "저장되지 않은 할당의 출고 수량은 갱신할 수 없다" })
+                .fetch()
+                .awaitRowsUpdated()
+        }
+        return true
+    }
+
     override suspend fun findExpiredIds(
         now: LocalDateTime,
         limit: Int,
@@ -137,6 +155,13 @@ class ReservationPersistenceAdapter(
             UPDATE reservation
                SET status = :status, expires_at = :expiresAt, confirmed_at = :confirmedAt, updated_at = :now, updated_by = :actor
              WHERE reservation_id = :reservationId AND status = :expectedStatus
+            """
+
+        const val UPDATE_FULFILLED_QUANTITY: String =
+            """
+            UPDATE reservation_allocation
+               SET fulfilled_quantity = :fulfilledQuantity, updated_at = :now, updated_by = :actor
+             WHERE reservation_allocation_id = :allocationId
             """
 
         const val FIND_EXPIRED_IDS: String =
