@@ -54,4 +54,5 @@ enum class ReservationChangeType {
     EXTENDED,
     RELEASED,
     EXPIRED,
+    FULFILLED,
 }
