@@ -30,6 +30,11 @@ enum class InventoryErrorCode(
         "INV_INVALID_ALLOCATION_REQUEST",
         "창고 ID는 양수이고 상품은 1개 이상 100개 이하이며 상품 ID는 양수이고 중복이 없어야 하며 수량은 1 이상이어야 합니다.",
     ),
+    INVALID_RELEASE_REQUEST(
+        ErrorType.VALIDATION,
+        "INV_INVALID_RELEASE_REQUEST",
+        "되돌릴 재고 행은 1개 이상이고 ID는 양수이며 중복이 없어야 하고 수량은 1 이상이어야 합니다.",
+    ),
     INVALID_AVAILABILITY_QUERY(
         ErrorType.VALIDATION,
         "INV_INVALID_AVAILABILITY_QUERY",

@@ -3,9 +3,12 @@ package com.dozycoffee.inventory.inventory.application.service
 import com.dozycoffee.inventory.global.error.AllocationConflictException
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.application.port.`in`.AllocateInventoryUseCase
+import com.dozycoffee.inventory.inventory.application.port.`in`.ReleaseInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AllocateInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.ReleaseInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AllocationResult
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
+import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.support.InventoryIntegrationTest
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +33,9 @@ import java.time.LocalDate
 class AllocationServiceIntegrationTest {
     @Autowired
     private lateinit var allocateInventoryUseCase: AllocateInventoryUseCase
+
+    @Autowired
+    private lateinit var releaseInventoryUseCase: ReleaseInventoryUseCase
 
     @Autowired
     private lateinit var transactionalOperator: TransactionalOperator
@@ -126,6 +132,52 @@ class AllocationServiceIntegrationTest {
                 assertThrows<InsufficientAvailableQuantityException> { allocate(productId to 5, other to 4) }
 
                 assertThat(totalReserved()).isEqualTo(0L)
+            }
+    }
+
+    @Nested
+    inner class `해제` {
+        @Test
+        fun `예약 수량이 가용 수량으로 되돌아온다`() =
+            runBlocking<Unit> {
+                val late: Long = row("LATE", LocalDate.of(2027, 6, 1), 10)
+                val early: Long = row("EARLY", LocalDate.of(2027, 1, 1), 4)
+                allocate(productId to 6)
+
+                transactionalOperator.executeAndAwait {
+                    releaseInventoryUseCase.release(
+                        ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(late, 2), ReleaseInventoryCommand.Item(early, 4))),
+                    )
+                }
+
+                assertThat(reserved(early)).isEqualTo(0)
+                assertThat(reserved(late)).isEqualTo(0)
+                assertThat(
+                    allocate(productId to 14)
+                        .items
+                        .single()
+                        .lots
+                        .sumOf { it.quantity },
+                ).isEqualTo(14)
+            }
+
+        @Test
+        fun `예약 수량보다 많이 되돌리려 하면 실패하고 롤백되어 앞서 되돌린 수량도 그대로다`() =
+            runBlocking<Unit> {
+                val late: Long = row("LATE", LocalDate.of(2027, 6, 1), 10)
+                val early: Long = row("EARLY", LocalDate.of(2027, 1, 1), 4)
+                allocate(productId to 6)
+
+                assertThrows<InsufficientReservedQuantityException> {
+                    transactionalOperator.executeAndAwait {
+                        releaseInventoryUseCase.release(
+                            ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(early, 4), ReleaseInventoryCommand.Item(late, 3))),
+                        )
+                    }
+                }
+
+                assertThat(reserved(early)).isEqualTo(4)
+                assertThat(reserved(late)).isEqualTo(2)
             }
     }
 
