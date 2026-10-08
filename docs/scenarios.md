@@ -81,6 +81,17 @@ OMS·가맹점 서비스가 주문의 상품을 한 창고에서 예약한다. �
 - **멱등**: 같은 멱등 키의 재요청은 새로 잡지 않고 저장된 예약의 현재 상태를 반환한다. 같은 키에 다른 내용이면 `INV_IDEMPOTENCY_KEY_CONFLICT`(409)이다.
 - **API**: `POST /api/v1/reservations`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `channel`, `externalOrderId`, `expiresAt`(시간대 오프셋을 포함한 ISO-8601, 예: `2026-10-07T21:30:00+09:00`), `items[{productId, quantity}]`이다. 처음과 재요청 모두 200이고 응답은 예약 ID, 상태, 만료 시각, 항목별 할당(재고 행 ID, 수량)이다.
 
+### 예약 확정·해제·연장·만료 (5.2~5.3)
+
+예약의 이후 상태 전이다. 결정 배경은 [ADR-0023](adr/0023-reservation-state-transitions.md)이다.
+
+- **확정**: `POST /api/v1/reservations/{id}/confirm`. 확정 전(`RESERVED`) 예약을 `CONFIRMED`로 바꾸고 만료 시각이 사라진다. 만료 시각이 지난 예약은 확정할 수 없다(`INV_RESERVATION_EXPIRED`, 409).
+- **해제**: `POST /api/v1/reservations/{id}/release`. 확정 전·확정된 예약을 `RELEASED`로 바꾸고 남은 예약 수량을 가용 수량으로 되돌린다. 출고 완료된 예약은 해제할 수 없다(`INV_INVALID_RESERVATION_STATE`, 409).
+- **연장**: `POST /api/v1/reservations/{id}/extend`(본문 `expiresAt`). 확정 전 예약의 만료 시각을 현재 만료 시각 이상, 최대 만료 시각(생성 시각 + 채널 상한) 이하로 늘린다. 범위를 벗어나면 400(`INV_INVALID_RESERVATION_EXPIRY`)이다.
+- **만료**: 스케줄러가 만료 시각이 지난 확정 전 예약을 `EXPIRED`로 바꾸고 수량을 되돌린다. 확정된 예약은 만료되지 않는다.
+- **멱등**: 확정·해제·연장은 `Idempotency-Key` 없이 상태로 멱등하다. 이미 목표 상태이면 아무것도 바꾸지 않고 200으로 현재 상태를 반환하고, 불가능한 전이는 409이다.
+- **호출 권한**: `inventory:service`만이다.
+
 ### 상태 흐름
 
 - 예약: `RESERVED` → `CONFIRMED` → `FULFILLED`, `RESERVED` → `RELEASED`/`EXPIRED`, `CONFIRMED` → `RELEASED`(WMS 취소 확정 후)

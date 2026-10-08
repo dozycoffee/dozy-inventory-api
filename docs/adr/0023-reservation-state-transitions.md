@@ -31,6 +31,9 @@ F-010에서 예약을 만들 수 있게 되었지만 이후 전이가 없어, �
 10. **이벤트는 발행 포트와 로그 구현이다**(ADR-0022 결정 13과 같은 방식). 예약 변경 이벤트(`CREATED`, `CONFIRMED`, `EXTENDED`, `RELEASED`, `EXPIRED`)는 상품별 수량과 재고 행별 할당 내역(재고 행 ID, 수량)을 담는다. WMS가 출고를 지시하려면 Lot 번호·유통기한 같은 Lot 정보가 필요한데, 이벤트 계약(페이로드, 파티션 키)은 F-018에서 Outbox와 함께 정하며 그때 inventory 쪽 조회로 Lot 정보를 채운다. 실제 발행도 그때 Outbox로 교체한다.
 11. **트랜잭션 안의 잠금 순서**: 예약 상태 변경(예약 행 잠금) 뒤에 재고 행을 `inventory_id` 오름차순으로 갱신한다. 예약 생성은 재고 행을 잠근 뒤 새 예약 행을 INSERT할 뿐 기존 예약 행을 건드리지 않으므로 두 경로가 서로를 기다리는 순환이 생기지 않는다.
 
+12. **API는 예약 ID 아래의 동작이다**: `POST /api/v1/reservations/{id}/confirm`, `/release`, `/extend`(본문 `expiresAt`은 오프셋을 포함한 ISO-8601). 호출은 `inventory:service`만 허용하고(결정 9), 응답은 예약 생성과 같은 본문이며, 없는 예약은 404(`INV_RESERVATION_NOT_FOUND`), 읽은 뒤 계속 다른 요청과 겹쳐 처리하지 못하면 409(`INV_RESERVATION_CHANGED_CONCURRENTLY`)이다. 만료는 스케줄러가 맡아 API가 없다.
+13. **만료 스케줄러**: 1분 간격(고정 지연)으로 한 묶음에 최대 100건을 가져와 예약 하나씩 `ExpireReservationUseCase`에 넘기고, 묶음이 가득 차고 그중 하나라도 처리했으면 이어서 다음 묶음을 가져온다(한 번에 최대 10묶음). 한 건의 실패는 로그만 남기고 나머지를 계속 처리하며, 요청 밖 작업이라 `SystemActor`로 실행해 변경 주체가 `system`으로 남는다. 설정은 `inventory.reservation.expiry-scan`(`enabled`, `interval`, `batch-size`)이다. 여러 인스턴스가 동시에 돌아도 만료 처리가 조건부 UPDATE라 같은 예약은 한 번만 처리된다. 통합 테스트가 만든 예약에 끼어들지 않도록 테스트에서는 기본으로 끄고(`enabled=false`) 스케줄러 테스트만 켠다.
+
 ## 결과 (Consequences)
 
 - 얻는 것: 예약 수량이 반드시 풀리고(해제·만료), 동시 요청에서도 상태가 한 번만 바뀌며, 재전송에 안전하다(상태 기반 멱등). 멱등 키 저장소 없이 단순하다.
