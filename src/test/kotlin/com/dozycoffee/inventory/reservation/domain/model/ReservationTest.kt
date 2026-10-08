@@ -4,7 +4,9 @@ import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
+import com.dozycoffee.inventory.reservation.domain.exception.InvalidReservationStateException
 import com.dozycoffee.inventory.reservation.domain.exception.ReservationErrorCode
+import com.dozycoffee.inventory.reservation.domain.exception.ReservationExpiredException
 import com.dozycoffee.inventory.reservation.domain.valueobject.ExternalOrderId
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationChannel
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationExpiry
@@ -111,6 +113,177 @@ class ReservationTest {
         fun `할당 수량의 합은 Int 범위를 넘어도 정확히 비교한다`() {
             assertRejected(ReservationErrorCode.INVALID_RESERVATION_ITEMS) {
                 item(quantity = 1, allocations = arrayOf(1L to Int.MAX_VALUE, 2L to Int.MAX_VALUE, 3L to 3))
+            }
+        }
+    }
+
+    @Nested
+    inner class `상태 전이` {
+        private fun restored(
+            status: ReservationStatus,
+            expiresAt: LocalDateTime? = now.plusMinutes(30),
+            confirmedAt: LocalDateTime? = null,
+        ): Reservation =
+            Reservation.reconstitute(
+                1L,
+                10L,
+                ReservationChannel.of("OMS"),
+                ExternalOrderId.of("ORDER-1"),
+                status,
+                ReservationExpiry.reconstitute(expiresAt, now.plusHours(1)),
+                confirmedAt,
+                key,
+                RequesterService.of("svc-oms"),
+                listOf(item()),
+            )
+
+        private fun assertState(block: () -> Any) {
+            assertThrows<InvalidReservationStateException> { block() }
+        }
+
+        @Nested
+        inner class `확정` {
+            @Test
+            fun `확정 전 예약은 CONFIRMED가 되고 만료 시각이 사라지며 확정 시각이 남는다`() {
+                val reservation: Reservation = restored(ReservationStatus.RESERVED)
+
+                assertEquals(true, reservation.confirm(now))
+
+                assertEquals(ReservationStatus.CONFIRMED, reservation.status)
+                assertNull(reservation.expiry.expiresAt)
+                assertEquals(now.plusHours(1), reservation.expiry.maxExpiresAt)
+                assertEquals(now, reservation.confirmedAt)
+            }
+
+            @Test
+            fun `이미 확정된 예약은 바꾸지 않는다`() {
+                val reservation: Reservation = restored(ReservationStatus.CONFIRMED, null, now.minusMinutes(5))
+
+                assertEquals(false, reservation.confirm(now))
+
+                assertEquals(now.minusMinutes(5), reservation.confirmedAt)
+            }
+
+            @Test
+            fun `만료 시각이 지난 예약은 확정할 수 없다`() {
+                assertThrows<ReservationExpiredException> { restored(ReservationStatus.RESERVED, now).confirm(now) }
+                assertThrows<ReservationExpiredException> { restored(ReservationStatus.RESERVED, now.minusMinutes(1)).confirm(now) }
+            }
+
+            @Test
+            fun `해제, 만료, 출고 완료된 예약은 확정할 수 없다`() {
+                listOf(ReservationStatus.RELEASED, ReservationStatus.EXPIRED, ReservationStatus.FULFILLED).forEach { status ->
+                    assertState { restored(status).confirm(now) }
+                }
+            }
+        }
+
+        @Nested
+        inner class `해제` {
+            @Test
+            fun `확정 전 예약과 확정된 예약은 RELEASED가 되고 만료 시각이 사라진다`() {
+                val reserved: Reservation = restored(ReservationStatus.RESERVED)
+                val confirmed: Reservation = restored(ReservationStatus.CONFIRMED, null, now)
+
+                assertEquals(true, reserved.release())
+                assertEquals(true, confirmed.release())
+
+                assertEquals(ReservationStatus.RELEASED, reserved.status)
+                assertNull(reserved.expiry.expiresAt)
+                assertEquals(ReservationStatus.RELEASED, confirmed.status)
+            }
+
+            @Test
+            fun `이미 해제되었거나 만료된 예약은 바꾸지 않는다`() {
+                val released: Reservation = restored(ReservationStatus.RELEASED, null)
+                val expired: Reservation = restored(ReservationStatus.EXPIRED, now.minusMinutes(1))
+
+                assertEquals(false, released.release())
+                assertEquals(false, expired.release())
+
+                assertEquals(ReservationStatus.EXPIRED, expired.status)
+                assertEquals(now.minusMinutes(1), expired.expiry.expiresAt)
+            }
+
+            @Test
+            fun `출고 완료된 예약은 해제할 수 없다`() = assertState { restored(ReservationStatus.FULFILLED, null).release() }
+        }
+
+        @Nested
+        inner class `연장` {
+            @Test
+            fun `최대 만료 시각까지 만료 시각을 늘린다`() {
+                val reservation: Reservation = restored(ReservationStatus.RESERVED)
+
+                assertEquals(true, reservation.extend(now.plusMinutes(45), now))
+                assertEquals(now.plusMinutes(45), reservation.expiry.expiresAt)
+                assertEquals(true, reservation.extend(now.plusHours(1), now))
+                assertEquals(now.plusHours(1), reservation.expiry.expiresAt)
+            }
+
+            @Test
+            fun `같은 만료 시각이면 바꾸지 않는다`() {
+                val reservation: Reservation = restored(ReservationStatus.RESERVED)
+
+                assertEquals(false, reservation.extend(now.plusMinutes(30), now))
+            }
+
+            @Test
+            fun `현재 만료 시각보다 이르거나 최대 만료 시각을 넘거나 현재 이전이면 입력 오류다`() {
+                val reservation: Reservation = restored(ReservationStatus.RESERVED)
+
+                listOf(now.plusMinutes(29), now.plusHours(1).plusNanos(1000), now, now.minusMinutes(1)).forEach { invalid ->
+                    assertRejected(ReservationErrorCode.INVALID_RESERVATION_EXPIRY) { reservation.extend(invalid, now) }
+                }
+                assertEquals(now.plusMinutes(30), reservation.expiry.expiresAt)
+            }
+
+            @Test
+            fun `만료 시각이 지난 예약은 연장할 수 없다`() {
+                assertThrows<ReservationExpiredException> { restored(ReservationStatus.RESERVED, now).extend(now.plusMinutes(10), now) }
+            }
+
+            @Test
+            fun `확정 전이 아닌 예약은 연장할 수 없다`() {
+                listOf(
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.RELEASED,
+                    ReservationStatus.EXPIRED,
+                    ReservationStatus.FULFILLED,
+                ).forEach { status ->
+                    assertState { restored(status).extend(now.plusMinutes(40), now) }
+                }
+            }
+        }
+
+        @Nested
+        inner class `만료` {
+            @Test
+            fun `만료 시각이 지난 확정 전 예약은 EXPIRED가 되고 만료 시각은 남는다`() {
+                val reservation: Reservation = restored(ReservationStatus.RESERVED, now.minusMinutes(1))
+
+                assertEquals(true, reservation.expire(now))
+
+                assertEquals(ReservationStatus.EXPIRED, reservation.status)
+                assertEquals(now.minusMinutes(1), reservation.expiry.expiresAt)
+            }
+
+            @Test
+            fun `만료 시각이 현재와 같으면 만료된다`() {
+                assertEquals(true, restored(ReservationStatus.RESERVED, now).expire(now))
+            }
+
+            @Test
+            fun `아직 만료 전이거나 확정 전이 아닌 예약은 바꾸지 않는다`() {
+                assertEquals(false, restored(ReservationStatus.RESERVED, now.plusSeconds(1)).expire(now))
+                listOf(
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.RELEASED,
+                    ReservationStatus.EXPIRED,
+                    ReservationStatus.FULFILLED,
+                ).forEach { status ->
+                    assertEquals(false, restored(status, null).expire(now))
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.dozycoffee.inventory.reservation.application.port.out
 
 import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.valueobject.ExternalOrderId
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationChannel
@@ -19,6 +20,21 @@ interface ReservationRepository {
         externalOrderId: ExternalOrderId,
         now: LocalDateTime,
     ): Boolean
+
+    /**
+     * 상태, 만료 시각, 확정 시각을 [reservation]의 값으로 갱신한다. 저장된 상태가 [expectedStatus]일 때만 갱신하고,
+     * 그 사이 다른 요청이 상태를 바꿨으면 아무것도 바꾸지 않고 false를 반환한다(조건부 UPDATE).
+     */
+    suspend fun updateState(
+        reservation: Reservation,
+        expectedStatus: ReservationStatus,
+    ): Boolean
+
+    /** 만료 시각이 [now] 이하인 확정 전 예약의 ID를 만료 시각이 이른 순으로 최대 [limit]개 반환한다 */
+    suspend fun findExpiredIds(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<Long>
 
     suspend fun findByIdempotencyKey(idempotencyKey: IdempotencyKey): Reservation?
 }

@@ -3,12 +3,14 @@ package com.dozycoffee.inventory.inventory.application.service
 import com.dozycoffee.inventory.global.error.AllocationConflictException
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AllocateInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.ReleaseInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AllocationResult
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
 import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
+import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotReservableException
@@ -153,6 +155,57 @@ class AllocationServiceTest {
 
                 assertThrows<InventoryNotFoundException> { service.allocate(command(1L to 5)) }
             }
+    }
+
+    @Nested
+    inner class `해제` {
+        @Test
+        fun `재고 행을 행 ID 오름차순으로 되돌린다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.release(any(), any())).thenReturn(Inventory.create(10L, 1L, 1L, QualityStatus.NORMAL))
+
+                service.release(
+                    ReleaseInventoryCommand(
+                        listOf(
+                            ReleaseInventoryCommand.Item(9L, 2),
+                            ReleaseInventoryCommand.Item(3L, 5),
+                            ReleaseInventoryCommand.Item(7L, 1),
+                        ),
+                    ),
+                )
+
+                inOrder(inventoryRepository) {
+                    verify(inventoryRepository).release(3L, 5)
+                    verify(inventoryRepository).release(7L, 1)
+                    verify(inventoryRepository).release(9L, 2)
+                }
+            }
+
+        @Test
+        fun `예약 수량이 모자라면 예외가 그대로 나가 호출자가 롤백한다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.release(3L, 5)).thenReturn(Inventory.create(10L, 1L, 1L, QualityStatus.NORMAL))
+                whenever(inventoryRepository.release(7L, 1)).thenThrow(InsufficientReservedQuantityException())
+
+                assertThrows<InsufficientReservedQuantityException> {
+                    service.release(
+                        ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(3L, 5), ReleaseInventoryCommand.Item(7L, 1))),
+                    )
+                }
+            }
+
+        @Test
+        fun `명령은 비어 있거나 ID와 수량이 양수가 아니거나 재고 행이 중복되면 거부한다`() {
+            listOf(
+                { ReleaseInventoryCommand(emptyList()) },
+                { ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(0L, 1))) },
+                { ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(1L, 0))) },
+                { ReleaseInventoryCommand(listOf(ReleaseInventoryCommand.Item(1L, 1), ReleaseInventoryCommand.Item(1L, 2))) },
+            ).forEach { build ->
+                val e: InvalidDomainValueException = assertThrows { build() }
+                assertEquals(InventoryErrorCode.INVALID_RELEASE_REQUEST, e.errorCode)
+            }
+        }
     }
 
     @Nested

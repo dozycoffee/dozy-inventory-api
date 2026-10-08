@@ -3,7 +3,9 @@ package com.dozycoffee.inventory.inventory.application.service
 import com.dozycoffee.inventory.global.error.AllocationConflictException
 import com.dozycoffee.inventory.global.error.DomainException
 import com.dozycoffee.inventory.inventory.application.port.`in`.AllocateInventoryUseCase
+import com.dozycoffee.inventory.inventory.application.port.`in`.ReleaseInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AllocateInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.ReleaseInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AllocationResult
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
@@ -31,8 +33,17 @@ import java.time.LocalDate
 class AllocationService(
     private val inventoryRepository: InventoryRepository,
     private val clock: Clock,
-) : AllocateInventoryUseCase {
+) : AllocateInventoryUseCase,
+    ReleaseInventoryUseCase {
     override suspend fun allocate(command: AllocateInventoryCommand): AllocationResult = apply(command, plan(command))
+
+    /** 재고 행을 `inventory_id` 오름차순으로 갱신해 동시 예약·해제와 데드락이 나지 않게 한다 */
+    override suspend fun release(command: ReleaseInventoryCommand) {
+        command.items
+            .sortedBy(
+                ReleaseInventoryCommand.Item::inventoryId,
+            ).forEach { inventoryRepository.release(it.inventoryId, it.quantity) }
+    }
 
     /** 후보를 상품별로 할당 순서대로 채워 계획을 세운다. 한 상품이라도 모자라면 가용 수량 부족이다 */
     private suspend fun plan(command: AllocateInventoryCommand): List<Pair<AllocationCandidate, Int>> {

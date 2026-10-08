@@ -72,8 +72,8 @@
   {
     "id": "F-011",
     "name": "예약 확정·해제·연장·만료",
-    "description": "예약 확정(WMS 출고 지시 이벤트), 명시적 해제, 총 수명 상한 내 연장, 만료 스케줄러, 예약 이벤트 이력. 시나리오 5.2~5.3.",
-    "status": "pending",
+    "description": "예약 확정(WMS 출고 지시 이벤트), 명시적 해제, 총 수명 상한 내 연장, 만료 스케줄러, 예약 이벤트 이력. 시나리오 5.2~5.3. 결정은 ADR-0023. 단계: (1) inventory의 예약 수량 해제 UseCase와 reservation 도메인 상태 전이·영속성, (2) 확정·해제·연장·만료 application, (3) 웹 어댑터와 만료 스케줄러.",
+    "status": "in_progress",
     "dependencies": ["F-010"]
   },
   {

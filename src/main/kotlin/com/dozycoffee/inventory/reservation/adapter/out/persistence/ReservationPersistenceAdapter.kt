@@ -2,7 +2,9 @@ package com.dozycoffee.inventory.reservation.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.persistence.translatingDuplicateKey
+import com.dozycoffee.inventory.global.security.CurrentActorProvider
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationRepository
+import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
 import com.dozycoffee.inventory.reservation.domain.exception.DuplicateReservationKeyException
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationAllocation
@@ -10,7 +12,11 @@ import com.dozycoffee.inventory.reservation.domain.model.ReservationItem
 import com.dozycoffee.inventory.reservation.domain.valueobject.ExternalOrderId
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationChannel
 import kotlinx.coroutines.flow.toList
+import org.springframework.r2dbc.core.DatabaseClient
+import org.springframework.r2dbc.core.awaitRowsUpdated
+import org.springframework.r2dbc.core.flow
 import org.springframework.stereotype.Component
+import java.time.Clock
 import java.time.LocalDateTime
 
 /**
@@ -22,6 +28,9 @@ class ReservationPersistenceAdapter(
     private val reservationR2dbcRepository: ReservationR2dbcRepository,
     private val reservationItemR2dbcRepository: ReservationItemR2dbcRepository,
     private val reservationAllocationR2dbcRepository: ReservationAllocationR2dbcRepository,
+    private val databaseClient: DatabaseClient,
+    private val currentActorProvider: CurrentActorProvider,
+    private val clock: Clock,
 ) : ReservationRepository {
     override suspend fun save(reservation: Reservation): Reservation {
         check(reservation.reservationId == null) { "예약은 새로 저장만 할 수 있다" }
@@ -52,6 +61,55 @@ class ReservationPersistenceAdapter(
         now: LocalDateTime,
     ): Boolean = reservationR2dbcRepository.countActive(channel.value, externalOrderId.value, now) > 0
 
+    /** `DatabaseClient`로 직접 쓰는 SQL은 Auditing이 동작하지 않아 `updated_at`, `updated_by`를 SQL에 직접 넣는다 */
+    override suspend fun updateState(
+        reservation: Reservation,
+        expectedStatus: ReservationStatus,
+    ): Boolean {
+        val reservationId: Long = checkNotNull(reservation.reservationId) { "저장되지 않은 예약의 상태는 갱신할 수 없다" }
+        val expiresAt: LocalDateTime? = reservation.expiry.expiresAt
+        val confirmedAt: LocalDateTime? = reservation.confirmedAt
+        val updated: Long =
+            databaseClient
+                .sql(UPDATE_STATE)
+                .bind("status", reservation.status.name)
+                .let { spec ->
+                    if (expiresAt ==
+                        null
+                    ) {
+                        spec.bindNull("expiresAt", LocalDateTime::class.java)
+                    } else {
+                        spec.bind("expiresAt", expiresAt)
+                    }
+                }.let { spec ->
+                    if (confirmedAt ==
+                        null
+                    ) {
+                        spec.bindNull("confirmedAt", LocalDateTime::class.java)
+                    } else {
+                        spec.bind("confirmedAt", confirmedAt)
+                    }
+                }.bind("now", LocalDateTime.now(clock))
+                .bind("actor", currentActorProvider.get().auditName)
+                .bind("reservationId", reservationId)
+                .bind("expectedStatus", expectedStatus.name)
+                .fetch()
+                .awaitRowsUpdated()
+        return updated > 0
+    }
+
+    override suspend fun findExpiredIds(
+        now: LocalDateTime,
+        limit: Int,
+    ): List<Long> =
+        databaseClient
+            .sql(FIND_EXPIRED_IDS)
+            .bind("now", now)
+            .bind("limit", limit)
+            .map { row, _ -> checkNotNull(row.get("reservation_id", Long::class.javaObjectType)) }
+            .flow()
+            .toList()
+
     override suspend fun findByIdempotencyKey(idempotencyKey: IdempotencyKey): Reservation? =
         reservationR2dbcRepository.findByIdempotencyKey(idempotencyKey.value)?.let { load(it) }
 
@@ -71,5 +129,22 @@ class ReservationPersistenceAdapter(
         val items: List<ReservationItem> =
             itemEntities.map { item: ReservationItemEntity -> item.toDomain(allocations[item.reservationItemId].orEmpty()) }
         return entity.toDomain(items)
+    }
+
+    private companion object {
+        const val UPDATE_STATE: String =
+            """
+            UPDATE reservation
+               SET status = :status, expires_at = :expiresAt, confirmed_at = :confirmedAt, updated_at = :now, updated_by = :actor
+             WHERE reservation_id = :reservationId AND status = :expectedStatus
+            """
+
+        const val FIND_EXPIRED_IDS: String =
+            """
+            SELECT reservation_id FROM reservation
+             WHERE status = 'RESERVED' AND expires_at <= :now
+             ORDER BY expires_at, reservation_id
+             LIMIT :limit
+            """
     }
 }
