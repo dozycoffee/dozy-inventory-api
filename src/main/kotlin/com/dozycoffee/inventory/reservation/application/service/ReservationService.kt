@@ -141,18 +141,8 @@ class ReservationService(
                 """{"expiresAt":"${saved.expiry.expiresAt}","maxExpiresAt":"${saved.expiry.maxExpiresAt}"}""",
             ),
         )
-        reservationChangedEventPublisher.publish(
-            ReservationChangedEvent(
-                changeType = ReservationChangeType.CREATED,
-                reservationId = reservationId,
-                warehouseId = saved.warehouseId,
-                channel = saved.channel.value,
-                externalOrderId = saved.externalOrderId.value,
-                items = quantities.map { (productId: Long, quantity: Int) -> ReservationChangedEvent.Item(productId, quantity) },
-                idempotencyKey = key.value,
-            ),
-        )
-        return result(saved)
+        reservationChangedEventPublisher.publish(ReservationChangedEvent.of(ReservationChangeType.CREATED, saved))
+        return ReservationResult.from(saved)
     }
 
     /** 같은 멱등 키로 이미 만든 예약이 있으면 그 예약을 반환한다. 요청 내용이 다르면 거부한다. 만료 시각은 시간에 따라 달라 비교하지 않는다 */
@@ -167,27 +157,8 @@ class ReservationService(
                 previous.externalOrderId.value == command.externalOrderId &&
                 previous.items.associate { it.productId to it.requestedQuantity } == command.items.associate { it.productId to it.quantity }
         if (!sameRequest) throw IdempotencyKeyConflictException()
-        return result(previous)
+        return ReservationResult.from(previous)
     }
-
-    private fun result(reservation: Reservation): ReservationResult =
-        ReservationResult(
-            reservationId = checkNotNull(reservation.reservationId) { "저장된 예약은 식별자가 있어야 한다" },
-            status = reservation.status,
-            warehouseId = reservation.warehouseId,
-            channel = reservation.channel.value,
-            externalOrderId = reservation.externalOrderId.value,
-            expiresAt = reservation.expiry.expiresAt,
-            maxExpiresAt = reservation.expiry.maxExpiresAt,
-            items =
-                reservation.items.map { item: ReservationItem ->
-                    ReservationResult.Item(
-                        item.productId,
-                        item.requestedQuantity,
-                        item.allocations.map { ReservationResult.Allocation(it.inventoryId, it.quantity) },
-                    )
-                },
-        )
 }
 
 private const val MAX_ATTEMPTS: Int = 5

@@ -232,7 +232,16 @@ class ReservationServiceTest {
                 verifyBlocking(publisher) { publish(published.capture()) }
                 assertEquals(ReservationChangeType.CREATED, published.firstValue.changeType)
                 assertEquals(keyValue, published.firstValue.idempotencyKey)
-                assertEquals(listOf(ReservationChangedEvent.Item(100L, 10)), published.firstValue.items)
+                assertEquals(
+                    listOf(
+                        ReservationChangedEvent.Item(
+                            100L,
+                            10,
+                            listOf(ReservationChangedEvent.Allocation(5L, 4), ReservationChangedEvent.Allocation(7L, 6)),
+                        ),
+                    ),
+                    published.firstValue.items,
+                )
             }
     }
 

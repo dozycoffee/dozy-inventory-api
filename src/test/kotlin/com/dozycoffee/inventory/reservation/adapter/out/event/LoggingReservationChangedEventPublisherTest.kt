@@ -16,7 +16,7 @@ class LoggingReservationChangedEventPublisherTest {
                     10L,
                     "OMS",
                     "ORDER-1",
-                    listOf(ReservationChangedEvent.Item(100L, 5)),
+                    listOf(ReservationChangedEvent.Item(100L, 5, listOf(ReservationChangedEvent.Allocation(5L, 5)))),
                     "key",
                 )
 
