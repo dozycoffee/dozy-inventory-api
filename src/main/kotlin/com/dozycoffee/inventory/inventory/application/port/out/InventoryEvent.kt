@@ -19,4 +19,5 @@ data class InventoryEvent(
 
 enum class InventoryEventType {
     INCREASED,
+    DECREASED,
 }

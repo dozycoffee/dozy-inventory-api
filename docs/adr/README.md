@@ -27,6 +27,7 @@
 | [0021](0021-consolidate-migrations-before-deployment.md) | 배포 전 마이그레이션 통합 | Accepted |
 | [0022](0022-reservation-and-allocation.md) | 예약 생성과 Lot 할당 규칙 | Accepted |
 | [0023](0023-reservation-state-transitions.md) | 예약 상태 전이(확정·해제·연장·만료) 규칙 | Accepted |
+| [0024](0024-outbound-confirmation.md) | 출고 확정 반영 규칙 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 

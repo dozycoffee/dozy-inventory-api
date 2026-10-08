@@ -8,8 +8,21 @@ class ReservationAllocation private constructor(
     val reservationAllocationId: Long?,
     val inventoryId: Long,
     val quantity: Int,
-    val fulfilledQuantity: Int,
+    fulfilledQuantity: Int,
 ) {
+    var fulfilledQuantity: Int = fulfilledQuantity
+        private set
+
+    /** 출고하지 못한 수량(결품). 출고 확정 전에는 할당 수량 전체이다 */
+    val shortageQuantity: Int
+        get() = quantity - fulfilledQuantity
+
+    /** 실제 출고 수량을 기록한다. 0 이상 할당 수량 이하여야 한다 */
+    fun fulfill(shippedQuantity: Int) {
+        if (shippedQuantity < 0 || shippedQuantity > quantity) throw InvalidDomainValueException(ReservationErrorCode.INVALID_FULFILLMENT)
+        fulfilledQuantity = shippedQuantity
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ReservationAllocation) return false
