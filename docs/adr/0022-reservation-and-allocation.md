@@ -24,6 +24,7 @@ F-010은 "같은 재고를 여러 채널이 동시에 잡아도 초과 판매가
 12. **경합 재시도는 예약 서비스가 5회까지 새 트랜잭션에서 하고 시도 사이에 무작위로 조금 쉰다**(최대 30ms). 같은 행에 몰린 요청이 다시 같이 부딪히는 것을 줄이기 위함이다. 그래도 밀리면 `INV_ALLOCATION_CONFLICT`(409)이며 호출자가 다시 요청한다. 초과 예약은 없다.
     `AllocationConflictException`은 예약이 재시도 대상으로 구분해야 해서 `IdempotencyKeyConflictException`처럼 `global/error`에 두고 도메인 간에 공유한다.
 13. **예약 이벤트는 발행 포트(`ReservationChangedEventPublisher`)와 로그 구현을 둔다.** 입고와 같은 방식이며 Outbox 저장 구현은 F-018에서 교체한다. 이력은 `reservation_event`에 `CREATED`로 남긴다.
+14. **API는 `POST /api/v1/reservations`이고 호출은 `inventory:service`만 허용한다.** 예약은 수량을 잡는 변경이라 호출 주체를 system client로 고정하고(관리자가 수동으로 잡는 시나리오가 없다), 처음과 재요청 모두 200이다(ADR-0019와 같은 규칙). 만료 시각은 시간대 오프셋을 포함한 ISO-8601 문자열로 받아 서비스 시간대(Asia/Seoul)의 로컬 시각으로 바꾸고, 응답은 같은 시간대 오프셋을 붙여 준다. 오프셋이 없거나 날짜만 있는 값은 400이다. Jackson이 `OffsetDateTime`에 날짜만 있는 값이나 숫자 문자열을 너그럽게 읽어 시간대를 임의로 가정하므로 문자열로 받아 엄격하게 검사한다.
 
 ## 결과 (Consequences)
 
