@@ -79,7 +79,7 @@
   {
     "id": "F-012",
     "name": "출고 확정",
-    "description": "WMS의 출고 확정을 Lot별 총 수량·예약 수량 차감으로 반영하고 예약을 FULFILLED로 바꾼다. 결품 처리 포함. 시나리오 6.1. 결정은 ADR-0024. 단계: (1) inventory 출고 반영 UseCase와 reservation 도메인·영속성, (2) 출고 확정 application, (3) 웹 어댑터(`POST /api/v1/reservations/{id}/fulfillment`).",
+    "description": "WMS의 출고 확정을 Lot별 총 수량·예약 수량 차감으로 반영하고 예약을 FULFILLED로 바꾼다. 결품 처리 포함. 시나리오 6.1. 결정은 ADR-0024. 단계: (1) inventory 출고 반영 UseCase와 reservation 도메인·영속성, (2) 출고 확정 application(완료), (3) 웹 어댑터(`POST /api/v1/reservations/{id}/fulfillment`).",
     "status": "in_progress",
     "dependencies": ["F-011"]
   },
