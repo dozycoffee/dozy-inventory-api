@@ -92,6 +92,17 @@ OMS·가맹점 서비스가 주문의 상품을 한 창고에서 예약한다. �
 - **멱등**: 확정·해제·연장은 `Idempotency-Key` 없이 상태로 멱등하다. 이미 목표 상태이면 아무것도 바꾸지 않고 200으로 현재 상태를 반환하고, 불가능한 전이는 409이다.
 - **호출 권한**: `inventory:service`만이다.
 
+### 출고 확정 (6.1)
+
+WMS가 피킹을 마친 출고를 예약에 반영한다. 결정 배경은 [ADR-0024](adr/0024-outbound-confirmation.md)이다.
+
+- **요청 단위**: 예약 하나. 예약의 모든 할당 재고 행에 대한 실제 출고 수량을 한 번에 보낸다(부분 출고 없음). 확정(`CONFIRMED`)된 예약만 대상이다.
+- **반영**: 출고한 수량만큼 총 수량과 예약 수량을 함께 줄이고 `OUTBOUND` 이력을 남기며, 예약은 `FULFILLED`가 된다.
+- **결품**: 출고 수량이 할당보다 적으면 모자란 만큼은 예약 수량만 가용 수량으로 되돌린다. 총 수량은 줄이지 않고 원인은 실사 조정·대사로 정리한다.
+- **응답**: 재고 행별 할당·출고·결품 수량과 처리 후 총 수량을 담아 WMS가 자기 수량과 즉시 비교한다.
+- **멱등**: `Idempotency-Key`가 필수이다. 같은 키·같은 수량의 재요청은 새로 반영하지 않고 처음과 같은 결과를 200으로 반환한다. 다른 키는 `INV_IDEMPOTENCY_KEY_CONFLICT`, 다른 수량은 `INV_INVALID_RESERVATION_STATE`(409)이다.
+- **API**: `POST /api/v1/reservations/{id}/fulfillment`(`inventory:service`만). 본문은 `allocations[{inventoryId, shippedQuantity}]`이다.
+
 ### 상태 흐름
 
 - 예약: `RESERVED` → `CONFIRMED` → `FULFILLED`, `RESERVED` → `RELEASED`/`EXPIRED`, `CONFIRMED` → `RELEASED`(WMS 취소 확정 후)
