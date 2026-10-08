@@ -27,6 +27,12 @@ enum class ReservationErrorCode(
         "예약의 현재 상태에서는 요청한 작업을 할 수 없습니다.",
     ),
     RESERVATION_EXPIRED(ErrorType.CONFLICT, "INV_RESERVATION_EXPIRED", "만료 시각이 지난 예약입니다."),
+    RESERVATION_NOT_FOUND(ErrorType.NOT_FOUND, "INV_RESERVATION_NOT_FOUND", "예약을 찾을 수 없습니다."),
+    RESERVATION_CHANGED_CONCURRENTLY(
+        ErrorType.CONFLICT,
+        "INV_RESERVATION_CHANGED_CONCURRENTLY",
+        "다른 요청이 같은 예약을 동시에 변경했습니다. 다시 시도해 주세요.",
+    ),
     DUPLICATE_ORDER_RESERVATION(
         ErrorType.CONFLICT,
         "INV_DUPLICATE_ORDER_RESERVATION",
