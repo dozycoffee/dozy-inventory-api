@@ -343,8 +343,8 @@ erDiagram
 | aggregate_type | VARCHAR(50) | N | `INVENTORY`, `RESERVATION`, `LOT`, `PRODUCT`, `ADJUSTMENT` |
 | aggregate_id | BIGINT | N | |
 | event_type | VARCHAR(100) | N | 이벤트 이름의 코드 값 |
-| partition_key | VARCHAR(100) | N | Kafka 파티션 키(`창고ID:상품ID`). 같은 키는 순서를 보장 |
-| payload | JSON | N | |
+| partition_key | VARCHAR(100) | N | Kafka 파티션 키. 재고 이벤트는 `창고ID:상품ID`, 예약 이벤트는 `창고ID:예약ID`, 상품 이벤트는 상품 ID(ADR-0025). 같은 키는 순서를 보장 |
+| payload | JSON | N | 구독자에게 보이는 이벤트 본문(JSON). 이벤트 ID 등은 Kafka 헤더로 싣는다 |
 | status | VARCHAR(50) | N | `PENDING`, `PUBLISHED` |
 | attempt_count | INT | N | 발행 시도 횟수 |
 | created_at, published_at | DATETIME(6) | N, Y | |

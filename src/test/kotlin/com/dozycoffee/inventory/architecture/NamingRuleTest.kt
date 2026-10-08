@@ -9,6 +9,9 @@ class NamingRuleTest {
     private companion object {
         /** 영속성 엔티티의 감사 컬럼 기반 클래스. 생성만 → +수정 → +삭제 순으로 한 줄기로 상속한다 */
         val AUDIT_BASES: Array<String> = arrayOf("CreatedAuditEntity", "BaseEntity", "SoftDeletableEntity")
+
+        /** 감사 기반 클래스에 맞지 않는 테이블의 엔티티. `outbox_event`는 `created_by`가 없어 `@CreatedDate`만 직접 둔다(architecture.md) */
+        val AUDIT_BASE_EXEMPT: Set<String> = setOf("OutboxEventEntity")
     }
 
     /** 도메인 패키지 안의 클래스·인터페이스·enum·object. (이름, 도메인 패키지 이름, 종류) */
@@ -125,7 +128,7 @@ class NamingRuleTest {
                             "${d.name}은(는) application/port/out의 포트를 구현해야 한다"
                         }
 
-                        d.name.endsWith("Entity") && !c.hasParentWithName(AUDIT_BASES.toList()) -> {
+                        d.name.endsWith("Entity") && d.name !in AUDIT_BASE_EXEMPT && !c.hasParentWithName(AUDIT_BASES.toList()) -> {
                             "${d.name}은(는) 감사 기반 클래스(CreatedAuditEntity, BaseEntity, SoftDeletableEntity)를 상속해야 한다"
                         }
 

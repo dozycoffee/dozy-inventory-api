@@ -159,6 +159,7 @@ class InboundServiceTest {
                 assertEquals(
                     InventoryEvent(
                         InventoryEventType.INCREASED,
+                        500L,
                         10L,
                         100L,
                         1000L,

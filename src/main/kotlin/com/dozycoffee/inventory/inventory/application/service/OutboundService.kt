@@ -76,6 +76,7 @@ class OutboundService(
         inventoryEventPublisher.publish(
             InventoryEvent(
                 eventType = InventoryEventType.DECREASED,
+                inventoryId = item.inventoryId,
                 warehouseId = inventory.warehouseId,
                 productId = inventory.productId,
                 lotId = inventory.lotId,

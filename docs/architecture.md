@@ -76,7 +76,7 @@ src/main/kotlin/com/dozycoffee/inventory
 ## 도메인 모델과 영속성 엔티티
 
 - **도메인 모델**(`domain/model`)은 비즈니스 규칙과 불변식을 가진 순수 Kotlin 클래스이고 감사 필드(`createdAt` 등)를 모른다.
-- **영속성 엔티티**(`adapter/out/persistence`의 `XxxEntity`)는 감사 기반 클래스를 상속해 감사 컬럼을 자동으로 채운다. 기반 클래스는 한 줄기다: `CreatedAuditEntity`(생성 정보만, 원장성 테이블) ← `BaseEntity`(+수정 정보) ← `SoftDeletableEntity`(+삭제 정보). 이 줄기에 맞지 않는 테이블(`outbox_event`는 `created_by`가 없다)은 기반 클래스 없이 `@CreatedDate` 필드를 직접 둔다. 비즈니스 로직을 두지 않는다.
+- **영속성 엔티티**(`adapter/out/persistence`의 `XxxEntity`)는 감사 기반 클래스를 상속해 감사 컬럼을 자동으로 채운다. 기반 클래스는 한 줄기다: `CreatedAuditEntity`(생성 정보만, 원장성 테이블) ← `BaseEntity`(+수정 정보) ← `SoftDeletableEntity`(+삭제 정보). 이 줄기에 맞지 않는 테이블(`outbox_event`는 `created_by`가 없다)은 기반 클래스 없이 `@CreatedDate` 필드를 직접 두고, 아키텍처 테스트(`NamingRuleTest`)에 `OutboxEventEntity`만 예외로 명시한다. 비즈니스 로직을 두지 않는다.
 - 영속성 어댑터가 `XxxEntity.from(model)`과 `toDomain()`으로 둘을 변환한다. 갱신할 때는 기존 엔티티에서 생성 정보를 보존한다(`copyAuditFieldsFrom`).
 - 삭제 여부가 도메인 규칙에 필요하면 도메인 모델에 `deleted` 같은 필드를 명시한다. 삭제 시각·삭제자 같은 감사 정보는 영속성에만 둔다.
 - 응답에 생성·수정 시각이 필요하면 도메인 모델이 읽기 전용 값으로 명시해서 들고 있게 한다.

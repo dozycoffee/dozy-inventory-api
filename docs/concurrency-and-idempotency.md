@@ -53,7 +53,7 @@ UPDATE inventory
 
 ## 3. 이벤트 발행 (Outbox)
 
-- 수량 변경과 같은 트랜잭션으로 `outbox_event`에 이벤트를 저장하고, 별도 프로세스가 Kafka로 발행한다(최소 한 번 전달).
-- 같은 `partition_key`(`창고ID:상품ID`)의 이벤트는 `outbox_event_id` 순서로 발행해 순서를 보장한다.
+- 수량 변경과 같은 트랜잭션으로 `outbox_event`에 이벤트를 저장하고(각 도메인의 이벤트 발행기가 `outbox`의 `RecordOutboxEventUseCase`로 저장), 발행기가 Kafka로 발행한다(최소 한 번 전달, ADR-0025).
+- 같은 `partition_key`(재고 `창고ID:상품ID`, 예약 `창고ID:예약ID`, 상품 상품 ID)의 이벤트는 `outbox_event_id` 순서로 발행해 순서를 보장한다.
 - 구독자는 중복 전달에 대비해 멱등하게 처리해야 한다.
 - 이벤트 발행은 `application/port/out`의 포트로 추상화한다.

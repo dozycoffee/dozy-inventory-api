@@ -107,6 +107,7 @@ class InboundService(
         inventoryEventPublisher.publish(
             InventoryEvent(
                 eventType = InventoryEventType.INCREASED,
+                inventoryId = checkNotNull(inventory.inventoryId) { "저장된 재고는 식별자가 있어야 한다" },
                 warehouseId = command.warehouseId,
                 productId = command.productId,
                 lotId = lotId,
