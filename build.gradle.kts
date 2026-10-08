@@ -85,6 +85,8 @@ spotless {
 
 tasks.test {
     useJUnitPlatform()
+    // 통합 테스트가 만든 예약을 스케줄러가 끼어들어 만료 처리하지 않도록 끈다. 스케줄러 테스트는 켜서 직접 실행한다
+    systemProperty("inventory.reservation.expiry-scan.enabled", "false")
     testLogging {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showCauses = true
