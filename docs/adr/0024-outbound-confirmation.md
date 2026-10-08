@@ -17,6 +17,7 @@ F-012는 WMS의 출고 확정을 재고에 반영한다. 예약은 확정(`CONFI
 5. **멱등 키는 `Idempotency-Key` 헤더이다**(수량을 바꾸는 요청이므로 ADR-0019와 같은 규칙). 이력의 `(멱등 키, 재고 행)` 유니크 제약이 같은 키의 재고 행 중복 반영을 막는다. 같은 키의 재요청은 예약이 이미 `FULFILLED`이고 요청한 출고 수량이 기록된 값과 같으면 아무것도 바꾸지 않고 처음과 같은 결과(처리 후 수량은 키로 이력을 다시 조회)를 반환한다. 수량이 다르면 409이다. 최종 판정은 `CONFIRMED` → `FULFILLED` 조건부 UPDATE이다.
 6. **응답은 재고 행별로 할당·출고·결품 수량과 처리 후 총 수량을 준다.** WMS가 자기 수량과 즉시 비교한다(시나리오 결정 8). 출고가 0인 행은 총 수량이 바뀌지 않아 처리 후 수량이 없다(null).
 7. **호출은 `inventory:service`만 허용한다**(WMS는 system client). 트랜잭션의 잠금 순서는 예약 행 → 재고 행 `inventory_id` 오름차순이다(ADR-0023 결정 11과 같다).
+8. **API**: `POST /api/v1/reservations/{id}/fulfillment`. 본문은 `allocations[{inventoryId, shippedQuantity}]`이고 `Idempotency-Key` 헤더가 필수이며 처음과 재요청 모두 200이다. 응답은 재고 행별로 상품, 할당·출고·결품 수량, 처리 후 총 수량(출고하지 않은 행은 null)을 준다. 재고 행 ID는 예약 생성·확정 응답의 `allocations[].inventoryId`와 같다. 오류는 입력 불일치 400(`INV_INVALID_FULFILLMENT`), 예약 없음 404, 불가능한 전이·다른 수량 409(`INV_INVALID_RESERVATION_STATE`), 다른 멱등 키 409(`INV_IDEMPOTENCY_KEY_CONFLICT`), 계속 겹침 409(`INV_RESERVATION_CHANGED_CONCURRENTLY`)이다.
 
 ## 결과 (Consequences)
 
