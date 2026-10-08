@@ -250,6 +250,161 @@ class ReservationPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `상태 갱신` {
+        private suspend fun saved(
+            key: String = "svc-oms-order-1",
+            orderId: String = "ORDER-1",
+        ): Reservation = adapter.save(reservation(key, orderId))
+
+        @Test
+        fun `확정하면 상태와 확정 시각을 저장하고 만료 시각을 비운다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = saved()
+                reservation.confirm(now.plusMinutes(1))
+
+                assertThat(adapter.updateState(reservation, ReservationStatus.RESERVED)).isTrue()
+
+                val loaded: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                assertThat(loaded.status).isEqualTo(ReservationStatus.CONFIRMED)
+                assertThat(loaded.expiry.expiresAt).isNull()
+                assertThat(loaded.expiry.maxExpiresAt).isEqualTo(now.plusHours(1))
+                assertThat(loaded.confirmedAt).isEqualTo(now.plusMinutes(1))
+            }
+
+        @Test
+        fun `연장하면 만료 시각을 저장한다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = saved()
+                reservation.extend(now.plusMinutes(50), now)
+
+                assertThat(adapter.updateState(reservation, ReservationStatus.RESERVED)).isTrue()
+
+                assertThat(
+                    checkNotNull(adapter.findById(checkNotNull(reservation.reservationId))).expiry.expiresAt,
+                ).isEqualTo(now.plusMinutes(50))
+            }
+
+        @Test
+        fun `저장된 상태가 기대한 상태가 아니면 아무것도 바꾸지 않고 false다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = saved()
+                val other: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                other.release()
+                assertThat(adapter.updateState(other, ReservationStatus.RESERVED)).isTrue()
+
+                reservation.confirm(now.plusMinutes(1))
+
+                assertThat(adapter.updateState(reservation, ReservationStatus.RESERVED)).isFalse()
+                val loaded: Reservation = checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+                assertThat(loaded.status).isEqualTo(ReservationStatus.RELEASED)
+                assertThat(loaded.confirmedAt).isNull()
+            }
+
+        @Test
+        fun `같은 예약을 50개가 동시에 확정하려 하면 정확히 하나만 성공한다`() =
+            runBlocking<Unit> {
+                val id: Long = checkNotNull(saved().reservationId)
+
+                val results: List<Boolean> =
+                    (1..50)
+                        .map {
+                            async(Dispatchers.Default) {
+                                val reservation: Reservation = checkNotNull(adapter.findById(id))
+                                reservation.confirm(now.plusMinutes(1))
+                                adapter.updateState(reservation, ReservationStatus.RESERVED)
+                            }
+                        }.awaitAll()
+
+                assertThat(results.count { it }).isEqualTo(1)
+                assertThat(checkNotNull(adapter.findById(id)).status).isEqualTo(ReservationStatus.CONFIRMED)
+            }
+
+        @Test
+        fun `수정 시각과 수정자를 갱신한다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = saved()
+                databaseClient
+                    .sql(
+                        "UPDATE reservation SET updated_by = 'before', updated_at = '2020-01-01 00:00:00'",
+                    ).fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+                reservation.release()
+
+                adapter.updateState(reservation, ReservationStatus.RESERVED)
+
+                val row: Map<String, Any?> =
+                    databaseClient
+                        .sql("SELECT updated_by, updated_at FROM reservation")
+                        .fetch()
+                        .one()
+                        .awaitFirst()
+                assertThat(row["updated_by"] as String).isNotEqualTo("before")
+                assertThat(row["updated_at"].toString()).doesNotStartWith("2020")
+            }
+
+        @Test
+        fun `저장되지 않은 예약은 갱신할 수 없다`() =
+            runBlocking<Unit> {
+                assertThrows<IllegalStateException> { adapter.updateState(reservation(), ReservationStatus.RESERVED) }
+            }
+    }
+
+    @Nested
+    inner class `만료된 예약 조회` {
+        private suspend fun saveExpiring(
+            orderId: String,
+            expiresAt: LocalDateTime,
+        ): Long {
+            val id: Long = checkNotNull(adapter.save(reservation(key = "key-$orderId", orderId = orderId)).reservationId)
+            databaseClient
+                .sql("UPDATE reservation SET expires_at = :expiresAt WHERE reservation_id = :id")
+                .bind("expiresAt", expiresAt)
+                .bind("id", id)
+                .fetch()
+                .rowsUpdated()
+                .awaitSingle()
+            return id
+        }
+
+        @Test
+        fun `만료 시각이 현재 이하인 확정 전 예약만 만료 시각이 이른 순으로 반환한다`() =
+            runBlocking<Unit> {
+                val later: Long = saveExpiring("A", now.minusMinutes(1))
+                val earlier: Long = saveExpiring("B", now.minusMinutes(10))
+                val exact: Long = saveExpiring("C", now)
+                saveExpiring("D", now.plusSeconds(1))
+
+                assertThat(adapter.findExpiredIds(now, 10)).containsExactly(earlier, later, exact)
+            }
+
+        @Test
+        fun `확정, 해제, 만료된 예약은 제외한다`() =
+            runBlocking<Unit> {
+                val reserved: Long = saveExpiring("A", now.minusMinutes(1))
+                listOf("CONFIRMED", "RELEASED", "EXPIRED", "FULFILLED").forEachIndexed { index, status ->
+                    val id: Long = saveExpiring("S$index", now.minusMinutes(5))
+                    databaseClient
+                        .sql(
+                            "UPDATE reservation SET status = '$status' WHERE reservation_id = $id",
+                        ).fetch()
+                        .rowsUpdated()
+                        .awaitSingle()
+                }
+
+                assertThat(adapter.findExpiredIds(now, 10)).containsExactly(reserved)
+            }
+
+        @Test
+        fun `한 번에 가져올 개수를 제한한다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> = (1..5).map { saveExpiring("O$it", now.minusMinutes(10L - it)) }
+
+                assertThat(adapter.findExpiredIds(now, 3)).containsExactlyElementsOf(ids.take(3))
+            }
+    }
+
+    @Nested
     inner class `멱등 키 중복` {
         @Test
         fun `같은 멱등 키는 DuplicateReservationKeyException이고 항목과 할당은 저장되지 않는다`() =

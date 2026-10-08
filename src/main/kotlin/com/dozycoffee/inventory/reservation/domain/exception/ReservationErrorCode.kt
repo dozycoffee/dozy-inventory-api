@@ -21,6 +21,12 @@ enum class ReservationErrorCode(
         "INV_INVALID_RESERVATION_ITEMS",
         "예약 상품은 1개 이상 100개 이하이고 중복될 수 없으며 수량은 1 이상이고 할당 수량의 합과 같아야 합니다.",
     ),
+    INVALID_RESERVATION_STATE(
+        ErrorType.CONFLICT,
+        "INV_INVALID_RESERVATION_STATE",
+        "예약의 현재 상태에서는 요청한 작업을 할 수 없습니다.",
+    ),
+    RESERVATION_EXPIRED(ErrorType.CONFLICT, "INV_RESERVATION_EXPIRED", "만료 시각이 지난 예약입니다."),
     DUPLICATE_ORDER_RESERVATION(
         ErrorType.CONFLICT,
         "INV_DUPLICATE_ORDER_RESERVATION",

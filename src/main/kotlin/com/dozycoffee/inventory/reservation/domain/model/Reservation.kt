@@ -4,7 +4,9 @@ import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
+import com.dozycoffee.inventory.reservation.domain.exception.InvalidReservationStateException
 import com.dozycoffee.inventory.reservation.domain.exception.ReservationErrorCode
+import com.dozycoffee.inventory.reservation.domain.exception.ReservationExpiredException
 import com.dozycoffee.inventory.reservation.domain.valueobject.ExternalOrderId
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationChannel
 import com.dozycoffee.inventory.reservation.domain.valueobject.ReservationExpiry
@@ -21,13 +23,89 @@ class Reservation private constructor(
     val warehouseId: Long,
     val channel: ReservationChannel,
     val externalOrderId: ExternalOrderId,
-    val status: ReservationStatus,
-    val expiry: ReservationExpiry,
-    val confirmedAt: LocalDateTime?,
+    status: ReservationStatus,
+    expiry: ReservationExpiry,
+    confirmedAt: LocalDateTime?,
     val idempotencyKey: IdempotencyKey,
     val requesterService: RequesterService,
     val items: List<ReservationItem>,
 ) {
+    var status: ReservationStatus = status
+        private set
+
+    var expiry: ReservationExpiry = expiry
+        private set
+
+    var confirmedAt: LocalDateTime? = confirmedAt
+        private set
+
+    /**
+     * 확정 전 예약을 확정한다. 확정된 예약은 만료되지 않아 만료 시각이 사라진다. 이미 확정되었으면 바꾸지 않고 false를 반환한다.
+     * 만료 시각이 지난 예약은 [ReservationExpiredException], 해제·만료·출고 완료된 예약은 [InvalidReservationStateException]이다.
+     */
+    fun confirm(now: LocalDateTime): Boolean =
+        when (status) {
+            ReservationStatus.CONFIRMED -> {
+                false
+            }
+
+            ReservationStatus.RESERVED -> {
+                if (expiry.isExpiredAt(now)) throw ReservationExpiredException()
+                status = ReservationStatus.CONFIRMED
+                expiry = expiry.cleared()
+                confirmedAt = now
+                true
+            }
+
+            else -> {
+                throw InvalidReservationStateException()
+            }
+        }
+
+    /**
+     * 예약을 해제한다. 확정 전이든 확정되었든 해제할 수 있다. 이미 해제되었거나 만료되었으면 바꾸지 않고 false를 반환하고,
+     * 출고 완료된 예약은 [InvalidReservationStateException]이다. 수량을 되돌리는 일은 호출한 서비스가 한다.
+     */
+    fun release(): Boolean =
+        when (status) {
+            ReservationStatus.RELEASED, ReservationStatus.EXPIRED -> {
+                false
+            }
+
+            ReservationStatus.RESERVED, ReservationStatus.CONFIRMED -> {
+                status = ReservationStatus.RELEASED
+                expiry = expiry.cleared()
+                true
+            }
+
+            ReservationStatus.FULFILLED -> {
+                throw InvalidReservationStateException()
+            }
+        }
+
+    /**
+     * 확정 전 예약의 만료 시각을 [newExpiresAt]으로 늘린다. 같은 시각이면 바꾸지 않고 false를 반환한다.
+     * 만료 시각이 지난 예약은 [ReservationExpiredException], 확정 전이 아닌 예약은 [InvalidReservationStateException]이고,
+     * 새 만료 시각이 현재 이전이거나 현재 만료 시각보다 이르거나 최대 만료 시각을 넘으면 입력 오류다.
+     */
+    fun extend(
+        newExpiresAt: LocalDateTime,
+        now: LocalDateTime,
+    ): Boolean {
+        if (status != ReservationStatus.RESERVED) throw InvalidReservationStateException()
+        if (expiry.isExpiredAt(now)) throw ReservationExpiredException()
+        if (newExpiresAt == expiry.expiresAt) return false
+        expiry = expiry.extendedTo(newExpiresAt, now)
+        return true
+    }
+
+    /** 만료 시각이 지난 확정 전 예약을 만료 처리한다. 대상이 아니면 바꾸지 않고 false를 반환한다 */
+    fun expire(now: LocalDateTime): Boolean {
+        if (status != ReservationStatus.RESERVED || !expiry.isExpiredAt(now)) return false
+        status = ReservationStatus.EXPIRED
+        return true
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Reservation) return false
