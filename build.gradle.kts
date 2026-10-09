@@ -91,6 +91,7 @@ tasks.test {
     systemProperty("inventory.reservation.expiry-scan.enabled", "false")
     // Outbox 발행기도 테스트가 쌓은 이벤트에 끼어들지 않도록 끈다. 발행기 테스트는 켜서 직접 실행한다
     systemProperty("inventory.outbox.publisher.enabled", "false")
+    systemProperty("inventory.outbox.cleanup.enabled", "false")
     testLogging {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showCauses = true
