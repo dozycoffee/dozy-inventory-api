@@ -52,6 +52,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.flywaydb:flyway-mysql")
     implementation("com.dozycoffee.auth:auth-spring-boot-starter:$dozyAuthVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -68,6 +69,7 @@ dependencies {
     testImplementation("com.epages:restdocs-api-spec-webtestclient:$restdocsApiSpecVersion")
     testImplementation("com.lemonappdev:konsist:$konsistVersion")
     testImplementation("org.testcontainers:testcontainers-mysql")
+    testImplementation("org.testcontainers:testcontainers-kafka")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -87,6 +89,8 @@ tasks.test {
     useJUnitPlatform()
     // 통합 테스트가 만든 예약을 스케줄러가 끼어들어 만료 처리하지 않도록 끈다. 스케줄러 테스트는 켜서 직접 실행한다
     systemProperty("inventory.reservation.expiry-scan.enabled", "false")
+    // Outbox 발행기도 테스트가 쌓은 이벤트에 끼어들지 않도록 끈다. 발행기 테스트는 켜서 직접 실행한다
+    systemProperty("inventory.outbox.publisher.enabled", "false")
     testLogging {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showCauses = true

@@ -36,7 +36,7 @@ OMS·가맹점 서비스(Store)가 같은 재고를 바라보므로 가용 재�
 
 export GPR_USER=<깃허브 계정> GPR_TOKEN=<read:packages 토큰>   # dozy-auth 스타터 다운로드용. 저장소에 두지 않는다
 cp .env.example .env                    # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
-docker compose up -d                    # 로컬 MySQL (호스트 포트 3307). 마이그레이션 파일이 합쳐졌으면(ADR-0021) `docker compose down -v`로 볼륨을 지우고 다시 만든다
+docker compose up -d                    # 로컬 MySQL(호스트 포트 3307)과 Kafka(호스트 포트 9092, Outbox 이벤트 발행 대상). 마이그레이션 파일이 합쳐졌으면(ADR-0021) `docker compose down -v`로 볼륨을 지우고 다시 만든다
 ./gradlew bootRun                       # 로컬 실행 (포트 8082, .env를 환경변수로 읽는다). local 프로필은 토큰 없이 개발 사용자로 동작하고, 그 외 프로필은 Auth 토큰이 필요하다
 ```
 
