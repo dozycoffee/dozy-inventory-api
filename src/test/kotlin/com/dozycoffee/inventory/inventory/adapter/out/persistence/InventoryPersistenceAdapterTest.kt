@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
+import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
 import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
@@ -14,6 +15,7 @@ import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotReservableException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
+import com.dozycoffee.inventory.inventory.domain.model.Lot
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import kotlinx.coroutines.Dispatchers
@@ -717,6 +719,34 @@ class InventoryPersistenceAdapterTest {
 
                 assertThat(candidates.map { it.productId to it.inventoryId }).containsExactlyInAnyOrder(productId to a, other to b)
                 assertThat(adapter.findAllocationCandidates(10L, emptySet(), today)).isEmpty()
+            }
+    }
+
+    @Nested
+    inner class `Lot 정보 조회` {
+        @Test
+        fun `재고 행의 Lot ID와 번호와 유통기한을 재고 행 ID 순서로 조회한다`() =
+            runBlocking<Unit> {
+                val dated: Lot = fixture.seedLot(productId, "LOT-X", LocalDate.of(2027, 1, 1))
+                val undated: Lot = fixture.seedLot(productId, "LOT-Y", null)
+                val first: Long = fixture.insertInventory(10L, productId, checkNotNull(dated.lotId))
+                val second: Long = fixture.insertInventory(10L, productId, checkNotNull(undated.lotId))
+
+                val infos: List<InventoryLotInfo> = adapter.findLotInfos(setOf(second, first))
+
+                assertThat(infos).containsExactly(
+                    InventoryLotInfo(first, checkNotNull(dated.lotId), "LOT-X", LocalDate.of(2027, 1, 1)),
+                    InventoryLotInfo(second, checkNotNull(undated.lotId), "LOT-Y", null),
+                )
+            }
+
+        @Test
+        fun `없는 재고 행은 결과에 없고 빈 집합은 빈 목록이다`() =
+            runBlocking<Unit> {
+                val inventoryId: Long = fixture.insertInventory(10L, productId, lotId)
+
+                assertThat(adapter.findLotInfos(setOf(inventoryId, inventoryId + 1000)).map { it.inventoryId }).containsExactly(inventoryId)
+                assertThat(adapter.findLotInfos(emptySet())).isEmpty()
             }
     }
 

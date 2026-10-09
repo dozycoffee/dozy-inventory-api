@@ -36,6 +36,9 @@ interface InventoryRepository {
         today: LocalDate,
     ): List<AllocationCandidate>
 
+    /** 재고 행이 속한 Lot의 정보. 없는 재고 행은 결과에 없다 */
+    suspend fun findLotInfos(inventoryIds: Set<Long>): List<InventoryLotInfo>
+
     /** 같은 키(창고 × Lot × 품질 상태)의 행이 있으면 총 수량을 더하고 없으면 수량이 [amount]인 행을 만든다 */
     suspend fun increase(
         key: InventoryKey,

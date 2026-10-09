@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.error.DomainException
 import com.dozycoffee.inventory.global.security.CurrentActorProvider
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
+import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
@@ -75,6 +76,22 @@ class InventoryPersistenceAdapter(
                     lotId = checkNotNull(row.get("lot_id", Long::class.javaObjectType)),
                     expirationDate = row.get("expiration_date", LocalDate::class.java),
                     availableQuantity = checkNotNull(row.get("available", Int::class.javaObjectType)),
+                )
+            }.flow()
+            .toList()
+    }
+
+    override suspend fun findLotInfos(inventoryIds: Set<Long>): List<InventoryLotInfo> {
+        if (inventoryIds.isEmpty()) return emptyList()
+        return databaseClient
+            .sql(LOT_INFOS)
+            .bind("inventoryIds", inventoryIds.toList())
+            .map { row, _ ->
+                InventoryLotInfo(
+                    inventoryId = checkNotNull(row.get("inventory_id", Long::class.javaObjectType)),
+                    lotId = checkNotNull(row.get("lot_id", Long::class.javaObjectType)),
+                    lotNumber = checkNotNull(row.get("lot_number", String::class.java)),
+                    expirationDate = row.get("expiration_date", LocalDate::class.java),
                 )
             }.flow()
             .toList()
@@ -222,6 +239,15 @@ class InventoryPersistenceAdapter(
                AND i.quantity - i.reserved_quantity > 0
                AND (l.expiration_date IS NULL OR l.expiration_date > :today)
              ORDER BY i.product_id, l.expiration_date IS NULL, l.expiration_date, i.inventory_id
+            """
+
+        const val LOT_INFOS: String =
+            """
+            SELECT i.inventory_id, i.lot_id, l.lot_number, l.expiration_date
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
+             WHERE i.inventory_id IN (:inventoryIds)
+             ORDER BY i.inventory_id
             """
 
         const val INSERT_OR_INCREASE: String =
