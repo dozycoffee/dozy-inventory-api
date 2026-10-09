@@ -121,7 +121,7 @@
   {
     "id": "F-018",
     "name": "Outbox와 Kafka 발행",
-    "description": "outbox_event 저장, 파티션 키 순서 발행기, 발행 정리 배치. Kafka 의존성과 compose 서비스를 추가한다. 이벤트 발행 포트 구현. 결정은 ADR-0025. 단계: (1) outbox 도메인·저장과 각 도메인 이벤트 발행기를 Outbox 저장 구현으로 교체, (2) Kafka 발행기(스케줄러, 어드바이저리 락, compose, 테스트 컨테이너), (3) 예약 이벤트의 Lot 정보 보강, (4) 발행 완료 이벤트 정리 배치.",
+    "description": "outbox_event 저장, 파티션 키 순서 발행기, 발행 정리 배치. Kafka 의존성과 compose 서비스를 추가한다. 이벤트 발행 포트 구현. 결정은 ADR-0025. 단계: (1) outbox 도메인·저장과 각 도메인 이벤트 발행기를 Outbox 저장 구현으로 교체, (2) Kafka 발행기(스케줄러, 어드바이저리 락, compose, 테스트 컨테이너)(완료), (3) 예약 이벤트의 Lot 정보 보강, (4) 발행 완료 이벤트 정리 배치.",
     "status": "in_progress",
     "dependencies": ["F-007"]
   },
