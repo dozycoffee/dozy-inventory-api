@@ -1,29 +1,39 @@
 package com.dozycoffee.inventory.reservation.adapter.out.event
 
+import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryLotsUseCase
+import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventoryLotResult
 import com.dozycoffee.inventory.outbox.application.port.`in`.RecordOutboxEventUseCase
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangeType
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangedEvent
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.verifyBlocking
+import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.whenever
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 @ExtendWith(MockitoExtension::class)
 class OutboxReservationChangedEventPublisherTest {
     @Mock
     private lateinit var recordOutboxEventUseCase: RecordOutboxEventUseCase
+
+    @Mock
+    private lateinit var getInventoryLotsUseCase: GetInventoryLotsUseCase
 
     private val mapper: JsonMapper = JsonMapper.builder().build()
     private lateinit var publisher: OutboxReservationChangedEventPublisher
@@ -33,6 +43,7 @@ class OutboxReservationChangedEventPublisherTest {
         publisher =
             OutboxReservationChangedEventPublisher(
                 recordOutboxEventUseCase,
+                getInventoryLotsUseCase,
                 mapper,
                 Clock.fixed(Instant.parse("2026-10-08T03:00:00Z"), ZoneId.of("Asia/Seoul")),
             )
@@ -56,7 +67,15 @@ class OutboxReservationChangedEventPublisherTest {
             "svc-oms-order-1",
         )
 
+    private val lots: List<InventoryLotResult> =
+        listOf(
+            InventoryLotResult(5L, 50L, "LOT-A", LocalDate.of(2027, 1, 1)),
+            InventoryLotResult(7L, 70L, "LOT-B", null),
+            InventoryLotResult(9L, 90L, "LOT-C", LocalDate.of(2027, 6, 30)),
+        )
+
     private suspend fun recorded(event: ReservationChangedEvent): RecordOutboxEventCommand {
+        whenever(getInventoryLotsUseCase.getLots(setOf(5L, 7L, 9L))).thenReturn(lots)
         publisher.publish(event)
         val command = argumentCaptor<RecordOutboxEventCommand>()
         verifyBlocking(recordOutboxEventUseCase, atLeastOnce()) { record(command.capture()) }
@@ -96,6 +115,31 @@ class OutboxReservationChangedEventPublisherTest {
             assertEquals(9L, json["items"][1]["allocations"][0]["inventoryId"].asLong())
             assertEquals("svc-oms-order-1", json["idempotencyKey"].asString())
             assertEquals("2026-10-08T12:00:00+09:00", json["occurredAt"].asString())
+        }
+
+    @Test
+    fun `할당 내역마다 Lot ID와 번호와 유통기한을 담고 유통기한이 없으면 null이다`() =
+        runBlocking<Unit> {
+            val json: JsonNode = mapper.readTree(recorded(event()).payload)
+
+            val first: JsonNode = json["items"][0]["allocations"][0]
+            assertEquals(50L, first["lotId"].asLong())
+            assertEquals("LOT-A", first["lotNumber"].asString())
+            assertEquals("2027-01-01", first["expirationDate"].asString())
+            val noExpiry: JsonNode = json["items"][0]["allocations"][1]
+            assertEquals("LOT-B", noExpiry["lotNumber"].asString())
+            assertTrue(noExpiry["expirationDate"].isNull)
+            assertEquals("2027-06-30", json["items"][1]["allocations"][0]["expirationDate"].asString())
+        }
+
+    @Test
+    fun `할당된 재고 행의 Lot을 찾을 수 없으면 이벤트를 저장하지 않고 실패한다`() =
+        runBlocking<Unit> {
+            whenever(getInventoryLotsUseCase.getLots(setOf(5L, 7L, 9L))).thenReturn(lots.take(2))
+
+            assertThrows<IllegalStateException> { publisher.publish(event()) }
+
+            verifyNoInteractions(recordOutboxEventUseCase)
         }
 
     @Test

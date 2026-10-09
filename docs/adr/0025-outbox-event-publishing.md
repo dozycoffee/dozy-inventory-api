@@ -17,6 +17,7 @@ Accepted (2026-10-08). ADR-0002(Kafka + Outbox)의 구체화다. 구현은 계�
 5. **발행기는 앱 안의 스케줄러이고 DB 어드바이저리 락으로 한 번에 한 인스턴스만 발행한다.** `outbox_event_id` 순서로 대기 이벤트를 가져와 발행하고 `PUBLISHED`로 바꾼다. 인스턴스가 여러 개여도 MySQL `GET_LOCK`으로 순서가 섞이지 않는다. 발행 후 상태를 바꾸기 전에 죽으면 같은 이벤트가 다시 나간다(최소 한 번). 발행에 실패한 이벤트는 시도 횟수를 늘리고 그 뒤 이벤트는 발행하지 않는다(순서 보장을 위해 같은 파티션 키가 건너뛰이면 안 되고, 단순하게 그 묶음의 발행을 멈춘다).
    구현 값: 어드바이저리 락 이름은 `dozy_inventory.outbox_publisher`(MySQL `GET_LOCK`, 대기 0)이고 락·조회·발행·상태 변경을 한 트랜잭션(한 DB 연결)에서 실행한다. 스케줄러는 1초 간격(고정 지연)으로 한 묶음 최대 100건을 발행하고, 묶음이 가득 차면 이어서 최대 10묶음까지 발행한다. 프로듀서는 `acks=all`, 멱등 프로듀서이며 브로커가 응답하지 않으면 5초 안에 실패로 처리해 발행기가 오래 막히지 않는다. 설정은 `inventory.outbox.publisher`(`enabled`, `interval`, `batch-size`, `topic-prefix`)와 `spring.kafka`이고 테스트에서는 발행기를 기본으로 끈다. 같은 파티션 키의 이벤트는 같은 키를 다루는 트랜잭션이 행 잠금으로 직렬화되어 `outbox_event_id`가 커밋 순서와 같아지므로 id 순서 발행이 곧 순서 보장이다.
 6. **예약 이벤트는 이벤트를 만드는 시점에 Lot 정보(Lot 번호, 유통기한)를 담는다.** 같은 트랜잭션에서 inventory의 조회 UseCase로 할당 재고 행의 Lot 정보를 읽어 payload에 저장한다. 이벤트는 그 시점의 불변 스냅샷이고 WMS는 추가 조회 없이 출고를 지시할 수 있다.
+   구현: inventory에 `GetInventoryLotsUseCase`(재고 행 ID 집합 → Lot ID·번호·유통기한)를 두고, 예약 이벤트를 Outbox에 저장하는 `OutboxReservationChangedEventPublisher`가 호출한 서비스의 트랜잭션 안에서 이를 호출해 payload의 `items[].allocations[]`에 `lotId`, `lotNumber`, `expirationDate`(없으면 null)를 담는다. 생성·확정·연장·해제·만료·출고 확정 이벤트가 모두 같은 한 곳을 지나므로 예약 서비스 코드는 바뀌지 않는다. 할당된 재고 행의 Lot을 찾지 못하면 이벤트를 저장하지 않고 실패해 트랜잭션이 롤백된다(재고 행은 Lot을 외래키로 가져 정상 흐름에서는 일어나지 않는다).
 7. **발행이 끝난 이벤트는 정리 배치가 일정 기간 뒤 삭제한다.** `idx_outbox_pending (status, outbox_event_id)`로 대기 조회를 빠르게 한다.
 
 ## 결과 (Consequences)
