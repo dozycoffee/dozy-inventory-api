@@ -18,6 +18,17 @@ spring:
     password: ${DB_PASSWORD}
     locations: classpath:db/migration
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        # 브로커가 응답하지 않으면 발행기가 오래 막히지 않고 실패로 처리해 다음 주기에 다시 시도한다
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+
   jackson:
     datatype:
       datetime:
@@ -43,6 +54,13 @@ inventory:
       enabled: true
       interval: PT1M
       batch-size: 100
+  outbox:
+    # Outbox 대기 이벤트를 Kafka로 발행하는 스케줄러. 테스트에서는 끈다. 토픽은 {topic-prefix}.{집계 유형 소문자}이다
+    publisher:
+      enabled: true
+      interval: PT1S
+      batch-size: 100
+      topic-prefix: dozy.inventory
 
 server:
   port: ${SERVER_PORT:8082}

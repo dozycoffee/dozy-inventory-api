@@ -63,7 +63,7 @@ inventory 서비스는 재고의 단일 진실 공급원(SSOT)으로, "무엇이
 ├── AGENTS.md / CLAUDE.md                // AI 에이전트·개발자 안내 (CLAUDE.md는 AGENTS.md를 가져옴)
 ├── docs                                 // 원칙, 아키텍처, ERD, 컨벤션, ADR 등
 ├── scripts/verify.sh                    // 서식 검사 + 빌드 + 테스트 (로컬·CI 공통)
-├── docker-compose.yml                   // 로컬 MySQL
+├── docker-compose.yml                   // 로컬 MySQL, Kafka
 ├── feature_list.json / PROGRESS.md      // 작업 목록과 진행 기록
 └── src
     ├── main
@@ -85,7 +85,7 @@ inventory 서비스는 재고의 단일 진실 공급원(SSOT)으로, "무엇이
 
 ```bash
 cp .env.example .env        # DB_PASSWORD를 채운다 (SPRING_PROFILES_ACTIVE=local 포함)
-docker compose up -d        # MySQL (호스트 포트 3307). 마이그레이션 체크섬 오류가 나면 docker compose down -v 로 볼륨을 지우고 다시 만든다
+docker compose up -d        # MySQL (호스트 포트 3307), Kafka (호스트 포트 9092). 마이그레이션 체크섬 오류가 나면 docker compose down -v 로 볼륨을 지우고 다시 만든다
 ./gradlew bootRun           # 애플리케이션 (포트 8082). local 프로필은 토큰 없이 개발 사용자로 동작한다
 ```
 
