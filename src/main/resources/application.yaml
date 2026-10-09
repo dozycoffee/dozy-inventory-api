@@ -61,6 +61,13 @@ inventory:
       interval: PT1S
       batch-size: 100
       topic-prefix: dozy.inventory
+    # 발행이 끝난 이벤트를 보관 기간(retention) 뒤 삭제하는 스케줄러. 발행 대기 이벤트는 지우지 않는다. 테스트에서는 끈다
+    cleanup:
+      enabled: true
+      interval: PT1H
+      initial-delay: PT1M
+      retention: P7D
+      batch-size: 1000
 
 server:
   port: ${SERVER_PORT:8082}

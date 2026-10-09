@@ -44,6 +44,18 @@ class OutboxEventPersistenceAdapter(
             .awaitRowsUpdated()
     }
 
+    override suspend fun deletePublishedBefore(
+        cutoff: LocalDateTime,
+        limit: Int,
+    ): Int =
+        databaseClient
+            .sql(DELETE_PUBLISHED_BEFORE)
+            .bind("cutoff", cutoff)
+            .bind("limit", limit)
+            .fetch()
+            .awaitRowsUpdated()
+            .toInt()
+
     /** `GET_LOCK`은 락을 잡으면 1, 이미 다른 연결이 잡고 있으면 0을 반환한다(대기 시간 0) */
     override suspend fun tryAcquirePublishLock(): Boolean = lockResult(ACQUIRE_LOCK) == 1L
 
@@ -74,6 +86,14 @@ class OutboxEventPersistenceAdapter(
 
         const val INCREASE_ATTEMPT_COUNT: String =
             "UPDATE outbox_event SET attempt_count = attempt_count + 1 WHERE outbox_event_id = :outboxEventId"
+
+        const val DELETE_PUBLISHED_BEFORE: String =
+            """
+            DELETE FROM outbox_event
+             WHERE status = 'PUBLISHED' AND published_at < :cutoff
+             ORDER BY outbox_event_id
+             LIMIT :limit
+            """
 
         const val ACQUIRE_LOCK: String = "SELECT GET_LOCK(:lockName, 0)"
 

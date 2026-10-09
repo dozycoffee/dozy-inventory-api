@@ -157,6 +157,62 @@ class OutboxEventPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `발행 완료 이벤트 삭제` {
+        private val base: LocalDateTime = LocalDateTime.of(2026, 10, 1, 12, 0)
+
+        private suspend fun savePublished(publishedAt: LocalDateTime): Long {
+            val id: Long = checkNotNull(adapter.save(event()).outboxEventId)
+            adapter.markPublished(id, publishedAt)
+            return id
+        }
+
+        private suspend fun remainingIds(): List<Long> =
+            databaseClient
+                .sql("SELECT outbox_event_id FROM outbox_event ORDER BY outbox_event_id")
+                .fetch()
+                .all()
+                .collectList()
+                .awaitSingle()
+                .map { it["outbox_event_id"].toString().toLong() }
+
+        @Test
+        fun `기준 시각보다 앞서 발행된 이벤트만 지우고 기준 시각과 같거나 뒤인 이벤트는 남긴다`() =
+            runBlocking<Unit> {
+                val old: Long = savePublished(base.minusSeconds(1))
+                val same: Long = savePublished(base)
+                val recent: Long = savePublished(base.plusSeconds(1))
+
+                assertThat(adapter.deletePublishedBefore(base, 100)).isEqualTo(1)
+
+                assertThat(remainingIds()).containsExactly(same, recent)
+                assertThat(adapter.findById(old)).isNull()
+            }
+
+        @Test
+        fun `발행 대기 이벤트는 오래되어도 지우지 않는다`() =
+            runBlocking<Unit> {
+                val pending: Long = checkNotNull(adapter.save(event()).outboxEventId)
+                savePublished(base.minusDays(30))
+
+                assertThat(adapter.deletePublishedBefore(base, 100)).isEqualTo(1)
+
+                assertThat(remainingIds()).containsExactly(pending)
+            }
+
+        @Test
+        fun `한 번에 지울 개수를 넘으면 식별자가 작은 이벤트부터 지우고 나머지는 다음 호출에서 지운다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> = (1..5).map { savePublished(base.minusDays(1)) }
+
+                assertThat(adapter.deletePublishedBefore(base, 2)).isEqualTo(2)
+                assertThat(remainingIds()).containsExactlyElementsOf(ids.drop(2))
+                assertThat(adapter.deletePublishedBefore(base, 10)).isEqualTo(3)
+                assertThat(remainingIds()).isEmpty()
+                assertThat(adapter.deletePublishedBefore(base, 10)).isEqualTo(0)
+            }
+    }
+
+    @Nested
     inner class `발행기 락` {
         @Test
         fun `락을 잡은 동안 다른 연결은 잡지 못하고 놓으면 다시 잡을 수 있다`() =

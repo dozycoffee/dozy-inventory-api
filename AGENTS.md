@@ -51,6 +51,7 @@ docker compose up -d                    # 로컬 MySQL(호스트 포트 3307)과
 | [docs/erd.md](docs/erd.md) | 테이블, 마이그레이션, 쿼리를 다룰 때 |
 | [docs/concurrency-and-idempotency.md](docs/concurrency-and-idempotency.md) | 예약·수량 변경·멱등 처리를 구현할 때 |
 | [docs/conventions.md](docs/conventions.md) | Kotlin 코드를 작성하기 전 (타입 명시, Entity, 코루틴, 주석 등) |
+| [docs/events.md](docs/events.md) | 이벤트 payload·토픽·키를 바꾸거나 구독자에게 알릴 때. 이벤트 계약 |
 | [docs/testing.md](docs/testing.md) | 테스트를 작성하기 전 |
 | [docs/scenarios.md](docs/scenarios.md) | 업무 시나리오와 경계 결정을 확인할 때 |
 | [docs/adr/](docs/adr/README.md) | 결정의 배경이 필요할 때 |
