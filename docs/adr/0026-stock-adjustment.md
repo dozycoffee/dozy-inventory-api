@@ -23,6 +23,8 @@ Accepted (2026-10-10). 구현은 계층별 PR로 나눈다: (1) inventory의 수
 11. **inventory 도메인은 조정 문서를 모른다.** inventory는 `AdjustInventoryUseCase`로 재고 행 수량 반영·이력·이벤트·보류 해제만 하고, 조정 요청의 문서(`stock_adjustment`)와 승인 규칙은 `adjustment` 도메인이 맡는다. `adjustment`는 항목 ID를 먼저 만든 뒤(원인 문서 ID가 필요하다) 그 ID를 inventory에 넘긴다.
    `adjustment` 도메인의 항목도 품질 상태를 가지므로 `QualityStatus`를 도메인 간 공유 값으로 보고 `global/domain`으로 옮겼다(`IdempotencyKey`, `RequesterService`와 같은 이유로, 다른 도메인의 `domain` 패키지는 import할 수 없다).
 12. **`adjustment` 도메인 모델은 조정과 항목이다.** `StockAdjustment`(실사 조정은 `audit(...)`으로 `APPLIED` 상태로 만들고, 승인자가 있으면 승인 시각은 생성 시각)와 `StockAdjustmentItem`(`Lot × 품질 상태`의 0이 아닌 변동량, 대상 재고 행은 재고에 반영한 뒤 기록). 항목의 `inventory_id`는 반영 뒤에 `assignInventoryIds`로 채운다. 대사 보정(`RECONCILIATION`)용 필드(대사 실행, 대사 시점 수량)는 F-019에서 추가한다.
+13. **조정 요청 흐름은 `StockAdjustmentService`가 오케스트레이션한다.** 트랜잭션 밖에서 항목의 Lot(`GetLotUseCase`)을 찾고, 같은 멱등 키의 이전 결과가 있으면 그것을 반환하고(내용이 다르면 `INV_IDEMPOTENCY_KEY_CONFLICT`, 이때는 승인 확인도 다시 하지 않는다), 승인 필요 여부를 확인한 뒤, 한 트랜잭션에서 조정 저장 → 재고 반영(`AdjustInventoryUseCase`, 항목 ID가 원인 문서) → 항목의 재고 행 기록을 처리한다. 같은 멱등 키가 동시에 들어오면 늦은 쪽의 조정 저장이 중복 키로 실패해 롤백되므로(재고 반영도 되돌아간다) 트랜잭션 밖에서 저장된 조정으로 이전 결과를 반환한다. 이전 결과의 반영 후 수량은 이력(`GetAdjustedQuantitiesUseCase`)에서 복원해 재요청 사이에 재고가 바뀌어도 처음과 같다.
+14. **승인 임계치는 `AdjustmentPolicy` 포트와 설정으로 둔다.** 설정 `inventory.adjustment.approval-threshold`의 `default`(기본 100, 가정한 값)와 `categories`(카테고리명 → 수량)이고 항목 하나의 `|변동량|`이 임계치를 **넘을 때**(같으면 아님) 승인자가 필요하다. 승인자 문자열이 공백뿐이면 없는 것으로 본다. 승인 필요 오류는 `INV_APPROVAL_REQUIRED`(400)이다.
 
 ## 결과 (Consequences)
 
