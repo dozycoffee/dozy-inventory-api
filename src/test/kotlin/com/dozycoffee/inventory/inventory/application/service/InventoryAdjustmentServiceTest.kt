@@ -1,6 +1,7 @@
 package com.dozycoffee.inventory.inventory.application.service
 
 import com.dozycoffee.inventory.global.domain.IdempotencyKey
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
@@ -12,7 +13,6 @@ import com.dozycoffee.inventory.inventory.application.port.out.InventoryReposito
 import com.dozycoffee.inventory.inventory.application.port.out.LotRepository
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException

@@ -1,4 +1,4 @@
-package com.dozycoffee.inventory.inventory.domain.enumeration
+package com.dozycoffee.inventory.global.domain
 
 enum class QualityStatus {
     NORMAL,

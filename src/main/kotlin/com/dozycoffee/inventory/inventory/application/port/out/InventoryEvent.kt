@@ -1,6 +1,6 @@
 package com.dozycoffee.inventory.inventory.application.port.out
 
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 
 /** 재고 변동 이벤트. 구독자(OMS, 가맹점)는 [quantityAfter]로 가용 재고 캐시를 갱신한다 */

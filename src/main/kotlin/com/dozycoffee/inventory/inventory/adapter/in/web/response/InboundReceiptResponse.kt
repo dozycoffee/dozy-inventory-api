@@ -1,7 +1,7 @@
 package com.dozycoffee.inventory.inventory.adapter.`in`.web.response
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InboundResult
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 
 data class InboundReceiptResponse(
     val inventoryId: Long,

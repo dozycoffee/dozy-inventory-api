@@ -1,7 +1,7 @@
 package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.common.BaseEntity
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Column

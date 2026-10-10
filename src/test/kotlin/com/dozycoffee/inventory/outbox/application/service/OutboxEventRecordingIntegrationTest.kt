@@ -1,9 +1,9 @@
 package com.dozycoffee.inventory.outbox.application.service
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.application.port.`in`.ConfirmInboundUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ConfirmInboundCommand
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.product.application.port.`in`.RegisterProductUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.command.RegisterProductCommand

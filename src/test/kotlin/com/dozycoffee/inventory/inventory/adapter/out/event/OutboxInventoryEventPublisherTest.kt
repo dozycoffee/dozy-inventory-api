@@ -1,8 +1,8 @@
 package com.dozycoffee.inventory.inventory.adapter.out.event
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEvent
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEventType
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.enumeration.ReferenceType
 import com.dozycoffee.inventory.outbox.application.port.`in`.RecordOutboxEventUseCase
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
