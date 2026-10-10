@@ -41,6 +41,11 @@ enum class InventoryErrorCode(
         "INV_INVALID_RELEASE_REQUEST",
         "되돌릴 재고 행은 1개 이상이고 ID는 양수이며 중복이 없어야 하고 수량은 1 이상이어야 합니다.",
     ),
+    INVALID_ADJUST_REQUEST(
+        ErrorType.VALIDATION,
+        "INV_INVALID_ADJUST_REQUEST",
+        "조정 항목은 1개 이상 500개 이하이고 ID는 양수이며 변동량은 0이 아니고 같은 Lot과 품질 상태, 같은 원인 문서가 중복되면 안 됩니다.",
+    ),
     INVALID_AVAILABILITY_QUERY(
         ErrorType.VALIDATION,
         "INV_INVALID_AVAILABILITY_QUERY",
