@@ -21,6 +21,8 @@ Accepted (2026-10-10). 구현은 계층별 PR로 나눈다: (1) inventory의 수
 9. **같은 멱등 키의 재요청은 새로 반영하지 않고 처음과 같은 결과를 준다.** 저장된 조정과 이력의 `quantity_after`로 결과를 다시 만들고, 내용이 다르면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
 10. **API는 `POST /api/v1/stock-adjustments`이고 호출은 `inventory:service`만 허용한다.** 수량은 WMS 확정으로만 바뀌며(원칙 6) 본사 관리자도 직접 조정할 수 없다.
 11. **inventory 도메인은 조정 문서를 모른다.** inventory는 `AdjustInventoryUseCase`로 재고 행 수량 반영·이력·이벤트·보류 해제만 하고, 조정 요청의 문서(`stock_adjustment`)와 승인 규칙은 `adjustment` 도메인이 맡는다. `adjustment`는 항목 ID를 먼저 만든 뒤(원인 문서 ID가 필요하다) 그 ID를 inventory에 넘긴다.
+   `adjustment` 도메인의 항목도 품질 상태를 가지므로 `QualityStatus`를 도메인 간 공유 값으로 보고 `global/domain`으로 옮겼다(`IdempotencyKey`, `RequesterService`와 같은 이유로, 다른 도메인의 `domain` 패키지는 import할 수 없다).
+12. **`adjustment` 도메인 모델은 조정과 항목이다.** `StockAdjustment`(실사 조정은 `audit(...)`으로 `APPLIED` 상태로 만들고, 승인자가 있으면 승인 시각은 생성 시각)와 `StockAdjustmentItem`(`Lot × 품질 상태`의 0이 아닌 변동량, 대상 재고 행은 재고에 반영한 뒤 기록). 항목의 `inventory_id`는 반영 뒤에 `assignInventoryIds`로 채운다. 대사 보정(`RECONCILIATION`)용 필드(대사 실행, 대사 시점 수량)는 F-019에서 추가한다.
 
 ## 결과 (Consequences)
 
