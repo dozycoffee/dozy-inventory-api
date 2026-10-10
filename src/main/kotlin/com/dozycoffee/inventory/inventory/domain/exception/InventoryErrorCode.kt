@@ -17,6 +17,7 @@ enum class InventoryErrorCode(
     INVALID_HISTORY_CHANGE(ErrorType.VALIDATION, "INV_INVALID_HISTORY_CHANGE", "변동량은 0일 수 없고 이력 유형의 부호와 맞아야 합니다."),
     INVALID_HISTORY_AFTER(ErrorType.VALIDATION, "INV_INVALID_HISTORY_AFTER", "변경 후 수량은 0 이상이어야 합니다."),
     INVENTORY_NOT_FOUND(ErrorType.NOT_FOUND, "INV_INVENTORY_NOT_FOUND", "재고를 찾을 수 없습니다."),
+    LOT_NOT_FOUND(ErrorType.NOT_FOUND, "INV_LOT_NOT_FOUND", "Lot을 찾을 수 없습니다."),
     DUPLICATE_LOT(ErrorType.CONFLICT, "INV_DUPLICATE_LOT", "이미 등록된 Lot 번호입니다."),
     DUPLICATE_IDEMPOTENCY_KEY(ErrorType.CONFLICT, "INV_DUPLICATE_IDEMPOTENCY_KEY", "이미 처리한 멱등 키입니다."),
     INVALID_INBOUND_QUALITY_STATUS(
@@ -39,6 +40,11 @@ enum class InventoryErrorCode(
         ErrorType.VALIDATION,
         "INV_INVALID_RELEASE_REQUEST",
         "되돌릴 재고 행은 1개 이상이고 ID는 양수이며 중복이 없어야 하고 수량은 1 이상이어야 합니다.",
+    ),
+    INVALID_ADJUST_REQUEST(
+        ErrorType.VALIDATION,
+        "INV_INVALID_ADJUST_REQUEST",
+        "조정 항목은 1개 이상 500개 이하이고 ID는 양수이며 변동량은 0이 아니고 같은 Lot과 품질 상태, 같은 원인 문서가 중복되면 안 됩니다.",
     ),
     INVALID_AVAILABILITY_QUERY(
         ErrorType.VALIDATION,
