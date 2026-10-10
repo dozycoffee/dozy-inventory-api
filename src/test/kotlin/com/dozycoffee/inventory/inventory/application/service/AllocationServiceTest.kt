@@ -1,5 +1,6 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.error.AllocationConflictException
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AllocateInventoryCommand
@@ -7,7 +8,6 @@ import com.dozycoffee.inventory.inventory.application.port.`in`.command.ReleaseI
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AllocationResult
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException

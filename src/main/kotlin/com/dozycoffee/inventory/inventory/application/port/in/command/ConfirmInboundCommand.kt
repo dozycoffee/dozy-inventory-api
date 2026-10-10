@@ -1,6 +1,6 @@
 package com.dozycoffee.inventory.inventory.application.port.`in`.command
 
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import java.time.LocalDate
 
 /**

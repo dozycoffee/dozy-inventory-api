@@ -1,6 +1,6 @@
 package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import org.springframework.data.repository.kotlin.CoroutineCrudRepository
 
 interface InventoryR2dbcRepository : CoroutineCrudRepository<InventoryEntity, Long> {

@@ -1,6 +1,6 @@
 package com.dozycoffee.inventory.inventory.fixture
 
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import java.time.LocalDateTime
 

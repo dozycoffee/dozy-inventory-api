@@ -1,11 +1,11 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.application.port.`in`.AdjustInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetAdjustedQuantitiesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException

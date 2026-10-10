@@ -2,12 +2,12 @@ package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
 import com.dozycoffee.inventory.global.config.ClockConfig
 import com.dozycoffee.inventory.global.config.R2dbcConfig
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
-import com.dozycoffee.inventory.inventory.domain.enumeration.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException

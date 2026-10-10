@@ -1,4 +1,4 @@
-package com.dozycoffee.inventory.inventory.domain.enumeration
+package com.dozycoffee.inventory.global.domain
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
