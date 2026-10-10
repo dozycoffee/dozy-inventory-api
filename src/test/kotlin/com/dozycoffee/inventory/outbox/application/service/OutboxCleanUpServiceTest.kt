@@ -11,9 +11,11 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import org.springframework.dao.TransientDataAccessResourceException
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
@@ -49,6 +51,45 @@ class OutboxCleanUpServiceTest {
                 whenever(outboxEventRepository.deletePublishedBefore(now, 10)).thenReturn(3)
 
                 assertEquals(3, service.cleanUp(Duration.ZERO, 10))
+            }
+    }
+
+    @Nested
+    inner class `일시적인 DB 오류` {
+        private val cutoff: LocalDateTime = LocalDateTime.of(2026, 10, 2, 12, 0)
+
+        @Test
+        fun `교착으로 실패하면 다시 시도해 성공한 결과를 반환한다`() =
+            runBlocking<Unit> {
+                whenever(outboxEventRepository.deletePublishedBefore(cutoff, 500))
+                    .thenThrow(TransientDataAccessResourceException("Deadlock found"))
+                    .thenThrow(TransientDataAccessResourceException("Deadlock found"))
+                    .thenReturn(7)
+
+                assertEquals(7, service.cleanUp(Duration.ofDays(7), 500))
+
+                verifyBlocking(outboxEventRepository, times(3)) { deletePublishedBefore(cutoff, 500) }
+            }
+
+        @Test
+        fun `5번 모두 실패하면 마지막 예외를 그대로 알린다`() =
+            runBlocking<Unit> {
+                whenever(outboxEventRepository.deletePublishedBefore(cutoff, 500))
+                    .thenThrow(TransientDataAccessResourceException("Deadlock found"))
+
+                assertThrows<TransientDataAccessResourceException> { service.cleanUp(Duration.ofDays(7), 500) }
+
+                verifyBlocking(outboxEventRepository, times(5)) { deletePublishedBefore(cutoff, 500) }
+            }
+
+        @Test
+        fun `일시적이지 않은 오류는 다시 시도하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(outboxEventRepository.deletePublishedBefore(cutoff, 500)).thenThrow(IllegalStateException("schema broken"))
+
+                assertThrows<IllegalStateException> { service.cleanUp(Duration.ofDays(7), 500) }
+
+                verifyBlocking(outboxEventRepository, times(1)) { deletePublishedBefore(cutoff, 500) }
             }
     }
 

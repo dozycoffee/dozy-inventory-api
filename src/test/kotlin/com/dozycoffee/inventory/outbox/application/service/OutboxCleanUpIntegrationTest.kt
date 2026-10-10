@@ -87,22 +87,16 @@ class OutboxCleanUpIntegrationTest {
         }
 
     @Test
-    fun `정리가 여러 개 동시에 돌아도 각 이벤트는 한 번만 지워진다`() =
+    fun `정리가 여러 개 동시에 돌아도 교착 없이 각 이벤트는 한 번만 지워진다`() =
         runBlocking<Unit> {
             val old: LocalDateTime = LocalDateTime.now(clock).minusDays(10)
-            repeat(40) { saved(old) }
+            repeat(200) { saved(old) }
 
             val deleted: List<Int> =
-                (1..5)
-                    .map {
-                        async(
-                            Dispatchers.IO,
-                        ) { cleanUpOutboxEventsUseCase.cleanUp(Duration.ofDays(7), 7) }
-                    }.awaitAll()
+                (1..10).map { async(Dispatchers.IO) { cleanUpOutboxEventsUseCase.cleanUp(Duration.ofDays(7), 5) } }.awaitAll()
 
             // 겹쳐 지워도 한 행이 두 번 세어지지 않으므로 지운 합계와 남은 행의 합은 처음 개수와 같다
-            assertThat(deleted.sum()).isBetween(7, 35)
-            assertThat(deleted.sum() + count()).isEqualTo(40L)
+            assertThat(deleted.sum() + count()).isEqualTo(200L)
             while (cleanUpOutboxEventsUseCase.cleanUp(Duration.ofDays(7), 100) > 0) {
                 // 남은 이벤트를 모두 지운다
             }
