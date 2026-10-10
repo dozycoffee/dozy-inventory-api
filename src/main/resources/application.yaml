@@ -43,6 +43,12 @@ dozy:
 inventory:
   # 유통기한이 오늘부터 이 일수 이내이면 Lot을 임박 상태로 본다
   expiring-soon-days: 30
+  adjustment:
+    # 실사 조정에서 항목 하나의 변동량 절댓값이 이 값을 넘으면 승인자가 필요하다. 기본값 100은 가정한 값이라 운영 전에 정한다.
+    # 카테고리별로 다르게 하려면 categories에 카테고리명: 수량을 추가한다(예: BEAN: 20)
+    approval-threshold:
+      default: 100
+      categories: {}
   reservation:
     # 예약 만료 시각의 상한(생성 시각 + TTL). 채널 값이 확정되기 전이라 기본값만 두고,
     # 채널별로 다르게 하려면 channels에 채널명: 시간을 추가한다(예: STORE: 48h)
