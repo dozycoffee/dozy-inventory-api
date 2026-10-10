@@ -100,8 +100,8 @@
   {
     "id": "F-015",
     "name": "실사 조정",
-    "description": "WMS의 조정 변동량(+/−)을 승인 임계치 검증 후 반영한다. stock_adjustment(AUDIT)와 ADJUSTMENT 이력, 보류 해제. 시나리오 8.1.",
-    "status": "pending",
+    "description": "WMS의 조정 변동량(+/−)을 승인 임계치 검증 후 반영한다. stock_adjustment(AUDIT)와 ADJUSTMENT 이력, 보류 해제. 시나리오 8.1. 결정은 ADR-0026. 단계: (1) inventory 수량 조정 반영 UseCase와 Lot 조회 UseCase(완료), (2) adjustment 도메인 모델·영속성, (3) 조정 요청 application(승인 임계치, 멱등), (4) 웹 어댑터.",
+    "status": "in_progress",
     "dependencies": ["F-007", "F-020"]
   },
   {
