@@ -17,6 +17,7 @@ enum class InventoryErrorCode(
     INVALID_HISTORY_CHANGE(ErrorType.VALIDATION, "INV_INVALID_HISTORY_CHANGE", "변동량은 0일 수 없고 이력 유형의 부호와 맞아야 합니다."),
     INVALID_HISTORY_AFTER(ErrorType.VALIDATION, "INV_INVALID_HISTORY_AFTER", "변경 후 수량은 0 이상이어야 합니다."),
     INVENTORY_NOT_FOUND(ErrorType.NOT_FOUND, "INV_INVENTORY_NOT_FOUND", "재고를 찾을 수 없습니다."),
+    LOT_NOT_FOUND(ErrorType.NOT_FOUND, "INV_LOT_NOT_FOUND", "Lot을 찾을 수 없습니다."),
     DUPLICATE_LOT(ErrorType.CONFLICT, "INV_DUPLICATE_LOT", "이미 등록된 Lot 번호입니다."),
     DUPLICATE_IDEMPOTENCY_KEY(ErrorType.CONFLICT, "INV_DUPLICATE_IDEMPOTENCY_KEY", "이미 처리한 멱등 키입니다."),
     INVALID_INBOUND_QUALITY_STATUS(
