@@ -29,6 +29,7 @@
 | [0023](0023-reservation-state-transitions.md) | 예약 상태 전이(확정·해제·연장·만료) 규칙 | Accepted |
 | [0024](0024-outbound-confirmation.md) | 출고 확정 반영 규칙 | Accepted |
 | [0025](0025-outbox-event-publishing.md) | Outbox 이벤트 저장과 Kafka 발행 규칙 | Accepted |
+| [0026](0026-stock-adjustment.md) | 실사 조정 반영 규칙 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
