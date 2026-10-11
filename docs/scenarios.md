@@ -13,7 +13,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 5 | 재고 예약: 요청, 확정 → WMS 출고 지시, 해제 | 이식 전 |
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
 | 7 | 반품 복귀 (7.1) | 이식 전 |
-| 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 이식 전 |
+| 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
 | 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 이식 전 |
 | 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
 
@@ -102,6 +102,17 @@ WMS가 피킹을 마친 출고를 예약에 반영한다. 결정 배경은 [ADR-
 - **응답**: 재고 행별 할당·출고·결품 수량과 처리 후 총 수량을 담아 WMS가 자기 수량과 즉시 비교한다.
 - **멱등**: `Idempotency-Key`가 필수이다. 같은 키·같은 수량의 재요청은 새로 반영하지 않고 처음과 같은 결과를 200으로 반환한다. 다른 키는 `INV_IDEMPOTENCY_KEY_CONFLICT`, 다른 수량은 `INV_INVALID_RESERVATION_STATE`(409)이다.
 - **API**: `POST /api/v1/reservations/{id}/fulfillment`(`inventory:service`만). 본문은 `allocations[{inventoryId, shippedQuantity}]`이다.
+
+### 실사 조정 (8.1)
+
+WMS가 실사 마감 시점의 실시간 수량으로 계산한 조정 변동량(+/−)을 `상품 × Lot × 품질 상태` 단위로 그대로 반영한다. 결정 배경은 [ADR-0026](adr/0026-stock-adjustment.md)이다.
+
+- **요청 단위**: 실사 건 하나(`auditId`)에 항목 여러 개(1~500개)이며 모두 한 트랜잭션이다. 하나라도 실패하면 전체를 되돌린다. 멱등 키는 요청 하나에 하나다.
+- **반영**: 증가는 재고 행이 없으면 만들고, 감소는 행이 있어야 하며 예약 수량을 뺀 가용 수량 안에서만 가능하다(넘으면 409 `INV_INSUFFICIENT_AVAILABLE_QUANTITY`). Lot은 이미 등록되어 있어야 한다(404 `INV_LOT_NOT_FOUND`). 품질 상태는 `NORMAL`, `DEFECTIVE`, `DISPOSAL_SCHEDULED` 모두 허용한다. 반영한 행의 할당 보류는 풀린다.
+- **승인**: 항목 하나의 변동량 절댓값이 상품 카테고리의 임계치(`inventory.adjustment.approval-threshold`, 기본 100은 가정한 값)를 넘으면 `approvedBy`가 있어야 한다(없으면 400 `INV_APPROVAL_REQUIRED`). 승인은 WMS가 자체 절차로 거치고 승인자 ID만 보내며 inventory 서비스는 검증하지 않고 기록한다.
+- **기록**: 조정은 요청 즉시 `APPLIED`이고 이력은 `ADJUSTMENT`(원인 문서는 조정 항목), 이벤트는 재고 증가·감소다.
+- **응답**: 항목별 반영 후 총 수량(`quantityAfter`)을 담는다. 같은 멱등 키의 재요청은 반영하지 않고 처음과 같은 결과를 200으로 반환하며 다른 내용이면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
+- **API**: `POST /api/v1/stock-adjustments`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `auditId`, `approvedBy`(선택), `items[{productId, lotNumber, qualityStatus, quantityChange}]`이다.
 
 ### 상태 흐름
 
