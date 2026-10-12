@@ -7,15 +7,34 @@ import com.dozycoffee.inventory.reservation.domain.exception.ReservationErrorCod
 class ReservationAllocation private constructor(
     val reservationAllocationId: Long?,
     val inventoryId: Long,
-    val quantity: Int,
+    quantity: Int,
     fulfilledQuantity: Int,
 ) {
+    var quantity: Int = quantity
+        private set
+
     var fulfilledQuantity: Int = fulfilledQuantity
         private set
 
     /** 출고하지 못한 수량(결품). 출고 확정 전에는 할당 수량 전체이다 */
     val shortageQuantity: Int
         get() = quantity - fulfilledQuantity
+
+    /** 재할당으로 수량을 [amount]만큼 줄인다. 1 이상 현재 할당 수량 이하여야 한다. 출고 확정 전의 할당만 줄일 수 있다 */
+    fun reduce(amount: Int) {
+        if (amount < 1 || amount > quantity ||
+            fulfilledQuantity != 0
+        ) {
+            throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+        }
+        quantity -= amount
+    }
+
+    /** 재할당으로 수량을 [amount]만큼 늘린다 */
+    fun increase(amount: Int) {
+        if (amount < 1) throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+        quantity += amount
+    }
 
     /** 실제 출고 수량을 기록한다. 0 이상 할당 수량 이하여야 한다 */
     fun fulfill(shippedQuantity: Int) {

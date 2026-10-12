@@ -39,6 +39,26 @@ interface ReservationRepository {
         expectedStatus: ReservationStatus,
     ): Boolean
 
+    /**
+     * 예약의 할당 행을 잠그고 저장된 수량이 [expectedQuantities](할당 ID별)와 정확히 같은지 확인한다. 같은 예약의 다른 재할당이 먼저 끝났으면 false이다.
+     * 잠금 읽기는 트랜잭션의 스냅샷이 아니라 최신 커밋을 읽으므로 재고 행을 건드리기 전에 읽은 값이 낡았는지 알 수 있다.
+     * 호출한 서비스의 트랜잭션 안에서 실행한다.
+     */
+    suspend fun lockAllocations(
+        reservation: Reservation,
+        expectedQuantities: Map<Long, Int>,
+    ): Boolean
+
+    /**
+     * 재할당(ADR-0031)을 저장한다. 할당의 수량을 바꾸고 지우고 추가하며 상태는 건드리지 않는다(호출한 쪽이 [updateState]로 먼저 예약 행을 잠근다).
+     * [expectedQuantities]는 재할당 전에 읽은 할당 ID별 수량이며, 저장된 수량이 다르면(그 사이 다른 요청이 바꿈) 아무것도 바꾸지 않고 false를 반환한다.
+     * [reservation]에 없는 할당은 지우고 식별자가 없는 할당은 새로 만든다. 호출한 서비스의 트랜잭션 안에서 실행하며 false이면 롤백해야 한다.
+     */
+    suspend fun updateAllocations(
+        reservation: Reservation,
+        expectedQuantities: Map<Long, Int>,
+    ): Boolean
+
     /** 주어진 재고 행에 수량을 할당받은 [status] 상태의 예약 ID를 ID 오름차순으로 반환한다 */
     suspend fun findIdsByInventoryIds(
         inventoryIds: Set<Long>,

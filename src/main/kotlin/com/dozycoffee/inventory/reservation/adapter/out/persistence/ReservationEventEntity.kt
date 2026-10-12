@@ -16,6 +16,7 @@ class ReservationEventEntity(
     var reservationId: Long,
     var eventType: ReservationEventType,
     var detail: String?,
+    var idempotencyKey: String? = null,
 ) : CreatedAuditEntity() {
     fun toDomain(): ReservationEvent =
         ReservationEvent.reconstitute(
@@ -23,6 +24,7 @@ class ReservationEventEntity(
             reservationId = reservationId,
             eventType = eventType,
             detail = detail,
+            idempotencyKey = idempotencyKey,
         )
 
     companion object {
@@ -32,6 +34,7 @@ class ReservationEventEntity(
                 reservationId = event.reservationId,
                 eventType = event.eventType,
                 detail = event.detail,
+                idempotencyKey = event.idempotencyKey,
             )
     }
 }

@@ -2,12 +2,13 @@ package com.dozycoffee.inventory.reservation.domain.model
 
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationEventType
 
-/** 예약에 일어난 일의 이력. 만든 뒤에는 바뀌지 않는다. [detail]은 사유, 변경 전후 만료 시각 같은 부가 정보의 JSON 문자열이다 */
+/** 예약에 일어난 일의 이력. 만든 뒤에는 바뀌지 않는다. [detail]은 사유, 변경 전후 만료 시각 같은 부가 정보의 JSON 문자열이고, [idempotencyKey]는 멱등 키로 처리한 변경(재할당)에만 있다 */
 class ReservationEvent private constructor(
     val reservationEventId: Long?,
     val reservationId: Long,
     val eventType: ReservationEventType,
     val detail: String?,
+    val idempotencyKey: String?,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -22,13 +23,15 @@ class ReservationEvent private constructor(
             reservationId: Long,
             eventType: ReservationEventType,
             detail: String?,
-        ): ReservationEvent = ReservationEvent(null, reservationId, eventType, detail)
+            idempotencyKey: String? = null,
+        ): ReservationEvent = ReservationEvent(null, reservationId, eventType, detail, idempotencyKey)
 
         fun reconstitute(
             reservationEventId: Long,
             reservationId: Long,
             eventType: ReservationEventType,
             detail: String?,
-        ): ReservationEvent = ReservationEvent(reservationEventId, reservationId, eventType, detail)
+            idempotencyKey: String? = null,
+        ): ReservationEvent = ReservationEvent(reservationEventId, reservationId, eventType, detail, idempotencyKey)
     }
 }

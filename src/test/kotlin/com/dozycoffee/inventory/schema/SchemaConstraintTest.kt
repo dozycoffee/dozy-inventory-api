@@ -134,6 +134,20 @@ class SchemaConstraintTest {
         }
 
     @Test
+    fun `예약 이력의 멱등 키는 같은 예약에서 중복될 수 없고 키가 없는 이력과 다른 예약은 허용된다`() =
+        runBlocking {
+            insertReservation(id = 1)
+            insertReservation(id = 2, key = "key-2")
+            insertReservationEvent(id = 1, reservationId = 1, key = "'realloc-1'")
+
+            assertRejected("uq_reservation_event_idempotency") { insertReservationEvent(id = 2, reservationId = 1, key = "'realloc-1'") }
+            insertReservationEvent(id = 3, reservationId = 1, key = "'REALLOC-1'")
+            insertReservationEvent(id = 4, reservationId = 2, key = "'realloc-1'")
+            insertReservationEvent(id = 5, reservationId = 1, key = "NULL")
+            insertReservationEvent(id = 6, reservationId = 1, key = "NULL")
+        }
+
+    @Test
     fun `확정 전 예약은 만료 시각이 필수이며 상한을 넘을 수 없다`() =
         runBlocking {
             assertRejected("chk_reservation_expiry") { insertReservation(id = 1, expiresAt = "NULL") }
@@ -281,6 +295,19 @@ class SchemaConstraintTest {
             INSERT INTO reservation (reservation_id, warehouse_id, channel, external_order_id, status, expires_at, max_expires_at,
                                      idempotency_key, requester_service, $AUDIT_COLUMNS)
             VALUES ($id, 1, 'OMS', 'order-$id', '$status', $expiresAt, DATE_ADD(NOW(6), INTERVAL 1 HOUR), '$key', 'svc-oms', $AUDIT_VALUES)
+            """.trimIndent(),
+        )
+    }
+
+    private suspend fun insertReservationEvent(
+        id: Long,
+        reservationId: Long,
+        key: String,
+    ) {
+        execute(
+            """
+            INSERT INTO reservation_event (reservation_event_id, reservation_id, event_type, idempotency_key, created_at, created_by)
+            VALUES ($id, $reservationId, 'REALLOCATED', $key, NOW(6), 'test')
             """.trimIndent(),
         )
     }

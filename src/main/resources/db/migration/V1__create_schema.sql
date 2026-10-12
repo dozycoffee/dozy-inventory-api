@@ -155,9 +155,11 @@ CREATE TABLE reservation_event
     reservation_id BIGINT NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     detail JSON DEFAULT NULL,
+    idempotency_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
     created_at DATETIME(6) NOT NULL,
     created_by VARCHAR(100) NOT NULL,
     PRIMARY KEY (reservation_event_id),
+    CONSTRAINT uq_reservation_event_idempotency UNIQUE (reservation_id, idempotency_key),
     CONSTRAINT ck_reservation_event_type CHECK (event_type IN
                                                 ('CREATED', 'EXTENDED', 'CONFIRMED', 'RELEASED', 'EXPIRED', 'FORCE_RELEASED', 'REALLOCATED',
                                                  'FULFILLED'))

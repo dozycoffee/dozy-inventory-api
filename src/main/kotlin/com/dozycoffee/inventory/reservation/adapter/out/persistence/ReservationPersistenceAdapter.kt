@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.global.security.CurrentActorProvider
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationRepository
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
 import com.dozycoffee.inventory.reservation.domain.exception.DuplicateReservationKeyException
+import com.dozycoffee.inventory.reservation.domain.exception.ReservationChangedConcurrentlyException
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationAllocation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationItem
@@ -116,6 +117,76 @@ class ReservationPersistenceAdapter(
         return true
     }
 
+    override suspend fun lockAllocations(
+        reservation: Reservation,
+        expectedQuantities: Map<Long, Int>,
+    ): Boolean {
+        val itemIds: List<Long> = reservation.items.mapNotNull(ReservationItem::reservationItemId)
+        if (itemIds.isEmpty()) return expectedQuantities.isEmpty()
+        val stored: Map<Long, Int> =
+            databaseClient
+                .sql(LOCK_ALLOCATIONS)
+                .bind("itemIds", itemIds)
+                .map { row, _ ->
+                    checkNotNull(row.get("reservation_allocation_id", Long::class.javaObjectType)) to
+                        checkNotNull(row.get("quantity", Int::class.javaObjectType))
+                }.flow()
+                .toList()
+                .toMap()
+        return stored == expectedQuantities
+    }
+
+    override suspend fun updateAllocations(
+        reservation: Reservation,
+        expectedQuantities: Map<Long, Int>,
+    ): Boolean {
+        val remaining: MutableSet<Long> = mutableSetOf()
+        for (item: ReservationItem in reservation.items) {
+            for (allocation: ReservationAllocation in item.allocations) {
+                val allocationId: Long? = allocation.reservationAllocationId
+                if (allocationId == null) {
+                    val itemId: Long = checkNotNull(item.reservationItemId) { "저장되지 않은 항목에는 할당을 추가할 수 없다" }
+                    translatingDuplicateKey(duplicate = { ReservationChangedConcurrentlyException() }) {
+                        reservationAllocationR2dbcRepository.save(ReservationAllocationEntity.from(itemId, allocation))
+                    }
+                    continue
+                }
+                remaining.add(allocationId)
+                val expected: Int = expectedQuantities[allocationId] ?: error("재할당 전 수량이 없는 할당: $allocationId")
+                if (expected != allocation.quantity && !updateAllocationQuantity(allocationId, allocation.quantity, expected)) return false
+            }
+        }
+        return expectedQuantities
+            .filterKeys { it !in remaining }
+            .all { (allocationId: Long, expected: Int) -> deleteAllocation(allocationId, expected) }
+    }
+
+    private suspend fun updateAllocationQuantity(
+        allocationId: Long,
+        quantity: Int,
+        expected: Int,
+    ): Boolean =
+        databaseClient
+            .sql(UPDATE_ALLOCATION_QUANTITY)
+            .bind("quantity", quantity)
+            .bind("now", LocalDateTime.now(clock))
+            .bind("actor", currentActorProvider.get().auditName)
+            .bind("allocationId", allocationId)
+            .bind("expected", expected)
+            .fetch()
+            .awaitRowsUpdated() > 0
+
+    private suspend fun deleteAllocation(
+        allocationId: Long,
+        expected: Int,
+    ): Boolean =
+        databaseClient
+            .sql(DELETE_ALLOCATION)
+            .bind("allocationId", allocationId)
+            .bind("expected", expected)
+            .fetch()
+            .awaitRowsUpdated() > 0
+
     override suspend fun findExpiredIds(
         now: LocalDateTime,
         limit: Int,
@@ -176,6 +247,27 @@ class ReservationPersistenceAdapter(
             UPDATE reservation_allocation
                SET fulfilled_quantity = :fulfilledQuantity, updated_at = :now, updated_by = :actor
              WHERE reservation_allocation_id = :allocationId
+            """
+
+        const val LOCK_ALLOCATIONS: String =
+            """
+            SELECT reservation_allocation_id, quantity FROM reservation_allocation
+             WHERE reservation_item_id IN (:itemIds)
+             ORDER BY reservation_allocation_id
+             FOR UPDATE
+            """
+
+        const val UPDATE_ALLOCATION_QUANTITY: String =
+            """
+            UPDATE reservation_allocation
+               SET quantity = :quantity, updated_at = :now, updated_by = :actor
+             WHERE reservation_allocation_id = :allocationId AND quantity = :expected AND fulfilled_quantity = 0
+            """
+
+        const val DELETE_ALLOCATION: String =
+            """
+            DELETE FROM reservation_allocation
+             WHERE reservation_allocation_id = :allocationId AND quantity = :expected AND fulfilled_quantity = 0
             """
 
         const val FIND_IDS_BY_INVENTORY_IDS: String =
