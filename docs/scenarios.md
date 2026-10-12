@@ -14,7 +14,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
 | 7 | 반품 복귀 (7.1) | 이식 전 |
 | 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
-| 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 이식 전 |
+| 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 9.1은 아래 "유통기한 스캔", 9.2는 이식 전 |
 | 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
 
 ## 확정된 결정
@@ -113,6 +113,15 @@ WMS가 실사 마감 시점의 실시간 수량으로 계산한 조정 변동량
 - **기록**: 조정은 요청 즉시 `APPLIED`이고 이력은 `ADJUSTMENT`(원인 문서는 조정 항목), 이벤트는 재고 증가·감소다.
 - **응답**: 항목별 반영 후 총 수량(`quantityAfter`)을 담는다. 같은 멱등 키의 재요청은 반영하지 않고 처음과 같은 결과를 200으로 반환하며 다른 내용이면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
 - **API**: `POST /api/v1/stock-adjustments`(`inventory:service`만). 멱등 키는 `Idempotency-Key` 헤더이고 본문은 `warehouseId`, `auditId`, `approvedBy`(선택), `items[{productId, lotNumber, qualityStatus, quantityChange}]`이다.
+
+### 유통기한 스캔 (9.1)
+
+하루 한 번 유통기한이 지난 Lot의 상태를 갱신하고 재고를 폐기 예정으로 옮긴다. 결정 배경은 [ADR-0027](adr/0027-lot-expiration-scan.md)이다.
+
+- **상태 판정**: 유통기한이 오늘 이하이면 경과(`EXPIRED`), `오늘 + inventory.expiring-soon-days`(30일) 이내이면 임박(`EXPIRING_SOON`)이다. 유통기한이 없는 Lot은 대상이 아니다.
+- **예약**: 경과한 Lot의 확정 전(`RESERVED`) 예약은 강제 해제하고(`RESERVATION_FORCE_RELEASED`, 사유 `LOT_EXPIRED`) OMS가 다른 Lot으로 다시 예약할 수 있다. 확정된(`CONFIRMED`) 예약은 건너뛰고 `Lot 경과` 이벤트에 담아 사람이 확인한다.
+- **품질 전환**: 정상 품질 행의 가용 수량(총 − 예약)만 폐기 예정 행으로 옮기고 `QUALITY_TRANSFER` 이력을 전환 전 −N, 후 +N으로 남긴다. 확정 예약이 잡은 수량은 그 예약이 끝난 뒤 다음 날 스캔이 이어서 옮긴다. 불량 품질 행은 건드리지 않는다.
+- **이벤트**: `LOT_EXPIRED`로 WMS가 폐기 신청을 만든다. 재고 증감 이벤트는 발행하지 않는다.
 
 ### 상태 흐름
 

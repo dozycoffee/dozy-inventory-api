@@ -17,6 +17,7 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 |------|------|-----------------------|
 | 재고 | `dozy.inventory.inventory` | `창고ID:상품ID` |
 | 예약 | `dozy.inventory.reservation` | `창고ID:예약ID` |
+| Lot | `dozy.inventory.lot` | `Lot ID` |
 | 상품 | `dozy.inventory.product` | `상품ID` |
 
 토픽 접두사 `dozy.inventory`는 설정(`inventory.outbox.publisher.topic-prefix`)이다.
@@ -25,8 +26,8 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 |------|------|
 | `event-id` | 이벤트의 고유 ID(`outbox_event_id`). 중복 제거에 쓴다 |
 | `event-type` | 이벤트 유형 |
-| `aggregate-type` | `INVENTORY`, `RESERVATION`, `PRODUCT` |
-| `aggregate-id` | 집계의 ID(재고 행, 예약, 상품) |
+| `aggregate-type` | `INVENTORY`, `RESERVATION`, `LOT`, `PRODUCT` |
+| `aggregate-id` | 집계의 ID(재고 행, 예약, Lot, 상품) |
 
 ## 재고 이벤트
 
@@ -61,6 +62,22 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 `RESERVATION_FORCE_RELEASED`는 inventory 서비스가 확정 전 예약을 강제로 해제했다는 뜻이며 예약 수량은 이미 돌아갔다. OMS는 주문을 다시 예약해 다른 Lot을 할당받을 수 있다.
 
 WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 없이 알 수 있다. 한 예약이 여러 상품에 걸치므로 키는 `창고ID:예약ID`이고, 같은 예약의 이벤트(생성 → 확정 → 출고 확정 등)는 순서가 지켜진다.
+
+## Lot 경과 이벤트
+
+유형: `LOT_EXPIRED`. 유통기한 스캔(하루 한 번)이 유통기한이 지난 Lot을 처리할 때 발행한다(ADR-0027). WMS는 이 이벤트로 폐기 신청(`REQUESTED`)을 만들고, 건너뛴 확정 예약은 사람이 확인한다. 이번 스캔에서 Lot이 경과로 바뀌었거나 수량을 폐기 예정으로 옮겼을 때 Lot마다 한 건 발행한다(같은 Lot에 남은 수량을 나중에 더 옮기면 다시 발행한다). 임박(`EXPIRING_SOON`)으로만 바뀐 Lot은 발행하지 않는다.
+
+| 필드 | 설명 |
+|------|------|
+| eventType, occurredAt | 이벤트 유형, 발생 시각 |
+| lotId, productId, lotNumber, expirationDate | Lot 정보 |
+| transfers[].warehouseId | 창고 |
+| transfers[].sourceInventoryId | 정상 품질이던 재고 행 |
+| transfers[].disposalInventoryId | 폐기 예정으로 옮긴 재고 행 |
+| transfers[].quantity | 이번에 옮긴 수량(가용 수량만. 확정 예약이 잡은 수량은 옮기지 않는다) |
+| confirmedReservationIds | 수량을 잡고 있어 건너뛴 확정 예약 ID. 사람이 확인한다 |
+
+품질 전환은 재고 증감 이벤트(`INVENTORY_INCREASED`·`INVENTORY_DECREASED`)를 발행하지 않는다. 같은 스캔에서 강제 해제한 확정 전 예약은 예약 토픽의 `RESERVATION_FORCE_RELEASED`(`reason`: `LOT_EXPIRED`)로 알린다.
 
 ## 상품 이벤트
 

@@ -6,6 +6,8 @@ import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.LotExpirationResult
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryHistoryRepository
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
+import com.dozycoffee.inventory.inventory.application.port.out.LotExpiredEvent
+import com.dozycoffee.inventory.inventory.application.port.out.LotExpiredEventPublisher
 import com.dozycoffee.inventory.inventory.application.port.out.LotRepository
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
@@ -52,6 +54,9 @@ class LotExpirationServiceTest {
     @Mock
     private lateinit var inventoryHistoryRepository: InventoryHistoryRepository
 
+    @Mock
+    private lateinit var lotExpiredEventPublisher: LotExpiredEventPublisher
+
     private lateinit var service: LotExpirationService
 
     private val today: LocalDate = LocalDate.of(2026, 10, 11)
@@ -63,6 +68,7 @@ class LotExpirationServiceTest {
                 lotRepository,
                 inventoryRepository,
                 inventoryHistoryRepository,
+                lotExpiredEventPublisher,
                 DirectTransactionalOperator(),
                 Clock.fixed(today.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC),
                 30,
@@ -108,7 +114,7 @@ class LotExpirationServiceTest {
                 whenever(lotRepository.findById(7L)).thenReturn(lot(today.plusDays(10), LotStatus.NORMAL))
                 whenever(lotRepository.updateStatus(any(), eq(LotStatus.NORMAL))).thenReturn(true)
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertTrue(result.statusChanged)
                 assertFalse(result.becameExpired)
@@ -122,7 +128,7 @@ class LotExpirationServiceTest {
             runBlocking<Unit> {
                 whenever(lotRepository.findById(7L)).thenReturn(lot(today.plusDays(10), LotStatus.EXPIRING_SOON))
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertFalse(result.statusChanged)
                 verifyBlocking(lotRepository, never()) { updateStatus(any(), any()) }
@@ -133,7 +139,7 @@ class LotExpirationServiceTest {
             runBlocking<Unit> {
                 whenever(lotRepository.findById(7L)).thenReturn(null)
 
-                assertThrows<LotNotFoundException> { service.process(7L) }
+                assertThrows<LotNotFoundException> { service.process(7L, emptyList()) }
             }
 
         @Test
@@ -142,7 +148,7 @@ class LotExpirationServiceTest {
                 whenever(lotRepository.findById(7L)).thenReturn(lot(today.minusDays(1), LotStatus.NORMAL))
                 whenever(lotRepository.updateStatus(any(), eq(LotStatus.NORMAL))).thenReturn(false)
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertFalse(result.statusChanged)
                 assertFalse(result.expired)
@@ -169,7 +175,7 @@ class LotExpirationServiceTest {
                 whenever(inventoryRepository.increase(InventoryKey(10L, 7L, QualityStatus.DISPOSAL_SCHEDULED), 100L, 70))
                     .thenReturn(row(8L, 10L, quantity = 70, quality = QualityStatus.DISPOSAL_SCHEDULED))
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertTrue(result.becameExpired)
                 assertTrue(result.expired)
@@ -185,7 +191,7 @@ class LotExpirationServiceTest {
                 whenever(inventoryRepository.increase(any(), eq(100L), eq(40)))
                     .thenReturn(row(8L, 10L, quantity = 45, quality = QualityStatus.DISPOSAL_SCHEDULED))
 
-                service.process(7L)
+                service.process(7L, emptyList())
 
                 val histories = argumentCaptor<InventoryHistory>()
                 verifyBlocking(inventoryHistoryRepository, org.mockito.kotlin.times(2)) { save(histories.capture()) }
@@ -214,7 +220,7 @@ class LotExpirationServiceTest {
                     )
                 }
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertEquals(listOf(3L, 9L), result.transfers.map { it.sourceInventoryId })
                 inOrder(inventoryRepository) {
@@ -235,7 +241,7 @@ class LotExpirationServiceTest {
                 whenever(inventoryRepository.increase(any(), eq(100L), eq(7)))
                     .thenReturn(row(20L, 30L, quantity = 7, quality = QualityStatus.DISPOSAL_SCHEDULED))
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertEquals(listOf(9L), result.transfers.map { it.sourceInventoryId })
             }
@@ -251,7 +257,7 @@ class LotExpirationServiceTest {
                 whenever(inventoryRepository.increase(any(), eq(100L), eq(30)))
                     .thenReturn(row(8L, 10L, quantity = 30, quality = QualityStatus.DISPOSAL_SCHEDULED))
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertFalse(result.statusChanged)
                 assertFalse(result.becameExpired)
@@ -270,11 +276,136 @@ class LotExpirationServiceTest {
                     .thenReturn(row(8L, 10L, quantity = 30, quality = QualityStatus.DISPOSAL_SCHEDULED))
                 whenever(inventoryHistoryRepository.save(any())).thenThrow(DuplicateIdempotencyKeyException())
 
-                val result: LotExpirationResult = service.process(7L)
+                val result: LotExpirationResult = service.process(7L, emptyList())
 
                 assertTrue(result.expired)
                 assertTrue(result.transfers.isEmpty())
                 assertFalse(result.statusChanged)
+            }
+    }
+
+    @Nested
+    inner class `Lot 경과 이벤트` {
+        private suspend fun stubExpiredLot(status: LotStatus) {
+            whenever(lotRepository.findById(7L)).thenReturn(lot(today, status))
+            if (status != LotStatus.EXPIRED) whenever(lotRepository.updateStatus(any(), eq(status))).thenReturn(true)
+            whenever(inventoryHistoryRepository.save(any())).thenAnswer { it.getArgument<InventoryHistory>(0) }
+        }
+
+        private suspend fun stubOneTransfer() {
+            whenever(
+                inventoryRepository.findAllByLot(7L, QualityStatus.NORMAL),
+            ).thenReturn(listOf(row(5L, 10L, quantity = 30, reserved = 10)))
+            whenever(inventoryRepository.decrease(5L, 20)).thenReturn(row(5L, 10L, quantity = 10, reserved = 10))
+            whenever(inventoryRepository.increase(any(), eq(100L), eq(20)))
+                .thenReturn(row(8L, 10L, quantity = 20, quality = QualityStatus.DISPOSAL_SCHEDULED))
+        }
+
+        @Test
+        fun `경과로 바뀌고 전환했으면 전환 내역과 건너뛴 확정 예약 ID를 담아 이벤트를 발행한다`() =
+            runBlocking<Unit> {
+                stubExpiredLot(LotStatus.EXPIRING_SOON)
+                stubOneTransfer()
+
+                service.process(7L, listOf(9L, 3L, 9L))
+
+                val event = argumentCaptor<LotExpiredEvent>()
+                verifyBlocking(lotExpiredEventPublisher) { publish(event.capture()) }
+                assertEquals(7L, event.firstValue.lotId)
+                assertEquals(100L, event.firstValue.productId)
+                assertEquals("LOT-A", event.firstValue.lotNumber)
+                assertEquals(today, event.firstValue.expirationDate)
+                assertEquals(listOf(LotExpiredEvent.Transfer(10L, 5L, 8L, 20)), event.firstValue.transfers)
+                assertEquals(listOf(3L, 9L), event.firstValue.confirmedReservationIds)
+            }
+
+        @Test
+        fun `경과로 바뀌었지만 전환할 수량이 없어도 이벤트를 발행한다`() =
+            runBlocking<Unit> {
+                whenever(lotRepository.findById(7L)).thenReturn(lot(today, LotStatus.EXPIRING_SOON))
+                whenever(lotRepository.updateStatus(any(), eq(LotStatus.EXPIRING_SOON))).thenReturn(true)
+                whenever(
+                    inventoryRepository.findAllByLot(7L, QualityStatus.NORMAL),
+                ).thenReturn(listOf(row(5L, 10L, quantity = 10, reserved = 10)))
+
+                service.process(7L, listOf(4L))
+
+                val event = argumentCaptor<LotExpiredEvent>()
+                verifyBlocking(lotExpiredEventPublisher) { publish(event.capture()) }
+                assertTrue(event.firstValue.transfers.isEmpty())
+                assertEquals(listOf(4L), event.firstValue.confirmedReservationIds)
+            }
+
+        @Test
+        fun `이미 경과한 Lot에서 수량을 더 전환했으면 이벤트를 다시 발행한다`() =
+            runBlocking<Unit> {
+                stubExpiredLot(LotStatus.EXPIRED)
+                stubOneTransfer()
+
+                service.process(7L, emptyList())
+
+                verifyBlocking(lotExpiredEventPublisher) { publish(any()) }
+            }
+
+        @Test
+        fun `바뀐 것도 전환한 것도 없으면 이벤트를 발행하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(lotRepository.findById(7L)).thenReturn(lot(today, LotStatus.EXPIRED))
+                whenever(inventoryRepository.findAllByLot(7L, QualityStatus.NORMAL)).thenReturn(emptyList())
+
+                service.process(7L, listOf(4L))
+
+                verifyBlocking(lotExpiredEventPublisher, never()) { publish(any()) }
+            }
+
+        @Test
+        fun `임박으로만 바뀌면 이벤트를 발행하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(lotRepository.findById(7L)).thenReturn(lot(today.plusDays(10), LotStatus.NORMAL))
+                whenever(lotRepository.updateStatus(any(), eq(LotStatus.NORMAL))).thenReturn(true)
+
+                service.process(7L, emptyList())
+
+                verifyBlocking(lotExpiredEventPublisher, never()) { publish(any()) }
+            }
+    }
+
+    @Nested
+    inner class `예약 수량이 있는 행 조회` {
+        @Test
+        fun `경과한 Lot의 예약 수량이 있는 정상 품질 행의 ID만 준다`() =
+            runBlocking<Unit> {
+                whenever(lotRepository.findById(7L)).thenReturn(lot(today, LotStatus.EXPIRING_SOON))
+                whenever(inventoryRepository.findAllByLot(7L, QualityStatus.NORMAL))
+                    .thenReturn(
+                        listOf(
+                            row(3L, 10L, quantity = 10, reserved = 4),
+                            row(4L, 20L, quantity = 5),
+                            row(9L, 30L, quantity = 7, reserved = 7),
+                        ),
+                    )
+
+                assertEquals(listOf(3L, 9L), service.findReservedInventoryIds(7L))
+            }
+
+        @Test
+        fun `아직 경과 전이거나 유통기한이 없는 Lot은 빈 목록이고 행을 조회하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(
+                    lotRepository.findById(7L),
+                ).thenReturn(lot(today.plusDays(1), LotStatus.EXPIRING_SOON)).thenReturn(lot(null, LotStatus.NORMAL))
+
+                assertEquals(emptyList<Long>(), service.findReservedInventoryIds(7L))
+                assertEquals(emptyList<Long>(), service.findReservedInventoryIds(7L))
+                verifyBlocking(inventoryRepository, never()) { findAllByLot(any(), any()) }
+            }
+
+        @Test
+        fun `없는 Lot이면 거부한다`() =
+            runBlocking<Unit> {
+                whenever(lotRepository.findById(7L)).thenReturn(null)
+
+                assertThrows<LotNotFoundException> { service.findReservedInventoryIds(7L) }
             }
     }
 }

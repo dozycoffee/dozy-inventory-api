@@ -1,6 +1,7 @@
 package com.dozycoffee.inventory.inventory.application.service
 
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
+import com.dozycoffee.inventory.inventory.application.port.`in`.FindExpiredLotInventoryIdsUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.FindLotsToScanUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.ProcessLotExpirationUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.LotExpirationResult
@@ -29,6 +30,9 @@ class LotExpirationServiceIntegrationTest {
 
     @Autowired
     private lateinit var processLotExpirationUseCase: ProcessLotExpirationUseCase
+
+    @Autowired
+    private lateinit var findExpiredLotInventoryIdsUseCase: FindExpiredLotInventoryIdsUseCase
 
     @Autowired
     private lateinit var databaseClient: DatabaseClient
@@ -99,7 +103,7 @@ class LotExpirationServiceIntegrationTest {
                 val lotId: Long = lot("SOON", today.plusDays(10), "NORMAL")
                 fixture.insertInventory(10L, productId, lotId, quantity = 10)
 
-                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId)
+                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId, emptyList())
 
                 assertThat(result.statusChanged).isTrue()
                 assertThat(result.expired).isFalse()
@@ -131,7 +135,7 @@ class LotExpirationServiceIntegrationTest {
                 fixture.insertInventory(20L, productId, lotId, quantity = 40)
                 fixture.insertInventory(20L, productId, lotId, "DEFECTIVE", quantity = 9)
 
-                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId)
+                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId, emptyList())
 
                 assertThat(result.becameExpired).isTrue()
                 assertThat(result.transfers.map { it.warehouseId to it.quantity }).containsExactly(10L to 70, 20L to 40)
@@ -148,7 +152,7 @@ class LotExpirationServiceIntegrationTest {
                     ),
                 ).isEqualTo(4L)
                 assertThat(scalar("SELECT SUM(quantity_change) FROM inventory_history")).isEqualTo(0L)
-                assertThat(scalar("SELECT COUNT(*) FROM outbox_event")).isEqualTo(0L)
+                assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE event_type LIKE 'INVENTORY_%'")).isEqualTo(0L)
             }
 
         @Test
@@ -158,7 +162,7 @@ class LotExpirationServiceIntegrationTest {
                 fixture.insertInventory(10L, productId, lotId, quantity = 20)
                 val target: Long = fixture.insertInventory(10L, productId, lotId, "DISPOSAL_SCHEDULED", quantity = 5)
 
-                processLotExpirationUseCase.process(lotId)
+                processLotExpirationUseCase.process(lotId, emptyList())
 
                 assertThat(scalar("SELECT quantity FROM inventory WHERE inventory_id = $target")).isEqualTo(25L)
                 assertThat(scalar("SELECT COUNT(*) FROM inventory WHERE lot_id = $lotId")).isEqualTo(2L)
@@ -169,14 +173,14 @@ class LotExpirationServiceIntegrationTest {
             runBlocking<Unit> {
                 val lotId: Long = lot("EXP", today.minusDays(1), "EXPIRING_SOON")
                 fixture.insertInventory(10L, productId, lotId, quantity = 20, reservedQuantity = 5)
-                processLotExpirationUseCase.process(lotId)
+                processLotExpirationUseCase.process(lotId, emptyList())
                 databaseClient
                     .sql("UPDATE inventory SET reserved_quantity = 0 WHERE quality_status = 'NORMAL'")
                     .fetch()
                     .rowsUpdated()
                     .awaitFirst()
 
-                val again: LotExpirationResult = processLotExpirationUseCase.process(lotId)
+                val again: LotExpirationResult = processLotExpirationUseCase.process(lotId, emptyList())
 
                 assertThat(again.transfers).isEmpty()
                 assertThat(again.statusChanged).isFalse()
@@ -193,7 +197,7 @@ class LotExpirationServiceIntegrationTest {
                 fixture.insertInventory(20L, productId, lotId, quantity = 40)
 
                 val results: List<LotExpirationResult> =
-                    (1..10).map { async(Dispatchers.IO) { processLotExpirationUseCase.process(lotId) } }.awaitAll()
+                    (1..10).map { async(Dispatchers.IO) { processLotExpirationUseCase.process(lotId, emptyList()) } }.awaitAll()
 
                 assertThat(results.sumOf { it.transfers.sumOf { transfer -> transfer.quantity } }).isEqualTo(90)
                 assertThat(scalar("SELECT SUM(quantity) FROM inventory")).isEqualTo(100L)
@@ -208,11 +212,74 @@ class LotExpirationServiceIntegrationTest {
                 val lotId: Long = lot("EXP", today.minusDays(1), "EXPIRED")
                 val row: Long = fixture.insertInventory(10L, productId, lotId, quantity = 50, reservedQuantity = 50)
 
-                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId)
+                val result: LotExpirationResult = processLotExpirationUseCase.process(lotId, emptyList())
 
                 assertThat(result.transfers).isEmpty()
                 assertThat(scalar("SELECT quantity FROM inventory WHERE inventory_id = $row")).isEqualTo(50L)
                 assertThat(scalar("SELECT COUNT(*) FROM inventory_history")).isEqualTo(0L)
+            }
+    }
+
+    @Nested
+    inner class `Lot 경과 이벤트` {
+        @Test
+        fun `전환과 같은 트랜잭션으로 LOT_EXPIRED 이벤트를 저장하고 전환 내역과 확정 예약 ID를 담는다`() =
+            runBlocking<Unit> {
+                val lotId: Long = lot("EXP", today.minusDays(1), "EXPIRING_SOON")
+                fixture.insertInventory(10L, productId, lotId, quantity = 100, reservedQuantity = 30)
+
+                processLotExpirationUseCase.process(lotId, listOf(41L, 40L))
+
+                assertThat(
+                    scalar(
+                        "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type = 'LOT' AND event_type = 'LOT_EXPIRED' AND aggregate_id = $lotId",
+                    ),
+                ).isEqualTo(1L)
+                assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE partition_key = '$lotId'")).isEqualTo(1L)
+                assertThat(scalar("SELECT payload->>'$.transfers[0].quantity' FROM outbox_event")).isEqualTo(70L)
+                assertThat(scalar("SELECT payload->>'$.lotNumber' = 'EXP' FROM outbox_event")).isEqualTo(1L)
+                assertThat(scalar("SELECT payload->>'$.confirmedReservationIds[0]' FROM outbox_event")).isEqualTo(40L)
+                assertThat(scalar("SELECT JSON_LENGTH(payload->'$.confirmedReservationIds') FROM outbox_event")).isEqualTo(2L)
+            }
+
+        @Test
+        fun `같은 날 다시 처리하면 이벤트가 하나만 남고 동시에 처리해도 하나다`() =
+            runBlocking<Unit> {
+                val lotId: Long = lot("EXP", today.minusDays(1), "EXPIRING_SOON")
+                fixture.insertInventory(10L, productId, lotId, quantity = 60)
+
+                (1..8).map { async(Dispatchers.IO) { processLotExpirationUseCase.process(lotId, emptyList()) } }.awaitAll()
+                processLotExpirationUseCase.process(lotId, emptyList())
+
+                assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE event_type = 'LOT_EXPIRED'")).isEqualTo(1L)
+            }
+
+        @Test
+        fun `임박으로만 바뀌면 이벤트가 없다`() =
+            runBlocking<Unit> {
+                val lotId: Long = lot("SOON", today.plusDays(10), "NORMAL")
+                fixture.insertInventory(10L, productId, lotId, quantity = 10)
+
+                processLotExpirationUseCase.process(lotId, emptyList())
+
+                assertThat(scalar("SELECT COUNT(*) FROM outbox_event")).isEqualTo(0L)
+            }
+    }
+
+    @Nested
+    inner class `예약 수량이 있는 행 조회` {
+        @Test
+        fun `경과한 Lot의 예약 수량이 있는 정상 품질 행만 찾고 경과 전 Lot은 비어 있다`() =
+            runBlocking<Unit> {
+                val expired: Long = lot("EXP", today.minusDays(1), "EXPIRING_SOON")
+                val reserved: Long = fixture.insertInventory(10L, productId, expired, quantity = 10, reservedQuantity = 3)
+                fixture.insertInventory(20L, productId, expired, quantity = 10)
+                fixture.insertInventory(20L, productId, expired, "DEFECTIVE", quantity = 10, reservedQuantity = 2)
+                val future: Long = lot("FUT", today.plusDays(5), "EXPIRING_SOON")
+                fixture.insertInventory(10L, productId, future, quantity = 10, reservedQuantity = 3)
+
+                assertThat(findExpiredLotInventoryIdsUseCase.findReservedInventoryIds(expired)).containsExactly(reserved)
+                assertThat(findExpiredLotInventoryIdsUseCase.findReservedInventoryIds(future)).isEmpty()
             }
     }
 }
