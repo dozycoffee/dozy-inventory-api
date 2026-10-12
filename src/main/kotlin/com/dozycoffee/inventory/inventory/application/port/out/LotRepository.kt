@@ -10,6 +10,9 @@ interface LotRepository {
 
     suspend fun findById(lotId: Long): Lot?
 
+    /** 주어진 ID의 Lot을 ID 오름차순으로 반환한다. 없는 ID는 결과에 없다 */
+    suspend fun findAllByIds(lotIds: Set<Long>): List<Lot>
+
     /** Lot 번호는 대소문자를 구분해 비교한다 */
     suspend fun findByProductIdAndLotNumber(
         productId: Long,

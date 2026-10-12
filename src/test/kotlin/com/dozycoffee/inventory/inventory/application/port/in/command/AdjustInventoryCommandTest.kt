@@ -45,6 +45,15 @@ class AdjustInventoryCommandTest {
         }
 
         @Test
+        fun `조정의 출처는 기본이 실사 조정이고 대사 보정도 담을 수 있다`() {
+            assertEquals(AdjustmentKind.AUDIT, command(item()).kind)
+            assertEquals(
+                AdjustmentKind.RECONCILIATION,
+                AdjustInventoryCommand(10L, listOf(item()), "wms-audit-1", "svc-wms", AdjustmentKind.RECONCILIATION).kind,
+            )
+        }
+
+        @Test
         fun `항목은 500개까지 담을 수 있다`() {
             command(*(1L..500L).map { item(lotId = it, referenceId = it) }.toTypedArray())
         }

@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustmentKind
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEvent
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEventPublisher
@@ -101,6 +102,30 @@ class InventoryAdjustmentServiceTest {
 
     private suspend fun stubSave() {
         whenever(inventoryHistoryRepository.save(any())).thenAnswer { it.getArgument<InventoryHistory>(0) }
+    }
+
+    @Nested
+    inner class `대사 보정 이력` {
+        @Test
+        fun `이력 유형이 RECONCILIATION이면 RECONCILIATION 이력을 남기고 이벤트는 같다`() =
+            runBlocking<Unit> {
+                stubExisting(5L, 1L, 10)
+                whenever(inventoryRepository.decrease(5L, 3)).thenReturn(inventory(5L, 1L, 7))
+                stubSave()
+
+                service.adjust(
+                    AdjustInventoryCommand(10L, listOf(item(1L, -3, referenceId = 31L)), key, "system", AdjustmentKind.RECONCILIATION),
+                )
+
+                val history = argumentCaptor<InventoryHistory>()
+                verifyBlocking(inventoryHistoryRepository) { save(history.capture()) }
+                assertEquals(HistoryType.RECONCILIATION, history.firstValue.historyType)
+                assertEquals(-3, history.firstValue.quantityChange)
+                assertEquals(ReferenceType.STOCK_ADJUSTMENT_ITEM, history.firstValue.referenceType)
+                val event = argumentCaptor<InventoryEvent>()
+                verifyBlocking(publisher) { publish(event.capture()) }
+                assertEquals(InventoryEventType.DECREASED, event.firstValue.eventType)
+            }
     }
 
     @Nested

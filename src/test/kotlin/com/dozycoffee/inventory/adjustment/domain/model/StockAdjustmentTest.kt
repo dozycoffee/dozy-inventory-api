@@ -2,7 +2,9 @@ package com.dozycoffee.inventory.adjustment.domain.model
 
 import com.dozycoffee.inventory.adjustment.domain.enumeration.AdjustmentStatus
 import com.dozycoffee.inventory.adjustment.domain.enumeration.AdjustmentType
+import com.dozycoffee.inventory.adjustment.domain.enumeration.ReconciliationRevision
 import com.dozycoffee.inventory.adjustment.domain.exception.AdjustmentErrorCode
+import com.dozycoffee.inventory.adjustment.domain.exception.InvalidAdjustmentStateException
 import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.domain.RequesterService
@@ -146,6 +148,163 @@ class StockAdjustmentTest {
             val b = StockAdjustmentItem.reconstitute(1L, null, 2L, QualityStatus.DEFECTIVE, -1)
 
             assertEquals(a, b)
+        }
+    }
+
+    @Nested
+    inner class `대사 보정안` {
+        private fun proposal(
+            inventoryQuantity: Int = 100,
+            wmsQuantity: Int = 92,
+        ): StockAdjustment =
+            StockAdjustment.reconciliation(
+                10L,
+                5L,
+                StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, inventoryQuantity, wmsQuantity),
+                RequesterService.of("system"),
+                IdempotencyKey.of("reconciliation-10-20261012-1-NORMAL"),
+            )
+
+        private fun restored(
+            status: AdjustmentStatus,
+            type: AdjustmentType = AdjustmentType.RECONCILIATION,
+        ): StockAdjustment =
+            StockAdjustment.reconstitute(
+                1L,
+                10L,
+                type,
+                status,
+                null,
+                RequesterService.of("system"),
+                if (status == AdjustmentStatus.APPLIED) "manager-1" else null,
+                if (status == AdjustmentStatus.APPLIED) now else null,
+                IdempotencyKey.of("reconciliation-10-20261012-1-NORMAL"),
+                listOf(StockAdjustmentItem.reconstitute(1L, null, 1L, QualityStatus.NORMAL, -8, 100, 92)),
+                5L,
+            )
+
+        @Test
+        fun `불일치한 행으로 처리 대기 보정안을 만들고 변동량은 WMS 수량에서 inventory 수량을 뺀 값이다`() {
+            val adjustment: StockAdjustment = proposal(100, 92)
+
+            assertEquals(AdjustmentType.RECONCILIATION, adjustment.adjustmentType)
+            assertEquals(AdjustmentStatus.PENDING, adjustment.status)
+            assertEquals(5L, adjustment.reconciliationRunId)
+            assertEquals(RequesterService.of("system"), adjustment.requestedBy)
+            assertNull(adjustment.externalReferenceId)
+            assertNull(adjustment.approvedBy)
+            val item: StockAdjustmentItem = adjustment.items.single()
+            assertEquals(-8, item.quantityChange)
+            assertEquals(100, item.inventoryQuantity)
+            assertEquals(92, item.wmsQuantity)
+            assertEquals(12, proposal(0, 12).items.single().quantityChange)
+        }
+
+        @Test
+        fun `두 수량이 같거나 음수이거나 실행과 창고가 양수가 아니면 거부한다`() {
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) { StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, 5, 5) }
+            assertInvalid(
+                AdjustmentErrorCode.INVALID_RECONCILIATION,
+            ) { StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, -1, 5) }
+            assertInvalid(
+                AdjustmentErrorCode.INVALID_RECONCILIATION,
+            ) { StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, 5, -1) }
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) { StockAdjustmentItem.reconciliation(0L, QualityStatus.NORMAL, 5, 6) }
+            val ok: StockAdjustmentItem = StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, 5, 6)
+            val key = IdempotencyKey.of("k")
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) {
+                StockAdjustment.reconciliation(0L, 5L, ok, RequesterService.of("system"), key)
+            }
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) {
+                StockAdjustment.reconciliation(10L, 0L, ok, RequesterService.of("system"), key)
+            }
+        }
+
+        @Test
+        fun `처리 대기 보정안을 승인하면 반영 상태가 되고 승인자와 시각을 기록한다`() {
+            val adjustment: StockAdjustment = restored(AdjustmentStatus.PENDING)
+
+            assertEquals(true, adjustment.approve("manager-1", now))
+
+            assertEquals(AdjustmentStatus.APPLIED, adjustment.status)
+            assertEquals("manager-1", adjustment.approvedBy)
+            assertEquals(now, adjustment.approvedAt)
+        }
+
+        @Test
+        fun `이미 반영된 보정안의 승인은 바꾸지 않고 false이고 거부된 보정안의 승인은 상태 오류다`() {
+            val applied: StockAdjustment = restored(AdjustmentStatus.APPLIED)
+
+            assertEquals(false, applied.approve("other", now.plusDays(1)))
+            assertEquals("manager-1", applied.approvedBy)
+            assertThrows<InvalidAdjustmentStateException> { restored(AdjustmentStatus.REJECTED).approve("manager-1", now) }
+            assertThrows<InvalidAdjustmentStateException> { restored(AdjustmentStatus.APPROVED).approve("manager-1", now) }
+        }
+
+        @Test
+        fun `승인자는 비어 있을 수 없고 100자를 넘을 수 없다`() {
+            assertInvalid(AdjustmentErrorCode.INVALID_APPROVER) { restored(AdjustmentStatus.PENDING).approve(" ", now) }
+            assertInvalid(AdjustmentErrorCode.INVALID_APPROVER) { restored(AdjustmentStatus.PENDING).approve("a".repeat(101), now) }
+        }
+
+        @Test
+        fun `처리 대기 보정안을 거부하고 이미 거부된 보정안은 false이며 반영된 보정안은 상태 오류다`() {
+            val pending: StockAdjustment = restored(AdjustmentStatus.PENDING)
+
+            assertEquals(true, pending.reject())
+            assertEquals(AdjustmentStatus.REJECTED, pending.status)
+            assertEquals(false, restored(AdjustmentStatus.REJECTED).reject())
+            assertThrows<InvalidAdjustmentStateException> { restored(AdjustmentStatus.APPLIED).reject() }
+        }
+
+        @Test
+        fun `실사 조정은 승인하거나 거부하거나 고칠 수 없다`() {
+            val audit: StockAdjustment = restored(AdjustmentStatus.APPLIED, AdjustmentType.AUDIT)
+
+            assertThrows<InvalidAdjustmentStateException> { audit.approve("manager-1", now) }
+            assertThrows<InvalidAdjustmentStateException> { audit.reject() }
+            assertThrows<InvalidAdjustmentStateException> { audit.revise(1, 2) }
+        }
+
+        @Test
+        fun `다시 확인한 수량이 같으면 그대로이고 다르면 수량과 변동량을 새 값으로 바꾼다`() {
+            val adjustment: StockAdjustment = proposal(100, 92)
+
+            assertEquals(ReconciliationRevision.UNCHANGED, adjustment.revise(100, 92))
+            assertEquals(-8, adjustment.items.single().quantityChange)
+
+            assertEquals(ReconciliationRevision.UPDATED, adjustment.revise(100, 95))
+            assertEquals(95, adjustment.items.single().wmsQuantity)
+            assertEquals(-5, adjustment.items.single().quantityChange)
+            assertEquals(ReconciliationRevision.UPDATED, adjustment.revise(90, 95))
+            assertEquals(90, adjustment.items.single().inventoryQuantity)
+            assertEquals(5, adjustment.items.single().quantityChange)
+            assertEquals(AdjustmentStatus.PENDING, adjustment.status)
+        }
+
+        @Test
+        fun `두 수량이 같아지면 불일치가 사라진 것이라 거부 상태로 닫고 수량은 그대로 둔다`() {
+            val adjustment: StockAdjustment = proposal(100, 92)
+
+            assertEquals(ReconciliationRevision.RESOLVED, adjustment.revise(92, 92))
+
+            assertEquals(AdjustmentStatus.REJECTED, adjustment.status)
+            assertEquals(-8, adjustment.items.single().quantityChange)
+        }
+
+        @Test
+        fun `처리 대기가 아닌 보정안은 고칠 수 없다`() {
+            assertThrows<InvalidAdjustmentStateException> { restored(AdjustmentStatus.APPLIED).revise(1, 2) }
+            assertThrows<InvalidAdjustmentStateException> { restored(AdjustmentStatus.REJECTED).revise(1, 2) }
+        }
+
+        @Test
+        fun `항목을 고칠 때 두 수량이 같거나 음수이면 거부한다`() {
+            val item: StockAdjustmentItem = StockAdjustmentItem.reconciliation(1L, QualityStatus.NORMAL, 10, 4)
+
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) { item.revise(5, 5) }
+            assertInvalid(AdjustmentErrorCode.INVALID_RECONCILIATION) { item.revise(-1, 5) }
+            assertEquals(-6, item.quantityChange)
         }
     }
 }

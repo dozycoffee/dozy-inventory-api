@@ -27,7 +27,8 @@ class MySqlTestContainerInitializer : ApplicationContextInitializer<Configurable
             MySQLContainer("mysql:8.0")
                 .withDatabaseName(DATABASE_NAME)
                 .withEnv("TZ", "Asia/Seoul")
-                .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci")
+                // 테스트 클래스마다 Spring 컨텍스트(연결 풀)가 캐시되어 기본 한도(151)를 넘으면 "Too many connections"로 컨텍스트 로드가 실패한다
+                .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-connections=1000")
                 .also { it.start() }
         }
     }

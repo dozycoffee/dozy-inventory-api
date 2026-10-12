@@ -5,6 +5,7 @@ import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistence
 import com.dozycoffee.inventory.inventory.application.port.`in`.AdjustInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetAdjustedQuantitiesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustmentKind
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
@@ -115,6 +116,29 @@ class InventoryAdjustmentServiceIntegrationTest {
                     ),
                 ).isEqualTo(1L)
                 assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE event_type = 'INVENTORY_INCREASED'")).isEqualTo(1L)
+            }
+
+        @Test
+        fun `이력 유형이 RECONCILIATION이면 RECONCILIATION 이력을 남기고 보류를 푼다`() =
+            runBlocking<Unit> {
+                val row: Long = fixture.insertInventory(10L, productId, lotA, quantity = 10, hold = true)
+
+                checkNotNull(
+                    transactionalOperator.executeAndAwait {
+                        adjustInventoryUseCase.adjust(
+                            AdjustInventoryCommand(10L, listOf(item(lotA, -4, 31L)), "recon-1", "system", AdjustmentKind.RECONCILIATION),
+                        )
+                    },
+                )
+
+                assertThat(column(row, "quantity")).isEqualTo(6L)
+                assertThat(column(row, "CAST(allocation_hold AS UNSIGNED)")).isEqualTo(0L)
+                assertThat(
+                    scalar(
+                        "SELECT COUNT(*) FROM inventory_history WHERE history_type = 'RECONCILIATION' AND reference_id = 31 AND quantity_change = -4",
+                    ),
+                ).isEqualTo(1L)
+                assertThat(scalar("SELECT COUNT(*) FROM inventory_history WHERE history_type = 'ADJUSTMENT'")).isEqualTo(0L)
             }
 
         @Test

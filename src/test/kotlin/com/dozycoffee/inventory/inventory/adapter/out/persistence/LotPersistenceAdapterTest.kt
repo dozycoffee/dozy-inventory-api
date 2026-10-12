@@ -96,6 +96,19 @@ class LotPersistenceAdapterTest {
                 assertThat(adapter.findByProductIdAndLotNumber(999_999L, "LOT-A")).isNull()
                 assertThat(adapter.findById(999_999L)).isNull()
             }
+
+        @Test
+        fun `ID 목록으로 한 번에 조회하면 ID 순서이고 없는 ID와 빈 집합은 결과가 없다`() =
+            runBlocking<Unit> {
+                val b: Lot = adapter.save(newLot("LOT-B"))
+                val a: Lot = adapter.save(newLot("LOT-A"))
+                val c: Lot = adapter.save(newLot("LOT-C"))
+
+                assertThat(adapter.findAllByIds(setOf(checkNotNull(c.lotId), checkNotNull(a.lotId), 999_999L)).map { it.lotNumber })
+                    .containsExactly("LOT-A", "LOT-C")
+                assertThat(adapter.findAllByIds(setOf(checkNotNull(b.lotId))).single().lotNumber).isEqualTo("LOT-B")
+                assertThat(adapter.findAllByIds(emptySet())).isEmpty()
+            }
     }
 
     @Nested

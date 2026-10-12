@@ -70,6 +70,30 @@ class InventoryPersistenceAdapter(
             .awaitSingle()
     }
 
+    override suspend fun findRowsByWarehouse(
+        warehouseId: Long,
+        productId: Long?,
+        lotNumber: String?,
+    ): List<InventoryRow> {
+        val clauses: MutableList<String> = mutableListOf("i.warehouse_id = :warehouseId")
+        if (productId != null) clauses += "i.product_id = :productId"
+        if (lotNumber != null) clauses += "l.lot_number = :lotNumber"
+        var spec: DatabaseClient.GenericExecuteSpec =
+            databaseClient
+                .sql(SEARCH_HEAD + clauses.joinToString(separator = " AND ", prefix = " WHERE ") + " ORDER BY i.inventory_id")
+                .bind("warehouseId", warehouseId)
+        if (productId != null) spec = spec.bind("productId", productId)
+        if (lotNumber != null) spec = spec.bind("lotNumber", lotNumber)
+        return spec.map { row, _ -> toInventoryRow(row) }.flow().toList()
+    }
+
+    override suspend fun findWarehouseIds(): List<Long> =
+        databaseClient
+            .sql("SELECT DISTINCT warehouse_id FROM inventory ORDER BY warehouse_id")
+            .map { row, _ -> checkNotNull(row.get("warehouse_id", Long::class.javaObjectType)) }
+            .flow()
+            .toList()
+
     override suspend fun findRowById(inventoryId: Long): InventoryRow? =
         databaseClient
             .sql(SEARCH_HEAD + " WHERE i.inventory_id = :inventoryId")

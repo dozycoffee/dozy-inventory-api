@@ -33,6 +33,17 @@ class LotPersistenceAdapter(
         }
     }
 
+    override suspend fun findAllByIds(lotIds: Set<Long>): List<Lot> =
+        if (lotIds.isEmpty()) {
+            emptyList()
+        } else {
+            lotR2dbcRepository
+                .findAllById(lotIds)
+                .toList()
+                .sortedBy { it.lotId }
+                .map { it.toDomain() }
+        }
+
     override suspend fun findById(lotId: Long): Lot? = lotR2dbcRepository.findById(lotId)?.toDomain()
 
     override suspend fun findByProductIdAndLotNumber(

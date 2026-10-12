@@ -13,9 +13,9 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 5 | 재고 예약: 요청, 확정 → WMS 출고 지시, 해제 | 이식 전 |
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 아래 "출고 확정", "Lot 재할당" |
 | 7 | 반품 복귀 (7.1) | 아래 "반품 복귀" |
-| 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
+| 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 8.3은 아래 "대사 보정", 8.2는 이식 전 |
 | 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 아래 "유통기한 스캔", "폐기 확정" |
-| 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
+| 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 대사는 아래 "대사 보정", 나머지는 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
 
 ## 확정된 결정
 
@@ -163,6 +163,17 @@ WMS가 폐기를 확정하면 해당 재고를 차감한다. 결정 배경은 [A
 - **반영**: 가용 수량 안에서 총 수량을 줄이고 넘으면 409(`INV_INSUFFICIENT_AVAILABLE_QUANTITY`)다. 이력은 `DISPOSAL`(원인 `DISPOSAL_ITEM`), 이벤트는 재고 감소다. 수량이 0이 된 행은 유지한다.
 - **응답**: 반영 직후의 총 수량(`quantityAfter`)을 담는다. 같은 멱등 키의 재요청은 차감하지 않고 처음과 같은 결과를 200으로 반환하며 다른 내용이면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
 - **API**: `POST /api/v1/disposals`(`inventory:service`만). 본문은 `warehouseId`, `productId`, `lotNumber`, `qualityStatus`, `quantity`, `disposalItemId`이다.
+
+### 대사 보정 (8.3, 10.3)
+
+하루 1회 배치가 WMS 수량과 inventory 총 수량을 비교해 보정안을 만들고, 담당자가 항목별로 승인하면 `RECONCILIATION` 이력으로 반영한다. 결정 배경은 [ADR-0033](adr/0033-reconciliation.md)이다.
+
+- **대사**: 새벽 1시 30분(`Asia/Seoul`)에 재고 행이 있는 창고마다 WMS의 `GET /api/v1/stock-quantities`로 창고 × 상품 × Lot × 품질 상태별 수량을 받아 inventory 총 수량(예약 수량 제외)과 비교한다. 불일치한 행마다 보정안(`PENDING`) 한 건을 만들고 창고별 실행 기록(`reconciliation_run`)을 남긴다. 처리 대기 보정안이 이미 있는 행은 만들지 않는다.
+- **승인**: `POST /api/v1/reconciliations/proposals/{id}/approval`. 창고 관리자(배정된 창고)와 `admin`이 할 수 있고, 변동량이 카테고리 임계치를 넘으면 `admin`만 가능하다(403 `INV_RECONCILIATION_ADMIN_REQUIRED`). 일괄 승인은 없다.
+- **재계산**: 승인할 때 WMS 수량을 다시 조회해 보정안의 값과 다르면 보정안 숫자만 갱신하고 반영하지 않은 채 409 `INV_RECONCILIATION_CHANGED`이다. 새 숫자를 확인하고 다시 승인한다. 불일치가 사라졌으면 보정안을 거부 상태로 닫는다.
+- **반영**: 승인하면 같은 트랜잭션에서 총 수량을 바꾸고 `RECONCILIATION` 이력과 재고 증감 이벤트를 남기며 반영한 행의 할당 보류를 푼다. 감소는 가용 수량 안에서만 가능하다(409 `INV_INSUFFICIENT_AVAILABLE_QUANTITY`, 보정안은 `PENDING`).
+- **거부**: `POST /api/v1/reconciliations/proposals/{id}/rejection`. 승인과 같은 권한이고 임계치와 무관하다.
+- **조회**: `GET /api/v1/reconciliations/proposals`(창고·상태 필터, 페이지)와 `/{id}`.
 
 ### 상태 흐름
 

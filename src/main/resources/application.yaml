@@ -42,9 +42,22 @@ dozy:
   auth:
     audience: inventory
     accepted-realms: [internal]
+    # 다른 서비스(WMS)를 system client로 호출할 때 쓴다. 켜면 AUTH_CLIENT_ID·AUTH_CLIENT_SECRET이 필요하다(비밀은 환경변수로만 주입한다)
+    client:
+      enabled: ${AUTH_CLIENT_ENABLED:false}
+      client-id: ${AUTH_CLIENT_ID:}
+      client-secret: ${AUTH_CLIENT_SECRET:}
     issuer-base-uri: ${AUTH_ISSUER_BASE_URI:http://localhost:8081}
 
 inventory:
+  # 하루 1회 WMS 수량과 대사해 보정안을 만드는 배치(ADR-0033). 테스트에서는 끈다. WMS 주소는 환경변수 WMS_BASE_URL로 주입한다
+  reconciliation:
+    enabled: true
+    cron: "0 30 1 * * *"
+    zone: Asia/Seoul
+    wms:
+      base-url: ${WMS_BASE_URL:}
+      timeout: PT10S
   # WMS의 직원 창고 소속 변경 이벤트를 받아 warehouse_access 사본을 교체하는 리스너(ADR-0032). 테스트에서는 끈다
   warehouse-access:
     listener:

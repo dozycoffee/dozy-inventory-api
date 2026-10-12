@@ -48,4 +48,37 @@ class LotServiceTest {
 
             assertThrows<LotNotFoundException> { service.getByProductAndLotNumber(100L, "NOPE") }
         }
+
+    @Test
+    fun `찾기는 없는 Lot이면 null이고 있으면 결과로 바꾼다`() =
+        runBlocking<Unit> {
+            whenever(lotRepository.findByProductIdAndLotNumber(100L, "LOT-A")).thenReturn(
+                Lot.reconstitute(7L, 100L, "LOT-A", null, null, LotStatus.NORMAL),
+            )
+            whenever(lotRepository.findByProductIdAndLotNumber(100L, "NOPE")).thenReturn(null)
+
+            assertEquals(LotResult(7L, 100L, "LOT-A", null, null), service.findByProductAndLotNumber(100L, "LOT-A"))
+            assertEquals(null, service.findByProductAndLotNumber(100L, "NOPE"))
+        }
+
+    @Test
+    fun `ID로 여러 Lot을 한 번에 찾고 비어 있으면 빈 목록이다`() =
+        runBlocking<Unit> {
+            whenever(lotRepository.findAllByIds(setOf(7L, 8L))).thenReturn(
+                listOf(
+                    Lot.reconstitute(7L, 100L, "LOT-A", null, null, LotStatus.NORMAL),
+                    Lot.reconstitute(8L, 101L, "LOT-B", LocalDate.of(2026, 9, 1), LocalDate.of(2027, 3, 1), LotStatus.NORMAL),
+                ),
+            )
+            whenever(lotRepository.findAllByIds(emptySet())).thenReturn(emptyList())
+
+            assertEquals(
+                listOf(
+                    LotResult(7L, 100L, "LOT-A", null, null),
+                    LotResult(8L, 101L, "LOT-B", LocalDate.of(2026, 9, 1), LocalDate.of(2027, 3, 1)),
+                ),
+                service.getByIds(setOf(7L, 8L)),
+            )
+            assertEquals(emptyList<LotResult>(), service.getByIds(emptySet()))
+        }
 }

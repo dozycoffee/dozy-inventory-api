@@ -770,6 +770,39 @@ class InventoryPersistenceAdapterTest {
             }
 
         @Test
+        fun `창고의 재고 행을 ID 순서로 모두 주고 상품과 Lot 번호로 거를 수 있으며 수량 0인 행도 포함한다`() =
+            runBlocking<Unit> {
+                val other: Long = fixture.seedProduct("BEAN-002")
+                val lotA: Long = lotOf(productId, "A", LocalDate.of(2027, 1, 1))
+                val lotB: Long = lotOf(productId, "B", LocalDate.of(2027, 6, 1))
+                val otherLot: Long = lotOf(other, "A", LocalDate.of(2027, 1, 1))
+                val first: Long = fixture.insertInventory(10L, productId, lotA, quantity = 10)
+                val zero: Long = fixture.insertInventory(10L, productId, lotA, "DEFECTIVE", quantity = 0)
+                val second: Long = fixture.insertInventory(10L, productId, lotB, quantity = 5)
+                val third: Long = fixture.insertInventory(10L, other, otherLot, quantity = 3)
+                fixture.insertInventory(20L, productId, lotA, quantity = 99)
+
+                assertThat(adapter.findRowsByWarehouse(10L, null, null).map { it.inventoryId }).containsExactly(first, zero, second, third)
+                assertThat(adapter.findRowsByWarehouse(10L, productId, null).map { it.inventoryId }).containsExactly(first, zero, second)
+                assertThat(adapter.findRowsByWarehouse(10L, null, "A").map { it.inventoryId }).containsExactly(first, zero, third)
+                assertThat(adapter.findRowsByWarehouse(10L, productId, "A").map { it.inventoryId }).containsExactly(first, zero)
+                assertThat(adapter.findRowsByWarehouse(10L, productId, "a")).isEmpty()
+                assertThat(adapter.findRowsByWarehouse(99L, null, null)).isEmpty()
+                assertThat(adapter.findRowsByWarehouse(10L, null, null).first().quantity).isEqualTo(10)
+            }
+
+        @Test
+        fun `재고 행이 있는 창고 ID를 중복 없이 오름차순으로 준다`() =
+            runBlocking<Unit> {
+                val lot: Long = lotOf(productId, "A", LocalDate.of(2027, 1, 1))
+                fixture.insertInventory(30L, productId, lot)
+                fixture.insertInventory(10L, productId, lot)
+                fixture.insertInventory(10L, productId, lot, "DEFECTIVE")
+
+                assertThat(adapter.findWarehouseIds()).containsExactly(10L, 30L)
+            }
+
+        @Test
         fun `조건이 없으면 전체를 창고 상품 유통기한 순서로 주고 유통기한이 없는 Lot은 마지막이다`() =
             runBlocking<Unit> {
                 val other: Long = fixture.seedProduct("BEAN-002")
