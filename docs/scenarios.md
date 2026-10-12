@@ -12,7 +12,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 4 | 재고 조회: 가용 재고(채널용), 현황·상세(관리자용), 이력 | 이식 전 |
 | 5 | 재고 예약: 요청, 확정 → WMS 출고 지시, 해제 | 이식 전 |
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
-| 7 | 반품 복귀 (7.1) | 이식 전 |
+| 7 | 반품 복귀 (7.1) | 아래 "반품 복귀" |
 | 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
 | 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 아래 "유통기한 스캔", "폐기 확정" |
 | 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
@@ -122,6 +122,17 @@ WMS가 실사 마감 시점의 실시간 수량으로 계산한 조정 변동량
 - **예약**: 경과한 Lot의 확정 전(`RESERVED`) 예약은 강제 해제하고(`RESERVATION_FORCE_RELEASED`, 사유 `LOT_EXPIRED`) OMS가 다른 Lot으로 다시 예약할 수 있다. 확정된(`CONFIRMED`) 예약은 건너뛰고 `Lot 경과` 이벤트에 담아 사람이 확인한다.
 - **품질 전환**: 정상 품질 행의 가용 수량(총 − 예약)만 폐기 예정 행으로 옮기고 `QUALITY_TRANSFER` 이력을 전환 전 −N, 후 +N으로 남긴다. 확정 예약이 잡은 수량은 그 예약이 끝난 뒤 다음 날 스캔이 이어서 옮긴다. 불량 품질 행은 건드리지 않는다.
 - **이벤트**: `LOT_EXPIRED`로 WMS가 폐기 신청을 만든다. 재고 증감 이벤트는 발행하지 않는다.
+
+### 반품 복귀 (7.1)
+
+WMS가 검수한 반품을 재고에 되돌린다. 결정 배경은 [ADR-0029](adr/0029-return-restoration.md)이다.
+
+- **요청 단위**: 반품 품목 한 줄이 요청 하나다. 멱등 키는 품목마다 하나(`Idempotency-Key` 헤더)이고 원인 문서는 WMS의 반품 상품 ID(`returnItemId`)다. 원래 출고와는 연결하지 않는다.
+- **Lot**: `상품 + Lot 번호`로 등록된 Lot을 찾는다. 없으면 404(`INV_LOT_NOT_FOUND`)이고 Lot을 새로 만들지 않는다. 상품이 없으면 404(`INV_PRODUCT_NOT_FOUND`)이며 비활성 상품도 반영한다.
+- **품질 상태**: WMS 검수 판정인 `NORMAL`·`DEFECTIVE`만 받고 폐기 예정은 400(`INV_INVALID_RETURN_QUALITY_STATUS`)이다. 판정에 맞는 행에 더하고 없으면 만든다.
+- **기록**: 이력은 `RETURN`(원인 `RETURN_ITEM`), 이벤트는 재고 증가다.
+- **응답**: 반영 직후의 총 수량(`quantityAfter`)을 담는다. 같은 멱등 키의 재요청은 반영하지 않고 처음과 같은 결과를 200으로 반환하며 다른 내용이면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
+- **API**: `POST /api/v1/returns`(`inventory:service`만). 본문은 `warehouseId`, `productId`, `lotNumber`, `qualityStatus`, `quantity`, `returnItemId`이다.
 
 ### 폐기 확정 (9.2)
 

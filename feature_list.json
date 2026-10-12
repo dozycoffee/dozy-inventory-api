@@ -86,8 +86,8 @@
   {
     "id": "F-013",
     "name": "반품 복귀",
-    "description": "반품 검수 결과를 RETURN 이력으로 재고에 반영한다. 불량 판정은 DEFECTIVE 행에 반영. 시나리오 7.1.",
-    "status": "pending",
+    "description": "반품 검수 결과를 RETURN 이력으로 재고에 반영한다. 불량 판정은 DEFECTIVE 행에 반영. 시나리오 7.1. 결정은 ADR-0029.",
+    "status": "completed",
     "dependencies": ["F-007", "F-020"]
   },
   {
