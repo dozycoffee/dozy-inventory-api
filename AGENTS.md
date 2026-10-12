@@ -54,6 +54,7 @@ docker build --secret id=gpr_user,env=GPR_USER --secret id=gpr_token,env=GPR_TOK
 | [docs/conventions.md](docs/conventions.md) | Kotlin 코드를 작성하기 전 (타입 명시, Entity, 코루틴, 주석 등) |
 | [docs/events.md](docs/events.md) | 이벤트 payload·토픽·키를 바꾸거나 구독자에게 알릴 때. 이벤트 계약 |
 | [docs/configuration.md](docs/configuration.md) | 환경변수, 프로필, 배치와 여러 인스턴스, 배포 환경을 다룰 때 |
+| [docs/runbook.md](docs/runbook.md) | 운영 중 이상 징후의 원인을 찾고 복구할 때 (초안) |
 | [docs/testing.md](docs/testing.md) | 테스트를 작성하기 전 |
 | [docs/scenarios.md](docs/scenarios.md) | 업무 시나리오와 경계 결정을 확인할 때 |
 | [docs/adr/](docs/adr/README.md) | 결정의 배경이 필요할 때 |
