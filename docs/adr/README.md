@@ -38,6 +38,7 @@
 | [0032](0032-warehouse-access-control.md) | 창고 접근 제어 규칙 | Accepted |
 | [0033](0033-reconciliation.md) | 대사 보정 규칙 | Accepted |
 | [0034](0034-health-checks.md) | 헬스 체크와 graceful shutdown | Accepted |
+| [0035](0035-container-image.md) | 컨테이너 이미지 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
