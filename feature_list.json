@@ -114,8 +114,8 @@
   {
     "id": "F-017",
     "name": "유통기한 스캔",
-    "description": "Lot 임박·경과 판정, 경과 Lot의 품질 전환(QUALITY_TRANSFER 이력), 확정 전 예약 강제 해제, Lot 경과 이벤트. 시나리오 9.1.",
-    "status": "pending",
+    "description": "Lot 임박·경과 판정, 경과 Lot의 품질 전환(QUALITY_TRANSFER 이력), 확정 전 예약 강제 해제, Lot 경과 이벤트. 시나리오 9.1. 결정은 ADR-0027. 단계: (1) inventory Lot 상태 갱신과 품질 전환(완료), (2) reservation 확정 전 예약 강제 해제와 확정 예약 조회, (3) 스캔 오케스트레이션, Lot 경과 이벤트, 스케줄러.",
+    "status": "in_progress",
     "dependencies": ["F-011", "F-007"]
   },
   {
