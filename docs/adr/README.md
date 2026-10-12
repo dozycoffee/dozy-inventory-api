@@ -32,6 +32,7 @@
 | [0026](0026-stock-adjustment.md) | 실사 조정 반영 규칙 | Accepted |
 | [0027](0027-lot-expiration-scan.md) | 유통기한 스캔 규칙 | Accepted |
 | [0028](0028-disposal-confirmation.md) | 폐기 확정 반영 규칙 | Accepted |
+| [0029](0029-return-restoration.md) | 반품 복귀 반영 규칙 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
