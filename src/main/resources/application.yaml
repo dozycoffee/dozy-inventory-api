@@ -60,6 +60,12 @@ inventory:
       enabled: true
       interval: PT1M
       batch-size: 100
+  # 유통기한이 지난 Lot의 상태를 갱신하고 재고를 폐기 예정으로 옮기는 스케줄러(ADR-0027). 하루 한 번(cron, zone 기준)이며 테스트에서는 끈다
+  lot-expiration-scan:
+    enabled: true
+    cron: "0 10 0 * * *"
+    zone: Asia/Seoul
+    batch-size: 100
   outbox:
     # Outbox 대기 이벤트를 Kafka로 발행하는 스케줄러. 테스트에서는 끈다. 토픽은 {topic-prefix}.{집계 유형 소문자}이다
     publisher:
