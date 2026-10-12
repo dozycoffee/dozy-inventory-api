@@ -14,7 +14,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
 | 7 | 반품 복귀 (7.1) | 이식 전 |
 | 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
-| 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 9.1은 아래 "유통기한 스캔", 9.2는 이식 전 |
+| 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 아래 "유통기한 스캔", "폐기 확정" |
 | 10 | 연동·정합성: 이벤트 발행, 멱등성, 총량 대사, 장애 | 일부 [concurrency-and-idempotency.md](concurrency-and-idempotency.md) |
 
 ## 확정된 결정
@@ -122,6 +122,16 @@ WMS가 실사 마감 시점의 실시간 수량으로 계산한 조정 변동량
 - **예약**: 경과한 Lot의 확정 전(`RESERVED`) 예약은 강제 해제하고(`RESERVATION_FORCE_RELEASED`, 사유 `LOT_EXPIRED`) OMS가 다른 Lot으로 다시 예약할 수 있다. 확정된(`CONFIRMED`) 예약은 건너뛰고 `Lot 경과` 이벤트에 담아 사람이 확인한다.
 - **품질 전환**: 정상 품질 행의 가용 수량(총 − 예약)만 폐기 예정 행으로 옮기고 `QUALITY_TRANSFER` 이력을 전환 전 −N, 후 +N으로 남긴다. 확정 예약이 잡은 수량은 그 예약이 끝난 뒤 다음 날 스캔이 이어서 옮긴다. 불량 품질 행은 건드리지 않는다.
 - **이벤트**: `LOT_EXPIRED`로 WMS가 폐기 신청을 만든다. 재고 증감 이벤트는 발행하지 않는다.
+
+### 폐기 확정 (9.2)
+
+WMS가 폐기를 확정하면 해당 재고를 차감한다. 결정 배경은 [ADR-0028](adr/0028-disposal-confirmation.md)이다.
+
+- **요청 단위**: 폐기 품목 한 줄이 요청 하나다. 멱등 키는 품목마다 하나(`Idempotency-Key` 헤더)이고 원인 문서는 WMS의 폐기 상품 ID(`disposalItemId`)다.
+- **대상**: 불량(`DEFECTIVE`)과 폐기 예정(`DISPOSAL_SCHEDULED`) 재고만 폐기한다. 정상(`NORMAL`) 재고는 400(`INV_INVALID_DISPOSAL_QUALITY_STATUS`)으로 반려한다. 재고 행은 `창고 + 상품 + Lot 번호 + 품질 상태`로 찾고 Lot이 없으면 404(`INV_LOT_NOT_FOUND`), 행이 없으면 404(`INV_INVENTORY_NOT_FOUND`)다.
+- **반영**: 가용 수량 안에서 총 수량을 줄이고 넘으면 409(`INV_INSUFFICIENT_AVAILABLE_QUANTITY`)다. 이력은 `DISPOSAL`(원인 `DISPOSAL_ITEM`), 이벤트는 재고 감소다. 수량이 0이 된 행은 유지한다.
+- **응답**: 반영 직후의 총 수량(`quantityAfter`)을 담는다. 같은 멱등 키의 재요청은 차감하지 않고 처음과 같은 결과를 200으로 반환하며 다른 내용이면 409(`INV_IDEMPOTENCY_KEY_CONFLICT`)다.
+- **API**: `POST /api/v1/disposals`(`inventory:service`만). 본문은 `warehouseId`, `productId`, `lotNumber`, `qualityStatus`, `quantity`, `disposalItemId`이다.
 
 ### 상태 흐름
 
