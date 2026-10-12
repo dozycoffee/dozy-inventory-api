@@ -34,6 +34,7 @@
 | [0028](0028-disposal-confirmation.md) | 폐기 확정 반영 규칙 | Accepted |
 | [0029](0029-return-restoration.md) | 반품 복귀 반영 규칙 | Accepted |
 | [0030](0030-admin-inventory-query.md) | 관리자 재고 현황·상세·이력 조회 규칙 | Accepted |
+| [0031](0031-lot-reallocation.md) | Lot 재할당과 할당 보류 규칙 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 
