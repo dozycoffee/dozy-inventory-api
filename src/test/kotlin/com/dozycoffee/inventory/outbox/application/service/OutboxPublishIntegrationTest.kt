@@ -3,6 +3,7 @@ package com.dozycoffee.inventory.outbox.application.service
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.outbox.application.port.`in`.PublishOutboxEventsUseCase
+import com.dozycoffee.inventory.outbox.application.port.`in`.RequeueOutboxEventUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.RegisterProductUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.command.RegisterProductCommand
 import com.dozycoffee.inventory.product.domain.enumeration.ProductCategory
@@ -48,6 +49,9 @@ class OutboxPublishIntegrationTest {
 
     @Autowired
     private lateinit var publishOutboxEventsUseCase: PublishOutboxEventsUseCase
+
+    @Autowired
+    private lateinit var requeueOutboxEventUseCase: RequeueOutboxEventUseCase
 
     @Autowired
     private lateinit var registerProductUseCase: RegisterProductUseCase
@@ -202,5 +206,51 @@ class OutboxPublishIntegrationTest {
             val records: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("e2e.product"), 30)
             assertThat(records.map { eventId(it) }.toSet()).hasSize(30)
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PENDING'")).isEqualTo("0")
+        }
+
+    private suspend fun insertEvent(
+        key: String,
+        payload: String,
+    ): Long {
+        databaseClient
+            .sql(
+                "INSERT INTO outbox_event " +
+                    "(aggregate_type, aggregate_id, event_type, partition_key, payload, status, attempt_count, created_at) " +
+                    "VALUES ('PRODUCT', 1, 'PRODUCT_REGISTERED', :key, :payload, 'PENDING', 0, NOW(6))",
+            ).bind("key", key)
+            .bind("payload", payload)
+            .fetch()
+            .rowsUpdated()
+            .awaitFirst()
+        return scalar("SELECT MAX(outbox_event_id) FROM outbox_event").toLong()
+    }
+
+    @Test
+    fun `브로커가 거부하는 이벤트는 임계치까지 시도한 뒤 격리되고 같은 키의 뒤 이벤트는 계속 발행되며 재발행하면 다시 발행 대기가 된다`() =
+        runBlocking<Unit> {
+            val poison: Long = insertEvent("p:1", """{"blob":"${"x".repeat(2_000_000)}"}""")
+            val healthy: Long = insertEvent("p:2", """{"ok":1}""")
+
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 2)).isEqualTo(1)
+            assertThat(scalar("SELECT attempt_count FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("1")
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("PENDING")
+            assertThat(scalar("SELECT last_error FROM outbox_event WHERE outbox_event_id = $poison")).isNotBlank()
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $healthy")).isEqualTo("PUBLISHED")
+
+            val later: Long = insertEvent("p:1", """{"ok":2}""")
+            insertEvent("p:3", """{"ok":3}""")
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 2)).isEqualTo(1)
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("DEAD")
+            assertThat(scalar("SELECT dead_at IS NOT NULL FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("1")
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $later")).isEqualTo("PENDING")
+
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 2)).isEqualTo(1)
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $later")).isEqualTo("PUBLISHED")
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("DEAD")
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 2)).isEqualTo(0)
+
+            requeueOutboxEventUseCase.requeue(poison)
+            assertThat(scalar("SELECT status FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("PENDING")
+            assertThat(scalar("SELECT attempt_count FROM outbox_event WHERE outbox_event_id = $poison")).isEqualTo("0")
         }
 }
