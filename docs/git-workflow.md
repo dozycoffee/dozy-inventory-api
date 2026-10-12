@@ -15,6 +15,7 @@
 - 이슈는 템플릿(`feature`, `bug`, `refactor`, `chore`)으로 만든다. 빈 이슈는 허용하지 않는다.
 - 기능, 버그 수정, 리팩토링, 구조에 영향을 주는 빌드·설정 변경처럼 이슈가 필요한 작업은 PR을 올릴 때 이슈도 함께 만들어 PR 본문의 "연관된 이슈"에 `- Closes #이슈번호` 형식(목록 항목)으로 연결한다. 이슈가 없으면 `- 없음 (사유)`로 적는다. 진행 기록 갱신 같은 사소한 문서 변경은 이슈 없이 올려도 된다.
 - 이슈와 PR의 Assignees에는 `jinwoojwa`를 지정한다.
+- PR에도 이슈와 같은 타입 **라벨**을 붙인다(`gh pr create --label`). feat는 `✨ feature`, fix는 `🐛 bug`, refactor는 `♻️ refactor`, chore·build·test·ci는 `🔧 chore`, 문서만 바꾸는 PR은 `documentation`이다. PR을 만든 직후 라벨이 붙었는지 확인한다.
 - 이슈를 만들 때 **Type**을 지정한다. `feature`는 Feature, `bug`는 Bug, `refactor`와 `chore`는 Task이다. 이슈 템플릿이 `type:`으로 자동 지정하고, `gh issue create`로 만들 때는 `--type`을 쓴다.
 - 이슈를 만들 때 조직 이슈 **Field**(Priority, Effort, Start date, Target date)도 채운다.
   - Priority: `Urgent`(장애·보안, 즉시 대응), `High`(로드맵에서 다음 작업이 의존하는 기반 작업이나 주요 기능), `Medium`(일반 기능·버그), `Low`(개선·정리)
