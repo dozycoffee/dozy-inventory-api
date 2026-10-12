@@ -81,7 +81,7 @@ class StockAdjustmentPersistenceAdapter(
         return spec.fetch().awaitRowsUpdated() > 0
     }
 
-    override suspend fun updateReconciliationItem(item: StockAdjustmentItem) {
+    override suspend fun updateReconciliationItem(item: StockAdjustmentItem): Boolean =
         databaseClient
             .sql(UPDATE_ITEM_QUANTITIES)
             .bind("inventoryQuantity", checkNotNull(item.inventoryQuantity) { "대사 보정안 항목은 inventory 수량이 있어야 한다" })
@@ -91,8 +91,7 @@ class StockAdjustmentPersistenceAdapter(
             .bind("actor", currentActorProvider.get().auditName)
             .bind("itemId", checkNotNull(item.stockAdjustmentItemId) { "저장되지 않은 항목은 갱신할 수 없다" })
             .fetch()
-            .awaitRowsUpdated()
-    }
+            .awaitRowsUpdated() > 0
 
     override suspend fun searchReconciliations(
         warehouseIds: Set<Long>?,
@@ -194,10 +193,11 @@ class StockAdjustmentPersistenceAdapter(
 
         const val UPDATE_ITEM_QUANTITIES: String =
             """
-            UPDATE stock_adjustment_item
-               SET inventory_quantity = :inventoryQuantity, wms_quantity = :wmsQuantity, quantity_change = :quantityChange,
-                   updated_at = :now, updated_by = :actor
-             WHERE stock_adjustment_item_id = :itemId
+            UPDATE stock_adjustment_item i
+              JOIN stock_adjustment a ON a.stock_adjustment_id = i.stock_adjustment_id
+               SET i.inventory_quantity = :inventoryQuantity, i.wms_quantity = :wmsQuantity, i.quantity_change = :quantityChange,
+                   i.updated_at = :now, i.updated_by = :actor
+             WHERE i.stock_adjustment_item_id = :itemId AND a.status = 'PENDING'
             """
 
         const val SEARCH_IDS_HEAD: String = "SELECT stock_adjustment_id FROM stock_adjustment"

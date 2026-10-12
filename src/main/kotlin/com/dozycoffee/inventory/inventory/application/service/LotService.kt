@@ -13,6 +13,9 @@ class LotService(
     private val lotRepository: LotRepository,
 ) : GetLotUseCase {
     @Transactional(readOnly = true)
+    override suspend fun getByIds(lotIds: Set<Long>): List<LotResult> = lotRepository.findAllByIds(lotIds).map(::toResult)
+
+    @Transactional(readOnly = true)
     override suspend fun findByProductAndLotNumber(
         productId: Long,
         lotNumber: String,

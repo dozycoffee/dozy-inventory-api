@@ -40,6 +40,11 @@ enum class AdjustmentErrorCode(
         "INV_INVALID_RECONCILIATION",
         "대사 보정안은 창고와 대사 실행이 양수이고 두 수량이 0 이상이며 서로 달라야 합니다.",
     ),
+    INVALID_RECONCILIATION_QUERY(
+        ErrorType.VALIDATION,
+        "INV_INVALID_RECONCILIATION_QUERY",
+        "보정안 조회 조건이 올바르지 않습니다. 창고 ID는 양수이고 페이지는 0 이상, 크기는 1 이상 100 이하여야 합니다.",
+    ),
     WMS_UNAVAILABLE(
         ErrorType.UPSTREAM,
         "INV_WMS_UNAVAILABLE",

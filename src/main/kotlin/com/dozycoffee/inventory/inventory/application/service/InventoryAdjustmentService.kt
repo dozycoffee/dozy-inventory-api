@@ -5,6 +5,7 @@ import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.application.port.`in`.AdjustInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetAdjustedQuantitiesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustmentKind
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEvent
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEventPublisher
@@ -45,7 +46,7 @@ class InventoryAdjustmentService(
                 targets.filter { it.second == null }.sortedWith(compareBy({ it.first.lotId }, { it.first.qualityStatus }))
         val applied: Map<Long, AdjustInventoryResult.Item> =
             ordered.associate { (item, current) ->
-                item.referenceId to applyOne(command.warehouseId, item, current, key, requester, command.historyType)
+                item.referenceId to applyOne(command.warehouseId, item, current, key, requester, historyTypeOf(command.kind))
             }
         return AdjustInventoryResult(command.items.map { applied.getValue(it.referenceId) })
     }
@@ -115,3 +116,9 @@ class InventoryAdjustmentService(
         return AdjustInventoryResult.Item(item.referenceId, inventoryId, changed.quantity)
     }
 }
+
+private fun historyTypeOf(kind: AdjustmentKind): HistoryType =
+    when (kind) {
+        AdjustmentKind.AUDIT -> HistoryType.ADJUSTMENT
+        AdjustmentKind.RECONCILIATION -> HistoryType.RECONCILIATION
+    }

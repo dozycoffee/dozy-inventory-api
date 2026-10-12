@@ -27,8 +27,11 @@ interface StockAdjustmentRepository {
         expectedStatus: AdjustmentStatus,
     ): Boolean
 
-    /** 대사 보정안 항목의 inventory·WMS 수량과 변동량을 [item]의 값으로 갱신한다 */
-    suspend fun updateReconciliationItem(item: StockAdjustmentItem)
+    /**
+     * 대사 보정안 항목의 inventory·WMS 수량과 변동량을 [item]의 값으로 갱신한다. 보정안이 처리 대기(`PENDING`)일 때만 갱신하고,
+     * 그 사이 반영·거부되었으면 아무것도 바꾸지 않고 false를 반환한다.
+     */
+    suspend fun updateReconciliationItem(item: StockAdjustmentItem): Boolean
 
     /**
      * 대사 보정안을 최신순(ID 내림차순)으로 [offset]부터 최대 [limit]개 반환한다. [warehouseIds]가 null이면 모든 창고, [status]가 null이면 모든 상태다.

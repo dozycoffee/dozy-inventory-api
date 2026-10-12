@@ -4,6 +4,7 @@ import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustmentKind
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEvent
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryEventPublisher
@@ -113,7 +114,7 @@ class InventoryAdjustmentServiceTest {
                 stubSave()
 
                 service.adjust(
-                    AdjustInventoryCommand(10L, listOf(item(1L, -3, referenceId = 31L)), key, "system", HistoryType.RECONCILIATION),
+                    AdjustInventoryCommand(10L, listOf(item(1L, -3, referenceId = 31L)), key, "system", AdjustmentKind.RECONCILIATION),
                 )
 
                 val history = argumentCaptor<InventoryHistory>()

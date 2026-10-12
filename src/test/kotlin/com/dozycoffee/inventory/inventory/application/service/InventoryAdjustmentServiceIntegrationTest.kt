@@ -5,8 +5,8 @@ import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistence
 import com.dozycoffee.inventory.inventory.application.port.`in`.AdjustInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetAdjustedQuantitiesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustInventoryCommand
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.AdjustmentKind
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AdjustInventoryResult
-import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.exception.DuplicateIdempotencyKeyException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
@@ -126,7 +126,7 @@ class InventoryAdjustmentServiceIntegrationTest {
                 checkNotNull(
                     transactionalOperator.executeAndAwait {
                         adjustInventoryUseCase.adjust(
-                            AdjustInventoryCommand(10L, listOf(item(lotA, -4, 31L)), "recon-1", "system", HistoryType.RECONCILIATION),
+                            AdjustInventoryCommand(10L, listOf(item(lotA, -4, 31L)), "recon-1", "system", AdjustmentKind.RECONCILIATION),
                         )
                     },
                 )
