@@ -142,8 +142,8 @@
   {
     "id": "F-021",
     "name": "창고 접근 제어",
-    "description": "warehouse_access 사본, WMS 소속 변경 이벤트 수신, 사본이 없을 때 거부와 로그·알림. 모든 API에 창고별 리소스 인가를 적용한다.",
-    "status": "pending",
+    "description": "warehouse_access 사본, WMS 소속 변경 이벤트 수신, 사본이 없을 때 거부와 로그·알림. 모든 API에 창고별 리소스 인가를 적용한다. 결정은 ADR-0032. 단계: (1) access 도메인(소속 사본, 접근 범위 판정), (2) 소속 변경 이벤트 수신(Kafka 리스너, DLT), (3) 관리자 재고 조회·가용 재고 조회에 창고 범위 적용과 창고 관리자 개방.",
+    "status": "completed",
     "dependencies": ["F-020", "F-018"]
   },
   {
