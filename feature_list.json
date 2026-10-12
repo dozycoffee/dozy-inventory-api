@@ -128,8 +128,8 @@
   {
     "id": "F-019",
     "name": "대사 보정",
-    "description": "일 1회 대사 배치(reconciliation_run), 보정안 생성, 항목별 승인 후 RECONCILIATION 이력 반영. WMS 합계 조회 포트가 필요하다. 시나리오 8.3, 10.3.",
-    "status": "pending",
+    "description": "일 1회 대사 배치(reconciliation_run), 보정안 생성, 항목별 승인 후 RECONCILIATION 이력 반영. WMS 합계 조회 포트가 필요하다. 시나리오 8.3, 10.3. 결정은 ADR-0033. 단계: (1) inventory의 대사용 조회와 RECONCILIATION 반영, (2) 보정안·대사 실행 도메인·영속성, (3) 대사 배치와 WMS 조회 연동, (4) 승인·거부·조회 application, (5) 웹 어댑터.",
+    "status": "completed",
     "dependencies": ["F-015", "F-018"]
   },
   {
