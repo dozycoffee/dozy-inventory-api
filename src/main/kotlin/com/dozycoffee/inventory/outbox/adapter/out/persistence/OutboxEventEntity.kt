@@ -22,9 +22,11 @@ class OutboxEventEntity(
     var payload: String,
     var status: OutboxStatus,
     var attemptCount: Int,
+    var lastError: String? = null,
     @CreatedDate
     var createdAt: LocalDateTime? = null,
     var publishedAt: LocalDateTime? = null,
+    var deadAt: LocalDateTime? = null,
 ) {
     fun toDomain(): OutboxEvent =
         OutboxEvent.reconstitute(
@@ -38,6 +40,8 @@ class OutboxEventEntity(
             attemptCount = attemptCount,
             createdAt = checkNotNull(createdAt) { "저장된 이벤트는 생성 시각이 있어야 한다" },
             publishedAt = publishedAt,
+            lastError = lastError,
+            deadAt = deadAt,
         )
 
     companion object {
@@ -51,8 +55,10 @@ class OutboxEventEntity(
                 payload = event.payload,
                 status = event.status,
                 attemptCount = event.attemptCount,
+                lastError = event.lastError,
                 createdAt = event.createdAt,
                 publishedAt = event.publishedAt,
+                deadAt = event.deadAt,
             )
     }
 }

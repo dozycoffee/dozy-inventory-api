@@ -3,6 +3,7 @@ package com.dozycoffee.inventory.outbox.domain.model
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
+import com.dozycoffee.inventory.outbox.domain.exception.InvalidOutboxStateException
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxErrorCode
 import java.time.LocalDateTime
 
@@ -17,11 +18,55 @@ class OutboxEvent private constructor(
     val eventType: String,
     val partitionKey: String,
     val payload: String,
-    val status: OutboxStatus,
-    val attemptCount: Int,
+    status: OutboxStatus,
+    attemptCount: Int,
+    lastError: String?,
     val createdAt: LocalDateTime?,
     val publishedAt: LocalDateTime?,
+    deadAt: LocalDateTime?,
 ) {
+    var status: OutboxStatus = status
+        private set
+
+    /** 발행에 실패한 횟수. 이벤트 고유의 실패만 센다(브로커 장애처럼 공통 문제는 세지 않는다, ADR-0037) */
+    var attemptCount: Int = attemptCount
+        private set
+
+    var lastError: String? = lastError
+        private set
+
+    /** 격리(`DEAD`)된 시각 */
+    var deadAt: LocalDateTime? = deadAt
+        private set
+
+    /**
+     * 이벤트 고유의 발행 실패를 기록한다. 시도 횟수를 하나 늘리고 마지막 오류를 남기며, 횟수가 [maxAttempts]에 이르면 `DEAD`로 격리하고 true를 반환한다.
+     * 발행 대기 이벤트만 기록할 수 있다([InvalidOutboxStateException]).
+     */
+    fun recordFailure(
+        error: String?,
+        maxAttempts: Int,
+        now: LocalDateTime,
+    ): Boolean {
+        if (status != OutboxStatus.PENDING) throw InvalidOutboxStateException()
+        if (maxAttempts < 1) throw InvalidDomainValueException(OutboxErrorCode.INVALID_OUTBOX_EVENT)
+        attemptCount += 1
+        lastError = error?.take(MAX_ERROR_LENGTH)
+        if (attemptCount < maxAttempts) return false
+        status = OutboxStatus.DEAD
+        deadAt = now
+        return true
+    }
+
+    /** 격리된 이벤트를 다시 발행 대기로 돌린다. 시도 횟수와 오류, 격리 시각을 지운다. 격리된 이벤트만 가능하다([InvalidOutboxStateException]) */
+    fun requeue() {
+        if (status != OutboxStatus.DEAD) throw InvalidOutboxStateException()
+        status = OutboxStatus.PENDING
+        attemptCount = 0
+        lastError = null
+        deadAt = null
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is OutboxEvent) return false
@@ -32,6 +77,7 @@ class OutboxEvent private constructor(
 
     companion object {
         const val MAX_KEY_LENGTH: Int = 100
+        const val MAX_ERROR_LENGTH: Int = 500
 
         fun create(
             aggregateType: AggregateType,
@@ -49,7 +95,20 @@ class OutboxEvent private constructor(
             ) {
                 throw InvalidDomainValueException(OutboxErrorCode.INVALID_OUTBOX_EVENT)
             }
-            return OutboxEvent(null, aggregateType, aggregateId, eventType, partitionKey, payload, OutboxStatus.PENDING, 0, null, null)
+            return OutboxEvent(
+                null,
+                aggregateType,
+                aggregateId,
+                eventType,
+                partitionKey,
+                payload,
+                OutboxStatus.PENDING,
+                0,
+                null,
+                null,
+                null,
+                null,
+            )
         }
 
         fun reconstitute(
@@ -63,6 +122,8 @@ class OutboxEvent private constructor(
             attemptCount: Int,
             createdAt: LocalDateTime,
             publishedAt: LocalDateTime?,
+            lastError: String? = null,
+            deadAt: LocalDateTime? = null,
         ): OutboxEvent =
             OutboxEvent(
                 outboxEventId,
@@ -73,8 +134,10 @@ class OutboxEvent private constructor(
                 payload,
                 status,
                 attemptCount,
+                lastError,
                 createdAt,
                 publishedAt,
+                deadAt,
             )
     }
 }

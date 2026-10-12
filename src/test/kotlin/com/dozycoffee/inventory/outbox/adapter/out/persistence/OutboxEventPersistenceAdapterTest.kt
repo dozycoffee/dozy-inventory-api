@@ -136,17 +136,88 @@ class OutboxEventPersistenceAdapterTest {
             }
 
         @Test
-        fun `시도 횟수를 하나씩 늘리고 상태는 그대로다`() =
+        fun `실패를 저장하면 시도 횟수와 마지막 오류가 남고 임계치 전에는 발행 대기다`() =
+            runBlocking<Unit> {
+                val saved: OutboxEvent = adapter.save(event())
+                val id: Long = checkNotNull(saved.outboxEventId)
+                val loaded: OutboxEvent = checkNotNull(adapter.findById(id))
+                loaded.recordFailure("RecordTooLargeException: too big", 3, LocalDateTime.of(2026, 10, 12, 9, 0))
+
+                assertThat(adapter.saveFailure(loaded)).isTrue()
+
+                val after: OutboxEvent = checkNotNull(adapter.findById(id))
+                assertThat(after.attemptCount).isEqualTo(1)
+                assertThat(after.lastError).isEqualTo("RecordTooLargeException: too big")
+                assertThat(after.status).isEqualTo(OutboxStatus.PENDING)
+                assertThat(adapter.findPending(10).map { it.outboxEventId }).containsExactly(id)
+            }
+
+        @Test
+        fun `격리를 저장하면 발행기가 가져가지 않고 격리 시각이 남으며 한 번 더 저장하면 false다`() =
             runBlocking<Unit> {
                 val id: Long = checkNotNull(adapter.save(event()).outboxEventId)
-
-                adapter.increaseAttemptCount(id)
-                adapter.increaseAttemptCount(id)
-
+                val at: LocalDateTime = LocalDateTime.of(2026, 10, 12, 9, 0, 0, 123_456_000)
                 val loaded: OutboxEvent = checkNotNull(adapter.findById(id))
-                assertThat(loaded.attemptCount).isEqualTo(2)
-                assertThat(loaded.status).isEqualTo(OutboxStatus.PENDING)
+                loaded.recordFailure("boom", 1, at)
+
+                assertThat(adapter.saveFailure(loaded)).isTrue()
+                assertThat(adapter.saveFailure(loaded)).isFalse()
+
+                val after: OutboxEvent = checkNotNull(adapter.findById(id))
+                assertThat(after.status).isEqualTo(OutboxStatus.DEAD)
+                assertThat(after.deadAt).isEqualTo(at)
+                assertThat(adapter.findPending(10)).isEmpty()
+            }
+
+        @Test
+        fun `이미 발행된 이벤트의 실패 저장은 아무것도 바꾸지 않고 false다`() =
+            runBlocking<Unit> {
+                val id: Long = checkNotNull(adapter.save(event()).outboxEventId)
+                val stale: OutboxEvent = checkNotNull(adapter.findById(id))
+                adapter.markPublished(id, LocalDateTime.of(2026, 10, 12, 9, 0))
+                stale.recordFailure("boom", 1, LocalDateTime.of(2026, 10, 12, 9, 0))
+
+                assertThat(adapter.saveFailure(stale)).isFalse()
+
+                assertThat(checkNotNull(adapter.findById(id)).status).isEqualTo(OutboxStatus.PUBLISHED)
+            }
+
+        @Test
+        fun `재발행을 저장하면 발행 대기로 돌아가고 시도 횟수와 오류와 격리 시각이 지워진다`() =
+            runBlocking<Unit> {
+                val id: Long = checkNotNull(adapter.save(event()).outboxEventId)
+                val dead: OutboxEvent = checkNotNull(adapter.findById(id))
+                dead.recordFailure("boom", 1, LocalDateTime.of(2026, 10, 12, 9, 0))
+                adapter.saveFailure(dead)
+                val again: OutboxEvent = checkNotNull(adapter.findById(id))
+                again.requeue()
+
+                assertThat(adapter.saveRequeue(again)).isTrue()
+                assertThat(adapter.saveRequeue(again)).isFalse()
+
+                val after: OutboxEvent = checkNotNull(adapter.findById(id))
+                assertThat(after.status).isEqualTo(OutboxStatus.PENDING)
+                assertThat(after.attemptCount).isEqualTo(0)
+                assertThat(after.lastError).isNull()
+                assertThat(after.deadAt).isNull()
                 assertThat(adapter.findPending(10).map { it.outboxEventId }).containsExactly(id)
+            }
+
+        @Test
+        fun `상태별 목록은 최신순이고 페이지로 자르며 개수를 센다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> = (1..5).map { checkNotNull(adapter.save(event()).outboxEventId) }
+                listOf(ids[0], ids[2], ids[4]).forEach {
+                    val dead: OutboxEvent = checkNotNull(adapter.findById(it))
+                    dead.recordFailure("boom", 1, LocalDateTime.of(2026, 10, 12, 9, 0))
+                    adapter.saveFailure(dead)
+                }
+
+                assertThat(adapter.findByStatus(OutboxStatus.DEAD, 0, 10).map { it.outboxEventId }).containsExactly(ids[4], ids[2], ids[0])
+                assertThat(adapter.findByStatus(OutboxStatus.DEAD, 1, 1).map { it.outboxEventId }).containsExactly(ids[2])
+                assertThat(adapter.findByStatus(OutboxStatus.PENDING, 0, 10).map { it.outboxEventId }).containsExactly(ids[3], ids[1])
+                assertThat(adapter.countByStatus(OutboxStatus.DEAD)).isEqualTo(3L)
+                assertThat(adapter.countByStatus(OutboxStatus.PUBLISHED)).isEqualTo(0L)
             }
 
         @Test

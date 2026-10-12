@@ -7,4 +7,14 @@ import org.springframework.data.repository.kotlin.CoroutineCrudRepository
 interface OutboxEventR2dbcRepository : CoroutineCrudRepository<OutboxEventEntity, Long> {
     @Query("SELECT * FROM outbox_event WHERE status = 'PENDING' ORDER BY outbox_event_id LIMIT :limit")
     fun findPending(limit: Int): Flow<OutboxEventEntity>
+
+    @Query("SELECT * FROM outbox_event WHERE status = :status ORDER BY outbox_event_id DESC LIMIT :limit OFFSET :offset")
+    fun findByStatus(
+        status: String,
+        offset: Long,
+        limit: Int,
+    ): Flow<OutboxEventEntity>
+
+    @Query("SELECT COUNT(*) FROM outbox_event WHERE status = :status")
+    suspend fun countByStatus(status: String): Long
 }

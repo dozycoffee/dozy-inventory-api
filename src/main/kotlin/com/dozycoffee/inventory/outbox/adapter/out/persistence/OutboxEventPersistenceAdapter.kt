@@ -1,6 +1,7 @@
 package com.dozycoffee.inventory.outbox.adapter.out.persistence
 
 import com.dozycoffee.inventory.outbox.application.port.out.OutboxEventRepository
+import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.reactive.awaitSingle
@@ -36,13 +37,34 @@ class OutboxEventPersistenceAdapter(
             .fetch()
             .awaitRowsUpdated() > 0
 
-    override suspend fun increaseAttemptCount(outboxEventId: Long) {
-        databaseClient
-            .sql(INCREASE_ATTEMPT_COUNT)
-            .bind("outboxEventId", outboxEventId)
-            .fetch()
-            .awaitRowsUpdated()
+    override suspend fun saveFailure(event: OutboxEvent): Boolean {
+        val lastError: String? = event.lastError
+        val deadAt: LocalDateTime? = event.deadAt
+        var spec: DatabaseClient.GenericExecuteSpec =
+            databaseClient
+                .sql(SAVE_FAILURE)
+                .bind("status", event.status.name)
+                .bind("attemptCount", event.attemptCount)
+                .bind("outboxEventId", checkNotNull(event.outboxEventId) { "저장되지 않은 이벤트의 실패는 기록할 수 없다" })
+        spec = if (lastError == null) spec.bindNull("lastError", String::class.java) else spec.bind("lastError", lastError)
+        spec = if (deadAt == null) spec.bindNull("deadAt", LocalDateTime::class.java) else spec.bind("deadAt", deadAt)
+        return spec.fetch().awaitRowsUpdated() > 0
     }
+
+    override suspend fun saveRequeue(event: OutboxEvent): Boolean =
+        databaseClient
+            .sql(SAVE_REQUEUE)
+            .bind("outboxEventId", checkNotNull(event.outboxEventId) { "저장되지 않은 이벤트는 재발행할 수 없다" })
+            .fetch()
+            .awaitRowsUpdated() > 0
+
+    override suspend fun findByStatus(
+        status: OutboxStatus,
+        offset: Long,
+        limit: Int,
+    ): List<OutboxEvent> = outboxEventR2dbcRepository.findByStatus(status.name, offset, limit).toList().map { it.toDomain() }
+
+    override suspend fun countByStatus(status: OutboxStatus): Long = outboxEventR2dbcRepository.countByStatus(status.name)
 
     override suspend fun deletePublishedBefore(
         cutoff: LocalDateTime,
@@ -84,8 +106,17 @@ class OutboxEventPersistenceAdapter(
              WHERE outbox_event_id = :outboxEventId AND status = 'PENDING'
             """
 
-        const val INCREASE_ATTEMPT_COUNT: String =
-            "UPDATE outbox_event SET attempt_count = attempt_count + 1 WHERE outbox_event_id = :outboxEventId"
+        const val SAVE_FAILURE: String =
+            """
+            UPDATE outbox_event SET status = :status, attempt_count = :attemptCount, last_error = :lastError, dead_at = :deadAt
+             WHERE outbox_event_id = :outboxEventId AND status = 'PENDING'
+            """
+
+        const val SAVE_REQUEUE: String =
+            """
+            UPDATE outbox_event SET status = 'PENDING', attempt_count = 0, last_error = NULL, dead_at = NULL
+             WHERE outbox_event_id = :outboxEventId AND status = 'DEAD'
+            """
 
         const val DELETE_PUBLISHED_BEFORE: String =
             """

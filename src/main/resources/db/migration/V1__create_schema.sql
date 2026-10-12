@@ -241,12 +241,14 @@ CREATE TABLE outbox_event
     payload JSON NOT NULL,
     status VARCHAR(50) NOT NULL,
     attempt_count INT NOT NULL DEFAULT 0,
+    last_error VARCHAR(500) DEFAULT NULL,
     created_at DATETIME(6) NOT NULL,
     published_at DATETIME(6) DEFAULT NULL,
+    dead_at DATETIME(6) DEFAULT NULL,
     PRIMARY KEY (outbox_event_id),
     CONSTRAINT chk_outbox_attempt_count CHECK (attempt_count >= 0),
     CONSTRAINT ck_outbox_aggregate_type CHECK (aggregate_type IN ('INVENTORY', 'RESERVATION', 'LOT', 'PRODUCT', 'ADJUSTMENT')),
-    CONSTRAINT ck_outbox_status CHECK (status IN ('PENDING', 'PUBLISHED'))
+    CONSTRAINT ck_outbox_status CHECK (status IN ('PENDING', 'PUBLISHED', 'DEAD'))
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 

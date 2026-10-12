@@ -102,6 +102,8 @@ inventory:
       enabled: true
       interval: PT1S
       batch-size: 100
+      # 이벤트 고유의 발행 실패가 이 횟수에 이르면 격리(DEAD)한다. 브로커 장애처럼 공통 문제로 인한 실패는 세지 않는다(ADR-0037)
+      max-attempts: 20
       topic-prefix: dozy.inventory
     # 발행이 끝난 이벤트를 보관 기간(retention) 뒤 삭제하는 스케줄러. 발행 대기 이벤트는 지우지 않는다. 테스트에서는 끈다
     cleanup:

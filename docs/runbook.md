@@ -86,14 +86,18 @@ SELECT COUNT(*) AS pending, MIN(created_at) AS oldest, MAX(attempt_count) AS max
   FROM outbox_event WHERE status = 'PENDING';
 
 -- 앞쪽 대기 이벤트: attempt_count가 크면 이 이벤트에서 발행이 계속 실패하고 있다
-SELECT outbox_event_id, aggregate_type, event_type, partition_key, attempt_count, created_at
+SELECT outbox_event_id, aggregate_type, event_type, partition_key, attempt_count, last_error, created_at
   FROM outbox_event WHERE status = 'PENDING' ORDER BY outbox_event_id LIMIT 10;
+
+-- 격리된(DEAD) 이벤트 수. 0이 아니면 아래 "격리된 이벤트"를 본다
+SELECT COUNT(*) FROM outbox_event WHERE status = 'DEAD';
 ```
-로그에 `이벤트 발행에 실패했다: outboxEventId=…`가 1초마다(발행 간격) 반복된다.
+로그에 `이벤트 발행에 실패했다: outboxEventId=…`가 1초마다(발행 간격) 반복된다. 이벤트가 격리되면 `OUTBOX_EVENT_DEAD` ERROR 로그가 한 번 남는다.
 
 ### 동작 이해
 - 변경은 이미 DB에 반영되어 있고(수량·예약은 정상), 구독자(OMS/WMS)에게 알리는 이벤트만 밀린 것이다.
-- 발행기는 이벤트를 `outbox_event_id` 순서로 발행하고 **한 이벤트가 실패하면 그 묶음의 발행을 멈춘다**(같은 파티션 키의 순서를 지키려고). 그래서 한 이벤트가 계속 실패하면 뒤의 모든 이벤트가 막힌다.
+- 발행기는 이벤트를 `outbox_event_id` 순서로 발행한다. 한 이벤트가 실패하면 **같은 파티션 키의 뒤 이벤트만 그 실행에서 건너뛰고** 다른 키는 계속 발행한다(ADR-0037).
+- 같은 토픽의 다른 이벤트가 같은 실행에서 성공했는데 이 이벤트만 실패하면 이벤트 고유의 문제로 보고 `attempt_count`를 늘린다. `inventory.outbox.publisher.max-attempts`(기본 20)에 이르면 `DEAD`로 격리한다. 브로커 장애처럼 그 토픽의 이벤트가 하나도 성공하지 못하면 횟수를 세지 않으므로 Kafka가 오래 죽어 있어도 이벤트를 잃지 않는다. 한 실행에서 연속 5건이 실패하면 나머지는 다음 주기로 넘긴다.
 - 발행기는 MySQL `GET_LOCK`(`dozy_inventory.outbox_publisher`)으로 한 인스턴스만 돈다.
 
 ### 원인별 조치
@@ -103,18 +107,23 @@ SELECT outbox_event_id, aggregate_type, event_type, partition_key, attempt_count
 | 토픽이 없고 자동 생성이 꺼져 있다 | 특정 집계(`dozy.inventory.inventory`/`reservation`/`lot`/`product`)의 이벤트만 막힘 | 토픽을 만든다([토픽 목록](events.md)) |
 | 메시지가 브로커 한도를 넘는다 | 특정 이벤트만 반복 실패(`RecordTooLargeException` 등) | 브로커 `message.max.bytes`를 확인한다. 이벤트 크기는 보통 작아 드물다 |
 | 인증/ACL 오류 | 모든 이벤트가 권한 오류 | Kafka ACL/자격을 확인한다 |
-| 특정 이벤트만 계속 실패(원인 불명) | 같은 `outboxEventId`가 반복해서 실패하고 attempt_count가 계속 증가 | 로그의 예외를 확인한다. 아래 "막힌 이벤트" |
+| 특정 이벤트만 계속 실패(원인 불명) | 같은 `outboxEventId`가 반복해서 실패하고 attempt_count가 계속 증가 | 로그의 예외와 `last_error`를 확인한다. 임계치에 이르면 자동으로 격리된다. 아래 "격리된 이벤트" |
+| 한 토픽의 모든 이벤트가 영구 실패(예: 직렬화 오류) | 같은 집계의 이벤트가 모두 PENDING으로 쌓이는데 `attempt_count`가 늘지 않음 | 성공하는 이벤트가 없어 격리되지 않는다(알림 대상). 로그의 예외로 원인을 고친다 |
 
-### 막힌 이벤트 (마지막 수단)
-같은 이벤트가 영구히 발행되지 못하면 뒤의 이벤트가 모두 막힌다. 원인을 고칠 수 있으면 고친다. 고칠 수 없으면:
-1. **구독자 영향을 판단한다.** 이 이벤트를 건너뛰면 구독자(OMS/WMS)는 그 변경을 놓친다. 필요하면 해당 서비스에 직접 알리고(또는 대사·조회 API로 맞춘다).
-2. **승인을 받고** 이벤트를 발행 완료로 표시해 건너뛴다. 이 SQL은 운영 DB를 바꾸므로 담당자 승인과 기록(이벤트 ID, 내용, 사유, 승인자)을 남긴다.
-```sql
--- 마지막 수단. 먼저 같은 이벤트인지 SELECT로 확인한다
-UPDATE outbox_event SET status = 'PUBLISHED', published_at = NOW(6)
- WHERE outbox_event_id = :id AND status = 'PENDING';
+### 격리된 이벤트
+`DEAD` 이벤트는 발행기가 가져가지 않고 정리 배치도 지우지 않는다. 격리되는 동안 같은 키의 뒤 이벤트는 계속 발행되므로 **구독자가 이 이벤트를 놓친 채 뒤 이벤트를 먼저 받을 수 있다.**
+1. **목록과 오류를 본다.** 운영자(`inventory:admin`) 토큰으로 호출한다.
 ```
-> 🔶 이 절차는 임시방편이다. 영구 실패 이벤트를 격리하는 장치(데드 레터)가 없어 한 이벤트가 전체를 막는 구조다. 후속 개선 후보로 [알려진 한계](#알려진-한계와-후속-개선)에 적었다.
+GET  /api/v1/outbox-events?page=0&size=20       격리된 이벤트 목록(최신순)
+GET  /api/v1/outbox-events/{outboxEventId}      payload, attemptCount, lastError, deadAt
+```
+2. **원인을 고친다.** `lastError`가 `RecordTooLargeException`이면 브로커 한도, 토픽/ACL 오류이면 Kafka 설정을 고친다. 원인을 모르면 고치기 전에 재발행하지 않는다(다시 20번 실패하고 격리된다).
+3. **구독자 영향을 판단한다.** 같은 키의 뒤 이벤트가 이미 나갔다면 구독자가 순서가 뒤집힌 채 받는다. 필요하면 해당 서비스에 알리거나 조회 API·대사로 맞춘다.
+4. **재발행한다.** 발행 대기로 되돌리면 발행기가 다음 주기에 다시 가져가고 시도 횟수는 0부터 센다. 격리 상태가 아니면 409(`INV_INVALID_OUTBOX_STATE`), 없으면 404이다. 구독자는 `event-id`로 중복을 거른다.
+```
+POST /api/v1/outbox-events/{outboxEventId}/requeue
+```
+5. 재발행할 수 없는 이벤트(구독자에게 더는 의미가 없는 이벤트 등)는 격리 상태로 둔다. 운영 DB를 직접 고치지 않는다. 격리 이벤트의 보관·삭제 정책은 🔶 미확정이다.
 
 ### 발행 후 확인
 `pending`이 0에 수렴하는지, 구독자가 이벤트를 받는지 확인한다. 구독자는 `event-id` 헤더로 중복을 거르므로 복구 직후 같은 이벤트가 다시 와도 정상이다(at-least-once).
@@ -288,6 +297,7 @@ WMS(물리 사실)와 inventory(약속의 기준)가 다르다는 신고가 오�
 |-----------------|------|--------------|
 | `WAREHOUSE_ACCESS_COPY_MISSING` | 소속 사본이 없는 창고 관리자의 요청 거부 | 높음(동기화 문제 가능, [4](#4-창고-관리자가-403을-받는다-소속-사본-문제)) |
 | `이벤트 발행에 실패했다: outboxEventId=…` | Outbox 발행 실패 | 높음, 반복되면 즉시([3](#3-outbox-이벤트가-밀린다-kafka-장애)) |
+| `OUTBOX_EVENT_DEAD` | 이벤트가 발행에 계속 실패해 격리됨 | 높음, 즉시([3](#3-outbox-이벤트가-밀린다-kafka-장애) "격리된 이벤트") |
 | `Outbox 발행에 실패했다` / `Outbox 이벤트 정리에 실패했다` | 발행·정리 배치 예외 | 중간 |
 | `대사에 실패했다: 창고 …` / `대사 배치에 실패했다` | 대사 실패 | 중간([5](#5-wms-연동이-실패한다)) |
 | `WMS에만 있고 inventory에 등록되지 않은 Lot이라 보정안을 만들지 못했다` | WMS에 있는 Lot이 inventory에 없다(입고 확정이 먼저 와야 함) | 낮음~중간, 반복되면 입고 연동 점검 |
@@ -323,7 +333,7 @@ SELECT history_type, quantity_change, quantity_after, reference_type, reference_
 SELECT stock_adjustment_id, adjustment_type, status, approved_by, approved_at, created_at
   FROM stock_adjustment WHERE warehouse_id = :warehouseId ORDER BY stock_adjustment_id DESC LIMIT 20;
 
--- 발행된 이벤트의 보관량(7일 보관 후 정리된다)
+-- 상태별 이벤트 수(PUBLISHED는 7일 보관 후 정리되고 DEAD는 정리되지 않는다)
 SELECT status, COUNT(*) FROM outbox_event GROUP BY status;
 
 -- 발행 락을 쥐고 있는 연결 (NULL이면 아무도 쥐고 있지 않다)
@@ -337,7 +347,8 @@ SELECT IS_USED_LOCK('dozy_inventory.outbox_publisher');
 
 | 한계 | 영향 | 후속 후보 |
 |------|------|-----------|
-| 영구히 발행되지 못하는 Outbox 이벤트가 뒤의 이벤트를 모두 막는다 | 한 이벤트 때문에 모든 이벤트 전달이 멈춘다 | 시도 횟수 초과 이벤트를 격리(데드 레터 상태)하고 알림 |
+| 한 토픽의 이벤트가 모두 영구 실패하면 격리되지 않는다 | 그 집계의 이벤트 전달이 계속 멈춘다 | 알림 규칙(관측성 작업, 보류) |
+| 격리된 이벤트를 지우는 정책이 없다 | `DEAD` 행이 쌓인다 | 보관 정책 결정 후 정리(🔶) |
 | 메트릭이 없다 | 적체, 배치 지연을 SQL과 로그로만 본다 | 관측성 작업(보류) |
 | 예약·실사 조정을 조회하는 API가 없다 | 상태 확인에 SQL이 필요하다 | 운영용 조회 API |
 | 예약 해제는 서비스 토큰만 호출할 수 있다 | 운영자가 직접 해제하기 어렵다 | 관리자 강제 해제 API(감사 기록 포함) |
