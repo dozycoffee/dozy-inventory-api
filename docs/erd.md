@@ -348,12 +348,13 @@ erDiagram
 | event_type | VARCHAR(100) | N | 이벤트 이름의 코드 값 |
 | partition_key | VARCHAR(100) | N | Kafka 파티션 키. 재고 이벤트는 `창고ID:상품ID`, 예약 이벤트는 `창고ID:예약ID`, 상품 이벤트는 상품 ID(ADR-0025). 같은 키는 순서를 보장 |
 | payload | JSON | N | 구독자에게 보이는 이벤트 본문(JSON). 이벤트 ID 등은 Kafka 헤더로 싣는다 |
-| status | VARCHAR(50) | N | `PENDING`, `PUBLISHED` |
-| attempt_count | INT | N | 발행 시도 횟수 |
-| created_at, published_at | DATETIME(6) | N, Y | |
+| status | VARCHAR(50) | N | `PENDING`, `PUBLISHED`, `DEAD`(발행에 계속 실패해 격리, ADR-0037) |
+| attempt_count | INT | N | 이벤트 고유의 발행 실패 횟수(공통 장애는 세지 않는다). 재발행하면 0 |
+| last_error | VARCHAR(500) | Y | 마지막 발행 오류 |
+| created_at, published_at, dead_at | DATETIME(6) | N, Y, Y | `dead_at`은 격리된 시각 |
 
 - 인덱스: `idx_outbox_pending (status, outbox_event_id)` — 발행 대기 조회. 같은 `partition_key`는 `outbox_event_id` 순서로 발행한다.
-- 발행 완료된 행은 일정 기간 뒤 삭제하는 정리 배치를 둔다.
+- 발행 완료된 행은 일정 기간 뒤 삭제하는 정리 배치를 둔다. `DEAD` 행은 지우지 않고 관리자 API로 재발행한다.
 
 #### warehouse_access — 직원의 창고 소속 사본
 

@@ -57,6 +57,7 @@
 | `inventory.reservation.max-ttl.channels.{채널}` | 없음 | 채널별 상한. 채널 값이 확정되지 않아 설정으로만 둔다(ADR-0022) |
 | `inventory.expiring-soon-days` | `30` | 유통기한이 이 일수 이내이면 Lot을 임박 상태로 본다 |
 | `inventory.outbox.publisher.interval`, `batch-size` | `PT1S`, 100 | Outbox 발행 간격과 한 번에 발행하는 건수 |
+| `inventory.outbox.publisher.max-attempts` | 20 | 이벤트 고유의 발행 실패가 이 횟수에 이르면 `DEAD`로 격리(ADR-0037). 브로커 장애처럼 공통 문제로 판단한 실패는 세지 않는다 |
 | `inventory.outbox.publisher.topic-prefix` | `dozy.inventory` | 발행 토픽 접두사(`{접두사}.{집계}`) |
 | `inventory.outbox.cleanup.retention` | `P7D` | 발행이 끝난 이벤트를 지우기 전 보관 기간 |
 | `inventory.warehouse-access.listener.topic` | `dozy.wms.warehouse-access` | 직원 창고 소속 이벤트를 받을 토픽 |
