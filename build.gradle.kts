@@ -86,6 +86,11 @@ spotless {
     }
 }
 
+// 컨테이너 이미지 빌드가 버전과 무관하게 같은 이름의 jar를 쓴다
+tasks.bootJar {
+    archiveFileName = "app.jar"
+}
+
 tasks.test {
     useJUnitPlatform()
     // 통합 테스트가 만든 예약을 스케줄러가 끼어들어 만료 처리하지 않도록 끈다. 스케줄러 테스트는 켜서 직접 실행한다
