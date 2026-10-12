@@ -48,4 +48,16 @@ class LotServiceTest {
 
             assertThrows<LotNotFoundException> { service.getByProductAndLotNumber(100L, "NOPE") }
         }
+
+    @Test
+    fun `찾기는 없는 Lot이면 null이고 있으면 결과로 바꾼다`() =
+        runBlocking<Unit> {
+            whenever(lotRepository.findByProductIdAndLotNumber(100L, "LOT-A")).thenReturn(
+                Lot.reconstitute(7L, 100L, "LOT-A", null, null, LotStatus.NORMAL),
+            )
+            whenever(lotRepository.findByProductIdAndLotNumber(100L, "NOPE")).thenReturn(null)
+
+            assertEquals(LotResult(7L, 100L, "LOT-A", null, null), service.findByProductAndLotNumber(100L, "LOT-A"))
+            assertEquals(null, service.findByProductAndLotNumber(100L, "NOPE"))
+        }
 }

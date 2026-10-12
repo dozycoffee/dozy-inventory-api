@@ -5,5 +5,6 @@ enum class ErrorType {
     FORBIDDEN,
     NOT_FOUND,
     CONFLICT,
+    UPSTREAM,
     INTERNAL,
 }

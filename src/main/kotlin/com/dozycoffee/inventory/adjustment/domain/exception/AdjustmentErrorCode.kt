@@ -40,5 +40,10 @@ enum class AdjustmentErrorCode(
         "INV_INVALID_RECONCILIATION",
         "대사 보정안은 창고와 대사 실행이 양수이고 두 수량이 0 이상이며 서로 달라야 합니다.",
     ),
+    WMS_UNAVAILABLE(
+        ErrorType.UPSTREAM,
+        "INV_WMS_UNAVAILABLE",
+        "WMS에서 창고 수량을 조회하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
+    ),
     DUPLICATE_ADJUSTMENT_KEY(ErrorType.CONFLICT, "INV_DUPLICATE_ADJUSTMENT_KEY", "이미 처리한 조정의 멱등 키입니다."),
 }

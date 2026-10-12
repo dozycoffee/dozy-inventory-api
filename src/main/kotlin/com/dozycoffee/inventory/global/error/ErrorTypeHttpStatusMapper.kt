@@ -9,6 +9,7 @@ object ErrorTypeHttpStatusMapper {
             ErrorType.FORBIDDEN -> HttpStatus.FORBIDDEN
             ErrorType.NOT_FOUND -> HttpStatus.NOT_FOUND
             ErrorType.CONFLICT -> HttpStatus.CONFLICT
+            ErrorType.UPSTREAM -> HttpStatus.BAD_GATEWAY
             ErrorType.INTERNAL -> HttpStatus.INTERNAL_SERVER_ERROR
         }
 }

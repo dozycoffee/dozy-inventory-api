@@ -94,6 +94,7 @@ tasks.test {
     systemProperty("inventory.outbox.publisher.enabled", "false")
     systemProperty("inventory.outbox.cleanup.enabled", "false")
     systemProperty("inventory.warehouse-access.listener.enabled", "false")
+    systemProperty("inventory.reconciliation.enabled", "false")
     testLogging {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showCauses = true
