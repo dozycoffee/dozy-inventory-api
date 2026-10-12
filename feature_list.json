@@ -107,8 +107,8 @@
   {
     "id": "F-016",
     "name": "Lot 재할당과 할당 보류",
-    "description": "피킹 불가 Lot의 재할당(확정 예약 한정)과 inventory 할당 보류, 실사·대사 반영 시 자동 해제. 시나리오 6.2.",
-    "status": "pending",
+    "description": "피킹 불가 Lot의 재할당(확정 예약 한정)과 inventory 할당 보류, 실사·대사 반영 시 자동 해제. 시나리오 6.2. 결정은 ADR-0031. 단계: (1) inventory 할당 보류 UseCase와 reservation 도메인·영속성, (2) 재할당 application(보류 선확정, FEFO 대체 Lot, 멱등), (3) 웹 어댑터(`POST /api/v1/reservations/{id}/reallocation`). 보류 자동 해제는 실사 조정(F-015)이 이미 하고 대사 보정(F-019)이 같은 규칙을 쓴다.",
+    "status": "completed",
     "dependencies": ["F-012", "F-015"]
   },
   {
