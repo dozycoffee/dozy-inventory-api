@@ -723,6 +723,25 @@ class InventoryPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `Lot의 품질 상태별 행 조회` {
+        @Test
+        fun `Lot의 지정한 품질 상태 행을 모든 창고에서 행 ID 순서로 조회한다`() =
+            runBlocking<Unit> {
+                val other: Long = checkNotNull(fixture.seedLot(productId, "LOT-OTHER").lotId)
+                val second: Long = fixture.insertInventory(20L, productId, lotId)
+                val first: Long = fixture.insertInventory(10L, productId, lotId)
+                fixture.insertInventory(10L, productId, lotId, "DEFECTIVE")
+                fixture.insertInventory(10L, productId, other)
+
+                val rows: List<Inventory> = adapter.findAllByLot(lotId, QualityStatus.NORMAL)
+
+                assertThat(rows.map { it.inventoryId }).containsExactly(second, first)
+                assertThat(rows.map { it.warehouseId }).containsExactly(20L, 10L)
+                assertThat(adapter.findAllByLot(lotId, QualityStatus.DISPOSAL_SCHEDULED)).isEmpty()
+            }
+    }
+
+    @Nested
     inner class `Lot 정보 조회` {
         @Test
         fun `재고 행의 Lot ID와 번호와 유통기한을 재고 행 ID 순서로 조회한다`() =

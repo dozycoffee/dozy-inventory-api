@@ -1,5 +1,6 @@
 package com.dozycoffee.inventory.inventory.adapter.out.persistence
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.error.DomainException
 import com.dozycoffee.inventory.global.security.CurrentActorProvider
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
@@ -38,6 +39,12 @@ class InventoryPersistenceAdapter(
         inventoryR2dbcRepository
             .findByWarehouseIdAndLotIdAndQualityStatus(key.warehouseId, key.lotId, key.qualityStatus)
             ?.toDomain()
+
+    override suspend fun findAllByLot(
+        lotId: Long,
+        qualityStatus: QualityStatus,
+    ): List<Inventory> =
+        inventoryR2dbcRepository.findAllByLotIdAndQualityStatusOrderByInventoryIdAsc(lotId, qualityStatus).toList().map { it.toDomain() }
 
     override suspend fun findAvailability(
         productIds: Set<Long>,
