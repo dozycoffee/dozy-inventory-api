@@ -40,9 +40,10 @@
 설정 파일의 모든 속성은 환경변수로 덮어쓸 수 있다. 이름은 **점(`.`)과 하이픈(`-`)을 밑줄(`_`)로 바꾸고 대문자로** 쓴다.
 `inventory.outbox.publisher.batch-size` → `INVENTORY_OUTBOX_PUBLISHER_BATCH_SIZE`. 이 규칙은 테스트로 확인한다(`EnvironmentVariableBindingTest`).
 
-맵 형태의 속성은 키를 이름 끝에 붙인다. 환경변수로 넘기면 키가 소문자가 되므로 카테고리·채널 이름은 대소문자를 구분하지 않고 찾는다.
-- `INVENTORY_ADJUSTMENT_APPROVAL_THRESHOLD_CATEGORIES_BEAN=20`
-- `INVENTORY_RESERVATION_MAX_TTL_CHANNELS_OMS=2h`
+맵 항목(카테고리별 임계치, 채널별 TTL)은 **하이픈을 밑줄로 바꾸지 않고 그냥 빼서** 키를 이름 끝에 붙인다. 밑줄을 넣으면 맵 항목으로 인식되지 않아 조용히 무시된다.
+환경변수로 넘기면 키가 소문자가 되므로 카테고리·채널 이름은 대소문자를 구분하지 않고 찾는다.
+- `INVENTORY_ADJUSTMENT_APPROVALTHRESHOLD_CATEGORIES_BEAN=20`
+- `INVENTORY_RESERVATION_MAXTTL_CHANNELS_OMS=2h`
 
 ### 조정할 수 있는 속성
 
