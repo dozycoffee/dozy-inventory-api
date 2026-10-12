@@ -26,5 +26,6 @@ enum class CommonErrorCode(
         "INV_ALLOCATION_CONFLICT",
         "다른 요청이 같은 재고를 동시에 예약해 할당하지 못했습니다. 다시 시도해 주세요.",
     ),
+    WAREHOUSE_ACCESS_DENIED(ErrorType.FORBIDDEN, "INV_WAREHOUSE_ACCESS_DENIED", "접근 권한이 없는 창고입니다."),
     INTERNAL_ERROR(ErrorType.INTERNAL, "INTERNAL_ERROR", "서버 내부 오류가 발생했습니다."),
 }

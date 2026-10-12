@@ -19,7 +19,8 @@ object AvailabilityApiDocs {
             "inventory-availability",
             TAG,
             SUMMARY,
-            "상품별 가용 수량을 창고별로 나눠 조회한다. `inventory:service`와 `inventory:admin`이 호출할 수 있다. " +
+            "상품별 가용 수량을 창고별로 나눠 조회한다. `inventory:service`, `inventory:admin`, `inventory:warehouse_manager`가 호출할 수 있다. " +
+                "창고 관리자는 배정된 창고만 볼 수 있고, 창고를 생략하면 배정된 모든 창고가 나오며(재고가 없으면 0), 배정되지 않은 창고를 지정하면 403이다. " +
                 "가용 수량은 정상 품질이고 할당 보류가 아닌 재고의 (총 수량 − 예약 수량) 합이며 Lot, 유통기한, 위치는 노출하지 않는다. " +
                 "`warehouseIds`를 생략하면 그 상품의 재고가 있는 모든 창고를, 지정하면 지정한 모든 창고를(재고가 없으면 0) 보여 준다. " +
                 "조회 결과는 약속이 아니며 약속은 예약으로만 한다. 가맹점 기준 최적 창고 선택은 호출 서비스(OMS, Store) 소관이다.",
@@ -47,6 +48,19 @@ object AvailabilityApiDocs {
             SUMMARY,
             "조회 조건이 올바르지 않으면 400을 응답한다. 상품이 없거나 100개를 넘거나 창고가 100개를 넘거나 ID가 양수가 아니면 INV_INVALID_AVAILABILITY_QUERY, " +
                 "필수 파라미터가 없거나 숫자가 아니면 VALIDATION_FAILED이다.",
+            null,
+            "Problem",
+            ApiDoc.authorization,
+            ApiDoc.problem(),
+        )
+
+    fun warehouseAccessDenied(): Consumer<EntityExchangeResult<ByteArray>> =
+        ApiDoc.operation(
+            "inventory-availability-warehouse-access-denied",
+            TAG,
+            SUMMARY,
+            "창고 관리자가 배정되지 않은 창고를 지정하면 403 INV_WAREHOUSE_ACCESS_DENIED를 응답한다. " +
+                "소속 사본이 하나도 없는 창고 관리자도 같은 403이다(서버에 ERROR 로그가 남는다).",
             null,
             "Problem",
             ApiDoc.authorization,

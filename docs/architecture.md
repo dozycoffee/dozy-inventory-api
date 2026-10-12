@@ -85,7 +85,7 @@ src/main/kotlin/com/dozycoffee/inventory
 
 - 다른 도메인의 기능은 **그 도메인의 `application/port/in`(UseCase, Command, Result)만** 호출한다. 다른 도메인의 Repository, 영속성 엔티티, 도메인 모델을 직접 쓰지 않는다.
 - 예: 예약이 재고 행을 잡을 때 `reservation`의 서비스가 `inventory`의 UseCase를 호출한다. 두 호출은 같은 트랜잭션 안에서 실행된다.
-- 도메인 간 의존이 순환하지 않도록 방향을 정한다(`reservation` → `inventory` → `product`).
+- 도메인 간 의존이 순환하지 않도록 방향을 정한다(`reservation` → `inventory` → `product`, `inventory` → `access`).
 
 ## global 패키지
 

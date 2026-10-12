@@ -1,10 +1,15 @@
 package com.dozycoffee.inventory.inventory.adapter.`in`.web
 
 import com.dozycoffee.auth.test.DozyTestTokens
+import com.dozycoffee.inventory.access.application.port.`in`.ResolveWarehouseScopeUseCase
 import com.dozycoffee.inventory.global.domain.QualityStatus
+import com.dozycoffee.inventory.global.domain.WarehouseScope
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
+import com.dozycoffee.inventory.global.error.WarehouseAccessDeniedException
+import com.dozycoffee.inventory.global.security.Actor
 import com.dozycoffee.inventory.global.security.SecurityConfig
 import com.dozycoffee.inventory.global.security.SecurityContextActorProvider
+import com.dozycoffee.inventory.global.security.UserActor
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryHistoriesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.SearchInventoriesUseCase
@@ -59,6 +64,9 @@ class InventoryQueryControllerTest {
     @MockitoBean
     private lateinit var getInventoryHistoriesUseCase: GetInventoryHistoriesUseCase
 
+    @MockitoBean
+    private lateinit var resolveWarehouseScopeUseCase: ResolveWarehouseScopeUseCase
+
     private lateinit var webTestClient: WebTestClient
 
     private val at: LocalDateTime = LocalDateTime.of(2026, 10, 14, 9, 0)
@@ -90,6 +98,7 @@ class InventoryQueryControllerTest {
     @BeforeEach
     fun setUp(restDocumentation: RestDocumentationContextProvider) {
         webTestClient = baseClient.mutate().filter(documentationConfiguration(restDocumentation)).build()
+        runBlocking { whenever(resolveWarehouseScopeUseCase.resolve(any())).thenReturn(WarehouseScope.All) }
     }
 
     private fun get(
@@ -143,8 +152,11 @@ class InventoryQueryControllerTest {
 
                 val query = argumentCaptor<SearchInventoriesQuery>()
                 verifyBlocking(searchInventoriesUseCase, org.mockito.kotlin.times(2)) { search(query.capture()) }
-                assertEquals(SearchInventoriesQuery(10L, 100L, QualityStatus.DEFECTIVE, LotStatus.EXPIRED, false, 2, 5), query.firstValue)
-                assertEquals(SearchInventoriesQuery(null, null, null, null, null, 0, 20), query.secondValue)
+                assertEquals(
+                    SearchInventoriesQuery(10L, 100L, QualityStatus.DEFECTIVE, LotStatus.EXPIRED, false, 2, 5, WarehouseScope.All),
+                    query.firstValue,
+                )
+                assertEquals(SearchInventoriesQuery(null, null, null, null, null, 0, 20, WarehouseScope.All), query.secondValue)
             }
 
         @Test
@@ -171,7 +183,7 @@ class InventoryQueryControllerTest {
         @Test
         fun `상세를 응답한다`() =
             runBlocking<Unit> {
-                whenever(getInventoryUseCase.getById(500L)).thenReturn(inventory)
+                whenever(getInventoryUseCase.getById(500L, WarehouseScope.All)).thenReturn(inventory)
 
                 get("admin", "/api/v1/inventories/{inventoryId}", 500L)
                     .expectStatus()
@@ -189,7 +201,7 @@ class InventoryQueryControllerTest {
         @Test
         fun `없는 재고 행은 404`() =
             runBlocking<Unit> {
-                whenever(getInventoryUseCase.getById(500L)).thenThrow(InventoryNotFoundException())
+                whenever(getInventoryUseCase.getById(500L, WarehouseScope.All)).thenThrow(InventoryNotFoundException())
 
                 get("admin", "/api/v1/inventories/{inventoryId}", 500L)
                     .expectStatus()
@@ -203,7 +215,9 @@ class InventoryQueryControllerTest {
         @Test
         fun `이력을 최신순 페이지로 응답하고 페이지 기본값을 쓴다`() =
             runBlocking<Unit> {
-                whenever(getInventoryHistoriesUseCase.getHistories(500L, 0, 20)).thenReturn(PageResult(listOf(history), 0, 20, 21L))
+                whenever(
+                    getInventoryHistoriesUseCase.getHistories(500L, WarehouseScope.All, 0, 20),
+                ).thenReturn(PageResult(listOf(history), 0, 20, 21L))
 
                 get("admin", "/api/v1/inventories/{inventoryId}/histories", 500L)
                     .expectStatus()
@@ -223,26 +237,71 @@ class InventoryQueryControllerTest {
         @Test
         fun `이력의 재고 행이 없으면 404`() =
             runBlocking<Unit> {
-                whenever(getInventoryHistoriesUseCase.getHistories(500L, 1, 5)).thenThrow(InventoryNotFoundException())
+                whenever(getInventoryHistoriesUseCase.getHistories(500L, WarehouseScope.All, 1, 5)).thenThrow(InventoryNotFoundException())
 
                 get("admin", "/api/v1/inventories/{inventoryId}/histories?page=1&size=5", 500L).expectStatus().isNotFound
             }
     }
 
     @Nested
-    inner class `권한` {
+    inner class `권한과 창고 범위` {
         @Test
-        fun `admin이 아닌 role은 403이고 토큰이 없으면 401이며 UseCase를 호출하지 않는다`() =
+        fun `service role과 토큰이 없는 요청은 403과 401이며 UseCase를 호출하지 않는다`() =
             runBlocking<Unit> {
                 listOf("/api/v1/inventories", "/api/v1/inventories/500", "/api/v1/inventories/500/histories").forEach { uri ->
                     get("service", uri).expectStatus().isForbidden
-                    get("warehouse_manager", uri).expectStatus().isForbidden
                     get(null, uri).expectStatus().isUnauthorized
                 }
 
                 verifyBlocking(searchInventoriesUseCase, never()) { search(any()) }
-                verifyBlocking(getInventoryUseCase, never()) { getById(any()) }
-                verifyBlocking(getInventoryHistoriesUseCase, never()) { getHistories(any(), any(), any()) }
+                verifyBlocking(getInventoryUseCase, never()) { getById(any(), any()) }
+                verifyBlocking(getInventoryHistoriesUseCase, never()) { getHistories(any(), any(), any(), any()) }
+                verifyBlocking(resolveWarehouseScopeUseCase, never()) { resolve(any()) }
+            }
+
+        @Test
+        fun `창고 관리자도 조회할 수 있고 요청자의 범위를 조회 UseCase에 넘긴다`() =
+            runBlocking<Unit> {
+                val scope = WarehouseScope.Only(setOf(10L, 30L))
+                whenever(resolveWarehouseScopeUseCase.resolve(any())).thenReturn(scope)
+                whenever(searchInventoriesUseCase.search(any())).thenReturn(PageResult(listOf(inventory), 0, 20, 1L))
+                whenever(getInventoryUseCase.getById(500L, scope)).thenReturn(inventory)
+                whenever(getInventoryHistoriesUseCase.getHistories(500L, scope, 0, 20)).thenReturn(PageResult(listOf(history), 0, 20, 1L))
+
+                get("warehouse_manager", "/api/v1/inventories").expectStatus().isOk
+                get("warehouse_manager", "/api/v1/inventories/500").expectStatus().isOk
+                get("warehouse_manager", "/api/v1/inventories/500/histories").expectStatus().isOk
+
+                val query = argumentCaptor<SearchInventoriesQuery>()
+                verifyBlocking(searchInventoriesUseCase) { search(query.capture()) }
+                assertEquals(scope, query.firstValue.scope)
+                val actor = argumentCaptor<Actor>()
+                verifyBlocking(resolveWarehouseScopeUseCase, org.mockito.kotlin.times(3)) { resolve(actor.capture()) }
+                assertEquals(setOf("warehouse_manager"), (actor.firstValue as UserActor).roles)
+            }
+
+        @Test
+        fun `배정되지 않은 창고이면 403 INV_WAREHOUSE_ACCESS_DENIED`() =
+            runBlocking<Unit> {
+                whenever(searchInventoriesUseCase.search(any())).thenThrow(WarehouseAccessDeniedException())
+
+                get("warehouse_manager", "/api/v1/inventories?warehouseId=20")
+                    .expectStatus()
+                    .isForbidden
+                    .expectBody()
+                    .jsonPath("$.code")
+                    .isEqualTo("INV_WAREHOUSE_ACCESS_DENIED")
+                    .consumeWith(InventoryQueryApiDocs.warehouseAccessDenied())
+            }
+
+        @Test
+        fun `소속 사본이 없는 창고 관리자는 범위를 구하는 단계에서 403이고 조회하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(resolveWarehouseScopeUseCase.resolve(any())).thenThrow(WarehouseAccessDeniedException())
+
+                get("warehouse_manager", "/api/v1/inventories").expectStatus().isForbidden
+
+                verifyBlocking(searchInventoriesUseCase, never()) { search(any()) }
             }
     }
 }

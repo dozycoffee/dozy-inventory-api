@@ -16,7 +16,7 @@ Accepted (2026-10-14). 채널용 가용 재고 조회(ADR-0020)에 이어 F-009�
 4. **페이지는 `page`(0부터, 기본 0)와 `size`(1~100, 기본 20)이고 응답에 `totalElements`와 `totalPages`를 담는다.** 범위를 벗어나거나 ID가 양수가 아니면 400(`INV_INVALID_INVENTORY_QUERY`), 알 수 없는 품질·Lot 상태 값은 `VALIDATION_FAILED`다.
 5. **상세는 재고 행 하나(현황과 같은 필드)이고 없으면 404(`INV_INVENTORY_NOT_FOUND`)다.**
 6. **이력은 재고 행의 `inventory_history`를 최신순(생성 시각, ID 내림차순)으로 페이지로 준다.** 유형, 변동량, 변경 후 총 수량, 원인 문서 유형·ID, 멱등 키, 요청 주체, 생성 시각을 담고 재고 행이 없으면 404다. `(inventory_id, created_at)` 인덱스를 쓰므로 새 마이그레이션이 없다.
-7. **경로와 권한**: `GET /api/v1/inventories`(현황), `GET /api/v1/inventories/{inventoryId}`(상세), `GET /api/v1/inventories/{inventoryId}/histories`(이력). 모두 `inventory:admin`만 호출한다. 창고 관리자는 배정된 창고만 볼 수 있어야 하므로 창고 접근 제어(F-021) 이후에 연다. 가용 재고 조회(`/api/v1/inventories/availability`, `service`·`admin`)는 그대로다.
+7. **경로와 권한**: `GET /api/v1/inventories`(현황), `GET /api/v1/inventories/{inventoryId}`(상세), `GET /api/v1/inventories/{inventoryId}/histories`(이력). 모두 `inventory:admin`만 호출한다. 창고 관리자는 배정된 창고만 볼 수 있어야 하므로 창고 접근 제어(F-021) 이후에 연다(ADR-0032에서 창고 관리자에게 현황·상세·이력과 가용 재고 조회를 열었다).
 8. **읽기 전용이라 락을 걸지 않고 조회 결과는 약속이 아니다**(원칙 3). 약속은 예약으로만 한다.
 
 ## 결과 (Consequences)

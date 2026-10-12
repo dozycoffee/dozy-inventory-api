@@ -28,9 +28,9 @@ data class InventoryRow(
         get() = quantity - reservedQuantity
 }
 
-/** 재고 현황의 필터. 값이 null인 조건은 적용하지 않는다 */
+/** 재고 현황의 필터. 값이 null인 조건은 적용하지 않는다. [warehouseIds]가 있으면 그 창고들의 행만 준다 */
 data class InventorySearchCondition(
-    val warehouseId: Long?,
+    val warehouseIds: Set<Long>?,
     val productId: Long?,
     val qualityStatus: QualityStatus?,
     val lotStatus: LotStatus?,

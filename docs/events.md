@@ -81,6 +81,39 @@ WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 �
 
 품질 전환은 재고 증감 이벤트(`INVENTORY_INCREASED`·`INVENTORY_DECREASED`)를 발행하지 않는다. 같은 스캔에서 강제 해제한 확정 전 예약은 예약 토픽의 `RESERVATION_FORCE_RELEASED`(`reason`: `LOT_EXPIRED`)로 알린다.
 
+## 수신 이벤트: 직원 창고 소속 (WMS → inventory)
+
+inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한다(ADR-0032). 창고 관리자(`inventory:warehouse_manager`)가 접근할 수 있는 창고를 판단하는 데 쓴다.
+
+| 항목 | 내용 |
+|------|------|
+| 토픽 | `dozy.wms.warehouse-access` (inventory 설정 `inventory.warehouse-access.listener.topic`) |
+| 메시지 키 | `principalId` (같은 직원의 이벤트는 순서가 지켜진다) |
+| 값 | JSON |
+
+```json
+{
+  "eventType": "WAREHOUSE_ACCESS_CHANGED",
+  "eventId": "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73",
+  "occurredAt": "2026-10-12T10:00:00+09:00",
+  "principalId": "0199a3c2-1111-7f30-8c4b-9d1e2f6a0b73",
+  "warehouseIds": [10, 20]
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| eventType | `WAREHOUSE_ACCESS_CHANGED`만 있다 |
+| eventId | 이벤트 고유 ID(UUID). 추적용이다 |
+| occurredAt | 발생 시각(오프셋 포함 ISO-8601) |
+| principalId | `dozy-auth`의 직원 principalId(UUID, 36자) |
+| warehouseIds | 그 직원이 **지금** 소속된 창고 ID 전체. 중복 없는 양수이고 최대 1000개. 소속이 모두 없어지면 빈 배열 |
+
+- **교체 의미**: 받으면 그 직원의 소속을 `warehouseIds`로 통째로 바꾼다. 같은 이벤트를 다시 받아도 결과가 같다(중복 전달에 안전).
+- **WMS가 보내는 시점**: 직원의 창고 소속이 추가·삭제될 때마다 그 직원의 전체 목록을 보낸다. 처음 연동할 때는 모든 직원에게 한 번씩 보내 사본을 채운다. 사본이 어긋났다고 의심되면 같은 이벤트를 다시 보내면 복구된다.
+- **실패 처리**: 처리에 실패하면 세 번 다시 시도하고 `dozy.wms.warehouse-access.dlt`로 보낸다. JSON이 아니거나 필드 규칙을 어기면 다시 시도하지 않고 바로 보낸다. 계약을 어긴 메시지는 DLT에서 확인한다.
+- **사본이 없을 때**: 이 이벤트를 받기 전의 창고 관리자는 모든 요청이 403(`INV_WAREHOUSE_ACCESS_DENIED`)이다.
+
 ## 상품 이벤트
 
 유형: `PRODUCT_REGISTERED`, `PRODUCT_STATUS_CHANGED`
