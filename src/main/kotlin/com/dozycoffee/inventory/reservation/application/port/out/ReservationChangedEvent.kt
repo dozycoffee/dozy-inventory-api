@@ -6,7 +6,7 @@ import com.dozycoffee.inventory.reservation.domain.model.ReservationItem
 /**
  * 예약이 바뀌었음을 구독자(OMS, WMS)에게 알리는 이벤트. 예약 수량이 바뀌면 가용 재고도 바뀐다.
  * [Item.allocations]는 수량이 할당된 재고 행별 내역이며 WMS가 출고를 지시할 때 쓴다.
- * [idempotencyKey]는 예약을 만든 요청의 멱등 키다.
+ * [idempotencyKey]는 예약을 만든 요청의 멱등 키다. [reason]은 시스템이 일으킨 변경(`FORCE_RELEASED`)의 사유 코드이고 그 외에는 null이다.
  */
 data class ReservationChangedEvent(
     val changeType: ReservationChangeType,
@@ -16,6 +16,7 @@ data class ReservationChangedEvent(
     val externalOrderId: String,
     val items: List<Item>,
     val idempotencyKey: String,
+    val reason: String? = null,
 ) {
     data class Item(
         val productId: Long,
@@ -32,6 +33,7 @@ data class ReservationChangedEvent(
         fun of(
             changeType: ReservationChangeType,
             reservation: Reservation,
+            reason: String? = null,
         ): ReservationChangedEvent =
             ReservationChangedEvent(
                 changeType = changeType,
@@ -44,6 +46,7 @@ data class ReservationChangedEvent(
                         Item(item.productId, item.requestedQuantity, item.allocations.map { Allocation(it.inventoryId, it.quantity) })
                     },
                 idempotencyKey = reservation.idempotencyKey.value,
+                reason = reason,
             )
     }
 }
@@ -54,5 +57,6 @@ enum class ReservationChangeType {
     EXTENDED,
     RELEASED,
     EXPIRED,
+    FORCE_RELEASED,
     FULFILLED,
 }

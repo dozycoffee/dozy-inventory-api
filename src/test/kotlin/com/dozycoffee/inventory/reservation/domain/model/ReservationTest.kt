@@ -210,6 +210,34 @@ class ReservationTest {
         }
 
         @Nested
+        inner class `강제 해제` {
+            @Test
+            fun `확정 전 예약만 RELEASED가 되고 만료 시각이 사라진다`() {
+                val reserved: Reservation = restored(ReservationStatus.RESERVED)
+
+                assertEquals(true, reserved.forceRelease())
+
+                assertEquals(ReservationStatus.RELEASED, reserved.status)
+                assertNull(reserved.expiry.expiresAt)
+            }
+
+            @Test
+            fun `확정, 해제, 만료, 출고 완료된 예약은 바꾸지 않고 예외도 던지지 않는다`() {
+                listOf(
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.RELEASED,
+                    ReservationStatus.EXPIRED,
+                    ReservationStatus.FULFILLED,
+                ).forEach { status ->
+                    val reservation: Reservation = restored(status, null, now)
+
+                    assertEquals(false, reservation.forceRelease())
+                    assertEquals(status, reservation.status)
+                }
+            }
+        }
+
+        @Nested
         inner class `연장` {
             @Test
             fun `최대 만료 시각까지 만료 시각을 늘린다`() {

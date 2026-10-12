@@ -143,6 +143,20 @@ class OutboxReservationChangedEventPublisherTest {
         }
 
     @Test
+    fun `강제 해제 이벤트는 사유를 담고 다른 이벤트에는 reason 필드가 없다`() =
+        runBlocking<Unit> {
+            val forced: JsonNode =
+                mapper.readTree(
+                    recorded(event(ReservationChangeType.FORCE_RELEASED).copy(reason = "LOT_EXPIRED")).payload,
+                )
+            val normal: JsonNode = mapper.readTree(recorded(event(ReservationChangeType.RELEASED)).payload)
+
+            assertEquals("RESERVATION_FORCE_RELEASED", forced["eventType"].asString())
+            assertEquals("LOT_EXPIRED", forced["reason"].asString())
+            assertEquals(false, normal.has("reason"))
+        }
+
+    @Test
     fun `모든 변경 유형을 RESERVATION 접두사로 저장한다`() =
         runBlocking<Unit> {
             ReservationChangeType.entries.forEach { type ->

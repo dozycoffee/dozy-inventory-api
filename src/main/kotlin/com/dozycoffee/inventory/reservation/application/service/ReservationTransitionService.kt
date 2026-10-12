@@ -1,10 +1,12 @@
 package com.dozycoffee.inventory.reservation.application.service
 
+import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.ReleaseInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.ReleaseInventoryCommand
 import com.dozycoffee.inventory.reservation.application.port.`in`.ConfirmReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ExpireReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ExtendReservationUseCase
+import com.dozycoffee.inventory.reservation.application.port.`in`.ForceReleaseReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ReleaseReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.command.ExtendReservationCommand
 import com.dozycoffee.inventory.reservation.application.port.`in`.result.ReservationResult
@@ -16,6 +18,7 @@ import com.dozycoffee.inventory.reservation.application.port.out.ReservationRepo
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationEventType
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
 import com.dozycoffee.inventory.reservation.domain.exception.ReservationChangedConcurrentlyException
+import com.dozycoffee.inventory.reservation.domain.exception.ReservationErrorCode
 import com.dozycoffee.inventory.reservation.domain.exception.ReservationNotFoundException
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationAllocation
@@ -45,7 +48,8 @@ class ReservationTransitionService(
 ) : ConfirmReservationUseCase,
     ReleaseReservationUseCase,
     ExtendReservationUseCase,
-    ExpireReservationUseCase {
+    ExpireReservationUseCase,
+    ForceReleaseReservationUseCase {
     override suspend fun confirm(reservationId: Long): ReservationResult =
         inTransaction {
             val reservation: Reservation = load(reservationId)
@@ -114,6 +118,31 @@ class ReservationTransitionService(
             },
         ) { "만료 결과가 없다" }
 
+    override suspend fun forceRelease(
+        reservationId: Long,
+        reason: String,
+    ): Boolean {
+        if (!FORCE_RELEASE_REASON.matches(reason)) throw InvalidDomainValueException(ReservationErrorCode.INVALID_FORCE_RELEASE_REASON)
+        return checkNotNull(
+            transactionalOperator.executeAndAwait {
+                val reservation: Reservation = reservationRepository.findById(reservationId) ?: return@executeAndAwait false
+                // 확정·해제와 겹쳐 조건부 UPDATE에서 밀리면 이미 처리된 것이라 해제할 것이 없다
+                if (!reservation.forceRelease() || !reservationRepository.updateState(reservation, ReservationStatus.RESERVED)) {
+                    return@executeAndAwait false
+                }
+                afterStateChange(
+                    reservation,
+                    ReservationEventType.FORCE_RELEASED,
+                    ReservationChangeType.FORCE_RELEASED,
+                    """{"reason":"$reason"}""",
+                    true,
+                    reason,
+                )
+                true
+            },
+        ) { "강제 해제 결과가 없다" }
+    }
+
     /**
      * 읽고 → 전이를 적용하고 → 조건부로 저장하는 흐름을 한 트랜잭션으로 실행한다. 읽은 뒤 다른 요청이 먼저 상태를 바꿔 저장이 밀리면
      * 트랜잭션을 새로 열어 바뀐 상태를 다시 읽고 판정한다. 이미 목표 상태이면 저장하지 않고 현재 상태를 돌려준다(멱등).
@@ -152,12 +181,13 @@ class ReservationTransitionService(
         changeType: ReservationChangeType,
         detail: String,
         returnsQuantity: Boolean,
+        reason: String? = null,
     ) {
         if (returnsQuantity) releaseQuantity(reservation)
         reservationEventRepository.save(
             ReservationEvent.create(checkNotNull(reservation.reservationId) { "저장된 예약은 식별자가 있어야 한다" }, eventType, detail),
         )
-        reservationChangedEventPublisher.publish(ReservationChangedEvent.of(changeType, reservation))
+        reservationChangedEventPublisher.publish(ReservationChangedEvent.of(changeType, reservation, reason))
     }
 
     /** 출고되지 않고 남은 예약 수량(할당 수량 − 출고 확정 수량)을 재고 행별로 되돌린다 */
@@ -183,3 +213,4 @@ class ReservationTransitionService(
 }
 
 private const val MAX_ATTEMPTS: Int = 3
+private val FORCE_RELEASE_REASON: Regex = Regex("[A-Z][A-Z0-9_]{0,49}")
