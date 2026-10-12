@@ -64,7 +64,8 @@ class ReconciliationApprovalService(
             if (adjustment.status != AdjustmentStatus.PENDING) throw InvalidAdjustmentStateException()
             if (requiresAdmin && !command.isAdmin) throw ReconciliationAdminRequiredException()
 
-            confirmQuantities(adjustment, lot)
+            // 다시 확인한 숫자가 달라졌는데 그 사이 다른 요청이 이미 처리했으면(보정안이 더 이상 처리 대기가 아니면) 다시 읽어 판정한다
+            if (!confirmQuantities(adjustment, lot)) return@repeat
             adjustment.approve(reviewer.value, now())
             val inventoryId: Long? = transactionalOperator.executeAndAwait { apply(adjustment, lot, reviewer) }
             // 조건부 UPDATE에서 밀렸으면 다른 요청이 먼저 처리한 것이라 다시 읽어 판정한다
@@ -120,13 +121,14 @@ class ReconciliationApprovalService(
     }
 
     /**
-     * WMS 수량과 지금의 inventory 수량을 다시 확인한다. 보정안의 값과 같으면 그대로 진행하고, 다르면 보정안을 새 값으로 고치거나
-     * (불일치가 사라졌으면) 거부 상태로 닫아 저장한 뒤 [ReconciliationChangedException]을 던진다.
+     * WMS 수량과 지금의 inventory 수량을 다시 확인한다. 보정안의 값과 같으면 true를 반환해 진행하고, 다르면 보정안을 새 값으로 고치거나
+     * (불일치가 사라졌으면) 거부 상태로 닫아 저장한 뒤 [ReconciliationChangedException]을 던진다. 다만 숫자가 달라진 이유가 다른 요청의 먼저 끝난 처리(이미 반영·거부)여서
+     * 보정안이 더 이상 처리 대기가 아니면 고치지 않고 false를 반환해 호출한 쪽이 다시 읽게 한다.
      */
     private suspend fun confirmQuantities(
         adjustment: StockAdjustment,
         lot: LotResult,
-    ) {
+    ): Boolean {
         val item: StockAdjustmentItem = adjustment.items.single()
         val wmsNow: Int =
             wmsStockPort
@@ -140,19 +142,23 @@ class ReconciliationApprovalService(
                 ?.quantity ?: 0
         when (adjustment.revise(inventoryNow, wmsNow)) {
             ReconciliationRevision.UNCHANGED -> {
-                return
+                return true
             }
 
             ReconciliationRevision.UPDATED -> {
-                transactionalOperator.executeAndAwait { stockAdjustmentRepository.updateReconciliationItem(item) }
+                if (!persisted { stockAdjustmentRepository.updateReconciliationItem(item) }) return false
             }
 
             ReconciliationRevision.RESOLVED -> {
-                transactionalOperator.executeAndAwait { stockAdjustmentRepository.updateState(adjustment, AdjustmentStatus.PENDING) }
+                if (!persisted { stockAdjustmentRepository.updateState(adjustment, AdjustmentStatus.PENDING) }) return false
             }
         }
         throw ReconciliationChangedException()
     }
+
+    /** 처리 대기일 때만 바뀌는 조건부 갱신을 트랜잭션으로 실행한다. 그 사이 다른 요청이 처리해 바뀌지 않았으면 false이다 */
+    private suspend fun persisted(update: suspend () -> Boolean): Boolean =
+        checkNotNull(transactionalOperator.executeAndAwait { update() }) { "보정안 갱신 결과가 없다" }
 
     /** 처리 대기 → 반영 상태를 조건부로 바꾸고 재고에 반영한다. 다른 요청에 밀렸으면 아무것도 바꾸지 않고 null을 반환한다 */
     private suspend fun apply(

@@ -291,6 +291,31 @@ class ReconciliationApprovalServiceTest {
             }
 
         @Test
+        fun `숫자가 달라진 이유가 다른 요청이 먼저 반영해서이면 고치지 않고 다시 읽어 현재 상태를 돌려준다`() =
+            runBlocking<Unit> {
+                // 처음 읽을 때는 처리 대기였는데, 다른 요청이 반영한 뒤라 inventory 수량이 92로 바뀌어 보인다
+                stubBase(listOf(proposal(), proposal(AdjustmentStatus.APPLIED)))
+                stubNow(wms = 92, inventory = 92)
+                whenever(stockAdjustmentRepository.updateState(any(), eq(AdjustmentStatus.PENDING))).thenReturn(false)
+
+                val result: ReconciliationProposalResult = service.approve(command())
+
+                assertEquals(AdjustmentStatus.APPLIED, result.status)
+                verifyBlocking(adjustInventoryUseCase, never()) { adjust(any()) }
+            }
+
+        @Test
+        fun `숫자만 달라졌고 그 사이 상태가 바뀌어 항목 갱신이 밀리면 다시 읽어 판정한다`() =
+            runBlocking<Unit> {
+                stubBase(listOf(proposal(), proposal(AdjustmentStatus.APPLIED)))
+                stubNow(wms = 95, inventory = 100)
+                whenever(stockAdjustmentRepository.updateReconciliationItem(any())).thenReturn(false)
+
+                assertEquals(AdjustmentStatus.APPLIED, service.approve(command()).status)
+                verifyBlocking(stockAdjustmentRepository, times(2)) { findById(1L) }
+            }
+
+        @Test
         fun `이미 반영된 보정안은 WMS를 조회하지 않고 현재 상태를 돌려준다`() =
             runBlocking<Unit> {
                 stubBase(listOf(proposal(AdjustmentStatus.APPLIED)))
