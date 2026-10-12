@@ -2,6 +2,7 @@ package com.dozycoffee.inventory.inventory.application.port.`in`.command
 
 import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
+import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Nested
@@ -45,6 +46,15 @@ class AdjustInventoryCommandTest {
         }
 
         @Test
+        fun `이력 유형은 기본이 ADJUSTMENT이고 RECONCILIATION도 담을 수 있다`() {
+            assertEquals(HistoryType.ADJUSTMENT, command(item()).historyType)
+            assertEquals(
+                HistoryType.RECONCILIATION,
+                AdjustInventoryCommand(10L, listOf(item()), "wms-audit-1", "svc-wms", HistoryType.RECONCILIATION).historyType,
+            )
+        }
+
+        @Test
         fun `항목은 500개까지 담을 수 있다`() {
             command(*(1L..500L).map { item(lotId = it, referenceId = it) }.toTypedArray())
         }
@@ -79,6 +89,13 @@ class AdjustInventoryCommandTest {
         @Test
         fun `같은 원인 문서가 중복되면 거부한다`() {
             assertInvalid { command(item(lotId = 1L, referenceId = 1L), item(lotId = 2L, referenceId = 1L)) }
+        }
+    }
+
+    @Test
+    fun `ADJUSTMENT와 RECONCILIATION이 아닌 이력 유형은 거부한다`() {
+        HistoryType.entries.filter { it != HistoryType.ADJUSTMENT && it != HistoryType.RECONCILIATION }.forEach { type ->
+            assertInvalid { AdjustInventoryCommand(10L, listOf(item()), "wms-audit-1", "svc-wms", type) }
         }
     }
 }

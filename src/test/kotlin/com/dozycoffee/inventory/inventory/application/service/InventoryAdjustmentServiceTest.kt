@@ -104,6 +104,30 @@ class InventoryAdjustmentServiceTest {
     }
 
     @Nested
+    inner class `대사 보정 이력` {
+        @Test
+        fun `이력 유형이 RECONCILIATION이면 RECONCILIATION 이력을 남기고 이벤트는 같다`() =
+            runBlocking<Unit> {
+                stubExisting(5L, 1L, 10)
+                whenever(inventoryRepository.decrease(5L, 3)).thenReturn(inventory(5L, 1L, 7))
+                stubSave()
+
+                service.adjust(
+                    AdjustInventoryCommand(10L, listOf(item(1L, -3, referenceId = 31L)), key, "system", HistoryType.RECONCILIATION),
+                )
+
+                val history = argumentCaptor<InventoryHistory>()
+                verifyBlocking(inventoryHistoryRepository) { save(history.capture()) }
+                assertEquals(HistoryType.RECONCILIATION, history.firstValue.historyType)
+                assertEquals(-3, history.firstValue.quantityChange)
+                assertEquals(ReferenceType.STOCK_ADJUSTMENT_ITEM, history.firstValue.referenceType)
+                val event = argumentCaptor<InventoryEvent>()
+                verifyBlocking(publisher) { publish(event.capture()) }
+                assertEquals(InventoryEventType.DECREASED, event.firstValue.eventType)
+            }
+    }
+
+    @Nested
     inner class `증가` {
         @Test
         fun `행이 없으면 만들고 ADJUSTMENT 이력과 증가 이벤트를 남긴다`() =

@@ -50,6 +50,19 @@ interface InventoryRepository {
     /** [condition]을 만족하는 재고 행의 개수 */
     suspend fun count(condition: InventorySearchCondition): Long
 
+    /**
+     * 창고의 재고 행과 그 Lot을 `inventory_id` 순서로 모두 반환한다(수량 0인 행 포함). [productId]와 [lotNumber]를 주면 그 조건의 행만 준다.
+     * 대사가 WMS 수량과 비교하려고 쓰며 락을 걸지 않는다.
+     */
+    suspend fun findRowsByWarehouse(
+        warehouseId: Long,
+        productId: Long?,
+        lotNumber: String?,
+    ): List<InventoryRow>
+
+    /** 재고 행이 있는 창고 ID를 오름차순으로 반환한다 */
+    suspend fun findWarehouseIds(): List<Long>
+
     /** 재고 행과 그 Lot을 합쳐 하나 조회한다 */
     suspend fun findRowById(inventoryId: Long): InventoryRow?
 

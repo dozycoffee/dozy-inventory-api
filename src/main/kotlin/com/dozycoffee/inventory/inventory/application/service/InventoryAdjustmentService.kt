@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 실사 조정의 재고 반영(ADR-0026). 증가는 행이 없으면 만들고 감소는 가용 수량 안에서만 줄이며, `ADJUSTMENT` 이력과 증가·감소 이벤트를
+ * 실사 조정과 대사 보정의 재고 반영(ADR-0026, ADR-0033). 증가는 행이 없으면 만들고 감소는 가용 수량 안에서만 줄이며, `ADJUSTMENT`(또는 `RECONCILIATION`) 이력과 증가·감소 이벤트를
  * 남기고 반영한 행의 할당 보류를 푼다. 호출한 서비스의 트랜잭션 안에서 실행하며 트랜잭션을 직접 열지 않는다.
  * 이미 있는 재고 행은 `inventory_id` 오름차순으로, 새로 만들 행은 그 뒤에 (Lot, 품질 상태) 순서로 갱신해 데드락을 피한다.
  */
@@ -44,7 +44,9 @@ class InventoryAdjustmentService(
             targets.filter { it.second != null }.sortedBy { it.second?.inventoryId } +
                 targets.filter { it.second == null }.sortedWith(compareBy({ it.first.lotId }, { it.first.qualityStatus }))
         val applied: Map<Long, AdjustInventoryResult.Item> =
-            ordered.associate { (item, current) -> item.referenceId to applyOne(command.warehouseId, item, current, key, requester) }
+            ordered.associate { (item, current) ->
+                item.referenceId to applyOne(command.warehouseId, item, current, key, requester, command.historyType)
+            }
         return AdjustInventoryResult(command.items.map { applied.getValue(it.referenceId) })
     }
 
@@ -71,6 +73,7 @@ class InventoryAdjustmentService(
         current: Inventory?,
         key: IdempotencyKey,
         requester: RequesterService,
+        historyType: HistoryType,
     ): AdjustInventoryResult.Item {
         val changed: Inventory =
             if (item.quantityChange > 0) {
@@ -85,7 +88,7 @@ class InventoryAdjustmentService(
         inventoryHistoryRepository.save(
             InventoryHistory.create(
                 inventoryId = inventoryId,
-                historyType = HistoryType.ADJUSTMENT,
+                historyType = historyType,
                 quantityChange = item.quantityChange,
                 quantityAfter = changed.quantity,
                 referenceType = ReferenceType.STOCK_ADJUSTMENT_ITEM,
