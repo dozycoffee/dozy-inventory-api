@@ -13,6 +13,9 @@ import com.dozycoffee.inventory.global.domain.RequesterService
 import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
@@ -186,6 +189,160 @@ class StockAdjustmentPersistenceAdapterTest {
                 val loaded: StockAdjustment = checkNotNull(adapter.findById(checkNotNull(saved.stockAdjustmentId)))
                 assertThat(loaded.items.map { it.inventoryId }).containsExactly(inventoryA, null)
                 assertThat(second.inventoryId).isNull()
+            }
+    }
+
+    @Nested
+    inner class `대사 보정안` {
+        private fun proposal(
+            key: String = "reconciliation-10-20261012-1-NORMAL",
+            lotId: Long = lotA,
+            quality: QualityStatus = QualityStatus.NORMAL,
+            inventoryQuantity: Int = 100,
+            wmsQuantity: Int = 92,
+            warehouseId: Long = 10L,
+        ): StockAdjustment =
+            StockAdjustment.reconciliation(
+                warehouseId,
+                1L,
+                StockAdjustmentItem.reconciliation(lotId, quality, inventoryQuantity, wmsQuantity),
+                RequesterService.of("system"),
+                IdempotencyKey.of(key),
+            )
+
+        @BeforeEach
+        fun seedRun() =
+            runBlocking<Unit> {
+                databaseClient
+                    .sql(
+                        """
+                        INSERT INTO reconciliation_run (reconciliation_run_id, warehouse_id, status, started_at, created_at, created_by, updated_at, updated_by)
+                        VALUES (1, 10, 'RUNNING', NOW(6), NOW(6), 'test', NOW(6), 'test'), (2, 20, 'RUNNING', NOW(6), NOW(6), 'test', NOW(6), 'test')
+                        """,
+                    ).fetch()
+                    .rowsUpdated()
+                    .awaitFirst()
+            }
+
+        @Test
+        fun `보정안을 대사 실행과 두 수량과 함께 저장하고 다시 읽는다`() =
+            runBlocking<Unit> {
+                val saved: StockAdjustment = adapter.save(proposal())
+
+                val loaded: StockAdjustment = checkNotNull(adapter.findById(checkNotNull(saved.stockAdjustmentId)))
+
+                assertThat(loaded.adjustmentType).isEqualTo(AdjustmentType.RECONCILIATION)
+                assertThat(loaded.status).isEqualTo(AdjustmentStatus.PENDING)
+                assertThat(loaded.reconciliationRunId).isEqualTo(1L)
+                assertThat(loaded.externalReferenceId).isNull()
+                assertThat(loaded.requestedBy).isEqualTo(RequesterService.of("system"))
+                assertThat(loaded.approvedBy).isNull()
+                val item: StockAdjustmentItem = loaded.items.single()
+                assertThat(item.inventoryQuantity).isEqualTo(100)
+                assertThat(item.wmsQuantity).isEqualTo(92)
+                assertThat(item.quantityChange).isEqualTo(-8)
+            }
+
+        @Test
+        fun `같은 멱등 키의 보정안은 중복으로 거부한다`() =
+            runBlocking<Unit> {
+                adapter.save(proposal())
+
+                assertThrows<DuplicateAdjustmentKeyException> { adapter.save(proposal()) }
+            }
+
+        @Test
+        fun `창고의 처리 대기 보정안이 있는 Lot과 품질 상태를 찾고 다른 창고나 끝난 보정안은 제외한다`() =
+            runBlocking<Unit> {
+                val pending: StockAdjustment = adapter.save(proposal("k-1", lotA, QualityStatus.NORMAL))
+                adapter.save(proposal("k-2", lotB, QualityStatus.DEFECTIVE))
+                adapter.save(proposal("k-3", lotA, QualityStatus.DISPOSAL_SCHEDULED, warehouseId = 20L))
+                val done: StockAdjustment = adapter.save(proposal("k-4", lotB, QualityStatus.NORMAL))
+                done.reject()
+                adapter.updateState(done, AdjustmentStatus.PENDING)
+                adapter.save(adjustment("audit-1"))
+
+                assertThat(adapter.findPendingReconciliationTargets(10L))
+                    .containsExactlyInAnyOrder(lotA to QualityStatus.NORMAL, lotB to QualityStatus.DEFECTIVE)
+                assertThat(pending.stockAdjustmentId).isNotNull()
+                assertThat(adapter.findPendingReconciliationTargets(20L)).containsExactly(lotA to QualityStatus.DISPOSAL_SCHEDULED)
+                assertThat(adapter.findPendingReconciliationTargets(99L)).isEmpty()
+            }
+
+        @Test
+        fun `기대한 상태일 때만 상태와 승인 정보를 바꾸고 아니면 false다`() =
+            runBlocking<Unit> {
+                val saved: StockAdjustment = adapter.save(proposal())
+                saved.approve("manager-1", now)
+
+                assertThat(adapter.updateState(saved, AdjustmentStatus.PENDING)).isTrue()
+
+                val loaded: StockAdjustment = checkNotNull(adapter.findById(checkNotNull(saved.stockAdjustmentId)))
+                assertThat(loaded.status).isEqualTo(AdjustmentStatus.APPLIED)
+                assertThat(loaded.approvedBy).isEqualTo("manager-1")
+                assertThat(loaded.approvedAt).isEqualTo(now)
+                assertThat(adapter.updateState(saved, AdjustmentStatus.PENDING)).isFalse()
+            }
+
+        @Test
+        fun `같은 보정안을 동시에 승인하려 하면 정확히 하나만 성공한다`() =
+            runBlocking<Unit> {
+                val saved: StockAdjustment = adapter.save(proposal())
+                val id: Long = checkNotNull(saved.stockAdjustmentId)
+
+                val results: List<Boolean> =
+                    (1..20)
+                        .map {
+                            async(Dispatchers.Default) {
+                                val copy: StockAdjustment = checkNotNull(adapter.findById(id))
+                                copy.approve("manager-$it", now)
+                                adapter.updateState(copy, AdjustmentStatus.PENDING)
+                            }
+                        }.awaitAll()
+
+                assertThat(results.count { it }).isEqualTo(1)
+            }
+
+        @Test
+        fun `항목의 두 수량과 변동량을 갱신한다`() =
+            runBlocking<Unit> {
+                val saved: StockAdjustment = adapter.save(proposal())
+                saved.revise(100, 95)
+
+                adapter.updateReconciliationItem(saved.items.single())
+
+                val item: StockAdjustmentItem = checkNotNull(adapter.findById(checkNotNull(saved.stockAdjustmentId))).items.single()
+                assertThat(item.wmsQuantity).isEqualTo(95)
+                assertThat(item.quantityChange).isEqualTo(-5)
+            }
+
+        @Test
+        fun `보정안 목록은 최신순이고 창고와 상태로 거르며 실사 조정은 제외한다`() =
+            runBlocking<Unit> {
+                val first: StockAdjustment = adapter.save(proposal("k-1", lotA, QualityStatus.NORMAL))
+                val second: StockAdjustment = adapter.save(proposal("k-2", lotB, QualityStatus.NORMAL))
+                val other: StockAdjustment = adapter.save(proposal("k-3", lotA, QualityStatus.DEFECTIVE, warehouseId = 20L))
+                second.reject()
+                adapter.updateState(second, AdjustmentStatus.PENDING)
+                adapter.save(adjustment("audit-1"))
+
+                fun ids(
+                    warehouses: Set<Long>?,
+                    status: AdjustmentStatus?,
+                ) = runBlocking { adapter.searchReconciliations(warehouses, status, 0L, 100).map { it.stockAdjustmentId } }
+
+                assertThat(ids(null, null)).containsExactly(other.stockAdjustmentId, second.stockAdjustmentId, first.stockAdjustmentId)
+                assertThat(ids(setOf(10L), null)).containsExactly(second.stockAdjustmentId, first.stockAdjustmentId)
+                assertThat(ids(setOf(10L, 20L), AdjustmentStatus.PENDING)).containsExactly(other.stockAdjustmentId, first.stockAdjustmentId)
+                assertThat(ids(null, AdjustmentStatus.REJECTED)).containsExactly(second.stockAdjustmentId)
+                assertThat(ids(emptySet(), null)).isEmpty()
+                assertThat(adapter.countReconciliations(null, null)).isEqualTo(3L)
+                assertThat(adapter.countReconciliations(setOf(20L), null)).isEqualTo(1L)
+                assertThat(adapter.countReconciliations(null, AdjustmentStatus.APPLIED)).isEqualTo(0L)
+                assertThat(adapter.countReconciliations(emptySet(), null)).isEqualTo(0L)
+                assertThat(
+                    adapter.searchReconciliations(null, null, 1L, 1).map { it.stockAdjustmentId },
+                ).containsExactly(second.stockAdjustmentId)
             }
     }
 

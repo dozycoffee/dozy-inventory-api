@@ -17,6 +17,8 @@ class StockAdjustmentItemEntity(
     var lotId: Long,
     var qualityStatus: QualityStatus,
     var quantityChange: Int,
+    var inventoryQuantity: Int?,
+    var wmsQuantity: Int?,
 ) : BaseEntity() {
     fun toDomain(): StockAdjustmentItem =
         StockAdjustmentItem.reconstitute(
@@ -25,6 +27,8 @@ class StockAdjustmentItemEntity(
             lotId = lotId,
             qualityStatus = qualityStatus,
             quantityChange = quantityChange,
+            inventoryQuantity = inventoryQuantity,
+            wmsQuantity = wmsQuantity,
         )
 
     companion object {
@@ -39,6 +43,8 @@ class StockAdjustmentItemEntity(
                 lotId = item.lotId,
                 qualityStatus = item.qualityStatus,
                 quantityChange = item.quantityChange,
+                inventoryQuantity = item.inventoryQuantity,
+                wmsQuantity = item.wmsQuantity,
             )
     }
 }

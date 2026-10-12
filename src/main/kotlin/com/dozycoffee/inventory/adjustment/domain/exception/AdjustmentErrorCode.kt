@@ -19,5 +19,26 @@ enum class AdjustmentErrorCode(
         "INV_APPROVAL_REQUIRED",
         "변동량이 승인 임계치를 넘는 항목이 있어 승인자가 필요합니다.",
     ),
+    ADJUSTMENT_NOT_FOUND(ErrorType.NOT_FOUND, "INV_ADJUSTMENT_NOT_FOUND", "조정(보정안)을 찾을 수 없습니다."),
+    INVALID_ADJUSTMENT_STATE(
+        ErrorType.CONFLICT,
+        "INV_INVALID_ADJUSTMENT_STATE",
+        "조정의 현재 상태에서는 요청한 작업을 할 수 없습니다.",
+    ),
+    RECONCILIATION_CHANGED(
+        ErrorType.CONFLICT,
+        "INV_RECONCILIATION_CHANGED",
+        "보정안을 만든 뒤 수량이 바뀌어 보정안을 다시 계산했습니다. 새 수량을 확인하고 다시 승인해 주세요.",
+    ),
+    RECONCILIATION_ADMIN_REQUIRED(
+        ErrorType.FORBIDDEN,
+        "INV_RECONCILIATION_ADMIN_REQUIRED",
+        "변동량이 승인 임계치를 넘는 보정안은 본사 관리자만 승인할 수 있습니다.",
+    ),
+    INVALID_RECONCILIATION(
+        ErrorType.VALIDATION,
+        "INV_INVALID_RECONCILIATION",
+        "대사 보정안은 창고와 대사 실행이 양수이고 두 수량이 0 이상이며 서로 달라야 합니다.",
+    ),
     DUPLICATE_ADJUSTMENT_KEY(ErrorType.CONFLICT, "INV_DUPLICATE_ADJUSTMENT_KEY", "이미 처리한 조정의 멱등 키입니다."),
 }

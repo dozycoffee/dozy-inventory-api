@@ -91,6 +91,7 @@ class InventoryDbFixture(
             "warehouse_access",
             "stock_adjustment_item",
             "stock_adjustment",
+            "reconciliation_run",
             "reservation_event",
             "reservation_allocation",
             "reservation_item",
