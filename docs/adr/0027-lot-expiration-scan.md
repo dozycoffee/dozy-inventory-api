@@ -17,6 +17,9 @@ Accepted (2026-10-11). 구현은 계층별 PR로 나눈다: (1) inventory의 Lot
 5. **확정 전(`RESERVED`) 예약은 강제 해제하고 확정된(`CONFIRMED`) 예약은 건너뛰며 이벤트로 알린다**(시나리오 결정 6). 알림은 별도 예약 이벤트가 아니라 `Lot 경과` 이벤트 하나에 확정 예약 ID 목록을 담는다. 이벤트와 강제 해제는 2, 3단계에서 구현한다.
 6. **`Lot 경과` 이벤트로 WMS가 폐기 신청을 만든다**(시나리오 결정 7). 이벤트(집계 `LOT`)는 Lot의 상태가 경과로 바뀌었거나 이번 스캔에서 전환한 수량이 있을 때 Lot마다 한 건 발행하고 행별 전환 수량과 건너뛴 확정 예약 ID를 담는다(3단계에서 계약을 확정한다).
 7. **강제 해제는 예약 하나씩 `ForceReleaseReservationUseCase.forceRelease(예약 ID, 사유)`로 한다.** 확정 전(`RESERVED`) 예약만 `RELEASED`로 바꾸고 예약 수량을 되돌리며, 이미 확정·해제·만료·출고되었거나 확정과 겹쳐 조건부 UPDATE에서 밀리면 아무것도 하지 않고 false다(확정이 이긴다). 이력은 `FORCE_RELEASED`(상세에 사유), 이벤트는 `RESERVATION_FORCE_RELEASED`이며 payload에 사유 코드 `reason`을 담는다(다른 예약 이벤트에는 필드가 없다). 사유는 `LOT_EXPIRED` 같은 영문 대문자·숫자·밑줄 50자 이하의 코드다. 대상 예약은 `FindReservationsByInventoryUseCase`로 재고 행 ID에서 찾는다(확정 전과 확정을 나눠서). 잠금 순서는 예약 행 → 재고 행 `inventory_id` 오름차순으로 기존과 같다.
+8. **오케스트레이션은 `reservation` 도메인의 `LotExpirationScanService`가 한다.** 도메인 의존 방향이 `reservation` → `inventory`이고 순환을 피해야 해서(`architecture.md`) inventory가 reservation을 부를 수 없다. Lot마다 ① `FindExpiredLotInventoryIdsUseCase`로 경과한 Lot의 예약 수량이 있는 정상 품질 행을 찾고 ② 그 행의 확정 전 예약을 하나씩 강제 해제하고(사유 `LOT_EXPIRED`) ③ 그 뒤에 확정 예약을 조회한 다음 ④ `ProcessLotExpirationUseCase.process(lotId, 확정 예약 ID)`로 상태 갱신·품질 전환·이벤트를 처리한다. 해제를 먼저 해야 풀린 수량이 같은 스캔에서 옮겨지고, 확정 예약을 그 뒤에 조회해야 해제와 겹쳐 확정된 예약도 건너뛸 목록에 들어간다. 단계마다 자기 트랜잭션이고 멱등이라 중간에 실패하면 다음 스캔이 이어서 처리하며 Lot이나 예약 한 건의 실패는 로그만 남기고 나머지를 계속 처리한다.
+9. **`Lot 경과` 이벤트(`LOT_EXPIRED`, 집계 `LOT`, 키 Lot ID)는 inventory의 품질 전환과 같은 트랜잭션에서 Outbox에 저장한다.** 전환은 했는데 이벤트가 없는 상태를 막으려는 것이다. 확정 예약 ID는 호출하는 쪽이 넘긴다. 이번에 경과로 바뀌었거나 수량을 전환했을 때 발행하고(임박만으로는 발행하지 않는다) 계약은 `docs/events.md`에 있다.
+10. **스케줄러는 하루 한 번(기본 매일 00:10, `Asia/Seoul`) 돌고 한 번에 최대 100개씩 10묶음까지 처리한다.** 설정은 `inventory.lot-expiration-scan`(`enabled`, `cron`, `zone`, `batch-size`)이고 테스트에서는 기본으로 끈다. 묶음이 가득 차지 않았거나 성공한 Lot이 없으면 멈추고, 요청 밖 작업이라 `SystemActor`로 실행한다. 서비스가 꺼져 있던 날의 스캔은 건너뛰어도 다음 실행이 후보를 모두 따라잡는다.
 
 ## 결과 (Consequences)
 
