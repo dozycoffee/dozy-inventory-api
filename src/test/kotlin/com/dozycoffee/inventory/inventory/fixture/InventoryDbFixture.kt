@@ -88,6 +88,7 @@ class InventoryDbFixture(
     suspend fun cleanUp() {
         listOf(
             "outbox_event",
+            "warehouse_access",
             "stock_adjustment_item",
             "stock_adjustment",
             "reservation_event",

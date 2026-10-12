@@ -20,16 +20,18 @@ class AvailabilityService(
      */
     @Transactional(readOnly = true)
     override suspend fun getAvailability(query: GetAvailabilityQuery): AvailabilityResult {
+        // 창고 관리자가 창고를 생략하면 배정된 모든 창고가 된다(재고가 없는 창고는 0). 범위 밖의 창고를 지정하면 거부한다
+        val requestedWarehouseIds: Set<Long>? = query.scope.narrow(query.warehouseIds)
         val rows: Map<Long, Map<Long, Long>> =
             inventoryRepository
-                .findAvailability(query.productIds, query.warehouseIds)
+                .findAvailability(query.productIds, requestedWarehouseIds)
                 .groupBy(AvailabilityRow::productId)
                 .mapValues { (_, productRows) -> productRows.associate { it.warehouseId to it.availableQuantity } }
 
         val products: List<ProductAvailability> =
             query.productIds.sorted().map { productId: Long ->
                 val quantities: Map<Long, Long> = rows[productId].orEmpty()
-                val warehouseIds: List<Long> = (query.warehouseIds ?: quantities.keys).sorted()
+                val warehouseIds: List<Long> = (requestedWarehouseIds ?: quantities.keys).sorted()
                 val warehouses: List<WarehouseAvailability> =
                     warehouseIds.map { WarehouseAvailability(it, quantities[it] ?: 0L) }
                 ProductAvailability(productId, warehouses.sumOf { it.availableQuantity }, warehouses)

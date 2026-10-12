@@ -1,5 +1,7 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.WarehouseScope
+import com.dozycoffee.inventory.global.error.WarehouseAccessDeniedException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.GetAvailabilityQuery
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AvailabilityResult
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.ProductAvailability
@@ -11,9 +13,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 
 @ExtendWith(MockitoExtension::class)
@@ -41,7 +45,7 @@ class AvailabilityServiceTest {
                     ),
                 )
 
-                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(2L, 1L), null))
+                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(2L, 1L), null, WarehouseScope.All))
 
                 assertEquals(
                     AvailabilityResult(
@@ -59,7 +63,7 @@ class AvailabilityServiceTest {
             runBlocking<Unit> {
                 whenever(inventoryRepository.findAvailability(setOf(1L, 3L), null)).thenReturn(listOf(AvailabilityRow(10L, 1L, 5L)))
 
-                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L, 3L), null))
+                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L, 3L), null, WarehouseScope.All))
 
                 assertEquals(ProductAvailability(3L, 0L, emptyList()), result.products[1])
             }
@@ -69,7 +73,7 @@ class AvailabilityServiceTest {
             runBlocking<Unit> {
                 whenever(inventoryRepository.findAvailability(setOf(1L), null)).thenReturn(listOf(AvailabilityRow(10L, 1L, 0L)))
 
-                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), null))
+                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), null, WarehouseScope.All))
 
                 assertEquals(listOf(WarehouseAvailability(10L, 0L)), result.products.single().warehouses)
             }
@@ -82,7 +86,10 @@ class AvailabilityServiceTest {
             runBlocking<Unit> {
                 whenever(inventoryRepository.findAvailability(setOf(1L), setOf(30L, 10L))).thenReturn(listOf(AvailabilityRow(10L, 1L, 4L)))
 
-                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), setOf(30L, 10L)))
+                val result: AvailabilityResult =
+                    service.getAvailability(
+                        GetAvailabilityQuery(setOf(1L), setOf(30L, 10L), WarehouseScope.All),
+                    )
 
                 assertEquals(
                     ProductAvailability(1L, 4L, listOf(WarehouseAvailability(10L, 4L), WarehouseAvailability(30L, 0L))),
@@ -95,12 +102,53 @@ class AvailabilityServiceTest {
             runBlocking<Unit> {
                 whenever(inventoryRepository.findAvailability(setOf(9L), setOf(10L, 20L))).thenReturn(emptyList())
 
-                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(9L), setOf(10L, 20L)))
+                val result: AvailabilityResult =
+                    service.getAvailability(
+                        GetAvailabilityQuery(setOf(9L), setOf(10L, 20L), WarehouseScope.All),
+                    )
 
                 assertEquals(
                     ProductAvailability(9L, 0L, listOf(WarehouseAvailability(10L, 0L), WarehouseAvailability(20L, 0L))),
                     result.products.single(),
                 )
+            }
+    }
+
+    @Nested
+    inner class `창고 범위` {
+        private val managerScope: WarehouseScope = WarehouseScope.Only(setOf(10L, 30L))
+
+        @Test
+        fun `창고를 생략하면 배정된 창고로 조회하고 재고가 없는 창고는 0으로 채운다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.findAvailability(setOf(1L), setOf(10L, 30L))).thenReturn(listOf(AvailabilityRow(10L, 1L, 5L)))
+
+                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), null, managerScope))
+
+                assertEquals(
+                    ProductAvailability(1L, 5L, listOf(WarehouseAvailability(10L, 5L), WarehouseAvailability(30L, 0L))),
+                    result.products.single(),
+                )
+            }
+
+        @Test
+        fun `배정된 창고를 지정하면 그대로 조회한다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.findAvailability(setOf(1L), setOf(30L))).thenReturn(listOf(AvailabilityRow(30L, 1L, 8L)))
+
+                val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), setOf(30L), managerScope))
+
+                assertEquals(8L, result.products.single().totalAvailableQuantity)
+            }
+
+        @Test
+        fun `배정되지 않은 창고를 하나라도 지정하면 거부하고 조회하지 않는다`() =
+            runBlocking<Unit> {
+                assertThrows<WarehouseAccessDeniedException> {
+                    service.getAvailability(GetAvailabilityQuery(setOf(1L), setOf(10L, 20L), managerScope))
+                }
+
+                verifyNoInteractions(inventoryRepository)
             }
     }
 
@@ -111,7 +159,7 @@ class AvailabilityServiceTest {
                 listOf(AvailabilityRow(10L, 1L, Int.MAX_VALUE.toLong()), AvailabilityRow(20L, 1L, Int.MAX_VALUE.toLong())),
             )
 
-            val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), null))
+            val result: AvailabilityResult = service.getAvailability(GetAvailabilityQuery(setOf(1L), null, WarehouseScope.All))
 
             assertEquals(Int.MAX_VALUE.toLong() * 2, result.products.single().totalAvailableQuantity)
         }

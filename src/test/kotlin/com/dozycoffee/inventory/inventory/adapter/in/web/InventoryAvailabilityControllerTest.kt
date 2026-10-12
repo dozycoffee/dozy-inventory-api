@@ -1,8 +1,13 @@
 package com.dozycoffee.inventory.inventory.adapter.`in`.web
 
 import com.dozycoffee.auth.test.DozyTestTokens
+import com.dozycoffee.inventory.access.application.port.`in`.ResolveWarehouseScopeUseCase
+import com.dozycoffee.inventory.global.domain.WarehouseScope
+import com.dozycoffee.inventory.global.error.WarehouseAccessDeniedException
+import com.dozycoffee.inventory.global.security.Actor
 import com.dozycoffee.inventory.global.security.SecurityConfig
 import com.dozycoffee.inventory.global.security.SecurityContextActorProvider
+import com.dozycoffee.inventory.global.security.UserActor
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetAvailabilityUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.GetAvailabilityQuery
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.AvailabilityResult
@@ -41,6 +46,9 @@ class InventoryAvailabilityControllerTest {
     @MockitoBean
     private lateinit var getAvailabilityUseCase: GetAvailabilityUseCase
 
+    @MockitoBean
+    private lateinit var resolveWarehouseScopeUseCase: ResolveWarehouseScopeUseCase
+
     private lateinit var webTestClient: WebTestClient
 
     private val result: AvailabilityResult =
@@ -54,6 +62,7 @@ class InventoryAvailabilityControllerTest {
     @BeforeEach
     fun setUp(restDocumentation: RestDocumentationContextProvider) {
         webTestClient = baseClient.mutate().filter(documentationConfiguration(restDocumentation)).build()
+        runBlocking { whenever(resolveWarehouseScopeUseCase.resolve(any())).thenReturn(WarehouseScope.All) }
     }
 
     private fun get(
@@ -149,12 +158,51 @@ class InventoryAvailabilityControllerTest {
     }
 
     @Nested
-    inner class `권한` {
+    inner class `권한과 창고 범위` {
         @Test
-        fun `warehouse_manager는 403이고 토큰이 없으면 401이며 UseCase를 호출하지 않는다`() =
+        fun `토큰이 없으면 401이며 UseCase를 호출하지 않는다`() =
             runBlocking<Unit> {
-                get("warehouse_manager", "/api/v1/inventories/availability?productIds=1").expectStatus().isForbidden
                 get(null, "/api/v1/inventories/availability?productIds=1").expectStatus().isUnauthorized
+
+                verifyBlocking(getAvailabilityUseCase, never()) { getAvailability(any()) }
+                verifyBlocking(resolveWarehouseScopeUseCase, never()) { resolve(any()) }
+            }
+
+        @Test
+        fun `창고 관리자도 호출할 수 있고 요청자의 범위를 Query에 담아 넘긴다`() =
+            runBlocking<Unit> {
+                val scope = WarehouseScope.Only(setOf(10L, 30L))
+                whenever(resolveWarehouseScopeUseCase.resolve(any())).thenReturn(scope)
+                whenever(getAvailabilityUseCase.getAvailability(any())).thenReturn(result)
+
+                get("warehouse_manager", "/api/v1/inventories/availability?productIds=1").expectStatus().isOk
+
+                assertEquals(scope, capturedQuery().scope)
+                val actor = argumentCaptor<Actor>()
+                verifyBlocking(resolveWarehouseScopeUseCase) { resolve(actor.capture()) }
+                assertEquals(setOf("warehouse_manager"), (actor.firstValue as UserActor).roles)
+            }
+
+        @Test
+        fun `배정되지 않은 창고를 지정하면 403 INV_WAREHOUSE_ACCESS_DENIED`() =
+            runBlocking<Unit> {
+                whenever(getAvailabilityUseCase.getAvailability(any())).thenThrow(WarehouseAccessDeniedException())
+
+                get("warehouse_manager", "/api/v1/inventories/availability?productIds=1&warehouseIds=20")
+                    .expectStatus()
+                    .isForbidden
+                    .expectBody()
+                    .jsonPath("$.code")
+                    .isEqualTo("INV_WAREHOUSE_ACCESS_DENIED")
+                    .consumeWith(AvailabilityApiDocs.warehouseAccessDenied())
+            }
+
+        @Test
+        fun `소속 사본이 없는 창고 관리자는 범위를 구하는 단계에서 403이고 조회하지 않는다`() =
+            runBlocking<Unit> {
+                whenever(resolveWarehouseScopeUseCase.resolve(any())).thenThrow(WarehouseAccessDeniedException())
+
+                get("warehouse_manager", "/api/v1/inventories/availability?productIds=1").expectStatus().isForbidden
 
                 verifyBlocking(getAvailabilityUseCase, never()) { getAvailability(any()) }
             }

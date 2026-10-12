@@ -4,6 +4,8 @@ import com.dozycoffee.auth.core.PrincipalType
 import com.dozycoffee.auth.test.DozyTestTokens
 import com.dozycoffee.inventory.inventory.adapter.out.persistence.LotPersistenceAdapter
 import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
+import kotlinx.coroutines.reactive.awaitFirst
+import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -211,10 +213,9 @@ class InventoryQueryApiIntegrationTest {
     @Nested
     inner class `권한` {
         @Test
-        fun `admin만 조회할 수 있다`() {
+        fun `service나 토큰이 없는 요청은 관리자 조회를 할 수 없다`() {
             listOf("/api/v1/inventories", "/api/v1/inventories/$normalRow", "/api/v1/inventories/$normalRow/histories").forEach { uri ->
                 get(uri, "service").expectStatus().isForbidden
-                get(uri, "warehouse_manager").expectStatus().isForbidden
                 get(uri, null).expectStatus().isUnauthorized
             }
         }
@@ -223,5 +224,129 @@ class InventoryQueryApiIntegrationTest {
         fun `가용 재고 조회 경로는 그대로 service도 호출할 수 있다`() {
             get("/api/v1/inventories/availability?productIds=$productId", "service").expectStatus().isOk
         }
+    }
+
+    /** 창고 관리자는 소속 사본(`warehouse_access`)에 있는 창고만 본다(ADR-0032). 토큰의 principalId가 사본의 직원이다 */
+    @Nested
+    inner class `창고 관리자` {
+        private val managerPrincipal: String = "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73"
+        private var warehouse20Row: Long = 0L
+
+        @BeforeEach
+        fun assign() =
+            runBlocking<Unit> {
+                databaseClient
+                    .sql(
+                        """
+                        INSERT INTO warehouse_access (principal_id, warehouse_id, created_at, created_by, updated_at, updated_by)
+                        VALUES ('$managerPrincipal', 10, NOW(6), 'test', NOW(6), 'test')
+                        """,
+                    ).fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+                warehouse20Row =
+                    databaseClient
+                        .sql("SELECT inventory_id FROM inventory WHERE warehouse_id = 20")
+                        .fetch()
+                        .one()
+                        .awaitFirst()["inventory_id"]
+                        .toString()
+                        .toLong()
+            }
+
+        @Test
+        fun `창고를 생략하면 배정된 창고의 재고 행만 준다`() {
+            get("/api/v1/inventories", "warehouse_manager")
+                .expectStatus()
+                .isOk
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.items[0].warehouseId")
+                .isEqualTo(10)
+                .jsonPath("$.items[1].warehouseId")
+                .isEqualTo(10)
+        }
+
+        @Test
+        fun `배정된 창고를 지정하면 보이고 배정되지 않은 창고를 지정하면 403이다`() {
+            get(
+                "/api/v1/inventories?warehouseId=10",
+                "warehouse_manager",
+            ).expectStatus().isOk.expectBody().jsonPath("$.totalElements").isEqualTo(2)
+            get("/api/v1/inventories?warehouseId=20", "warehouse_manager")
+                .expectStatus()
+                .isForbidden
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("INV_WAREHOUSE_ACCESS_DENIED")
+        }
+
+        @Test
+        fun `상세와 이력은 배정된 창고의 행만 보고 다른 창고의 행은 403이다`() {
+            get("/api/v1/inventories/$normalRow", "warehouse_manager").expectStatus().isOk
+            get("/api/v1/inventories/$normalRow/histories", "warehouse_manager").expectStatus().isOk
+            get("/api/v1/inventories/$warehouse20Row", "warehouse_manager").expectStatus().isForbidden
+            get("/api/v1/inventories/$warehouse20Row/histories", "warehouse_manager").expectStatus().isForbidden
+            get("/api/v1/inventories/999999", "warehouse_manager").expectStatus().isNotFound
+        }
+
+        @Test
+        fun `가용 재고는 창고를 생략하면 배정된 창고만 보여 주고 지정한 다른 창고는 403이다`() {
+            get("/api/v1/inventories/availability?productIds=$productId", "warehouse_manager")
+                .expectStatus()
+                .isOk
+                .expectBody()
+                .jsonPath("$.products[0].warehouses.length()")
+                .isEqualTo(1)
+                .jsonPath("$.products[0].warehouses[0].warehouseId")
+                .isEqualTo(10)
+                .jsonPath("$.products[0].totalAvailableQuantity")
+                .isEqualTo(70)
+            get("/api/v1/inventories/availability?productIds=$productId&warehouseIds=10,20", "warehouse_manager").expectStatus().isForbidden
+        }
+
+        @Test
+        fun `admin과 service는 소속 사본과 상관없이 모든 창고를 본다`() {
+            get("/api/v1/inventories", "admin")
+                .expectStatus()
+                .isOk
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(3)
+            get("/api/v1/inventories/availability?productIds=$productId", "service")
+                .expectStatus()
+                .isOk
+                .expectBody()
+                .jsonPath("$.products[0].warehouses.length()")
+                .isEqualTo(2)
+        }
+
+        @Test
+        fun `소속 사본이 없는 창고 관리자는 모든 조회가 403이다`() =
+            runBlocking<Unit> {
+                databaseClient
+                    .sql("DELETE FROM warehouse_access")
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+
+                get("/api/v1/inventories", "warehouse_manager").expectStatus().isForbidden
+                get("/api/v1/inventories/$normalRow", "warehouse_manager").expectStatus().isForbidden
+                get("/api/v1/inventories/availability?productIds=$productId", "warehouse_manager").expectStatus().isForbidden
+            }
+
+        @Test
+        fun `소속을 바꾸면 다음 요청부터 바뀐 창고가 보인다`() =
+            runBlocking<Unit> {
+                databaseClient
+                    .sql("UPDATE warehouse_access SET warehouse_id = 20")
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+
+                get("/api/v1/inventories?warehouseId=10", "warehouse_manager").expectStatus().isForbidden
+                get("/api/v1/inventories?warehouseId=20", "warehouse_manager").expectStatus().isOk
+            }
     }
 }

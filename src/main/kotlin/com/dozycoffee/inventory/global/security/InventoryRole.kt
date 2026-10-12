@@ -23,4 +23,5 @@ object InventoryAuthorize {
     const val SERVICE: String = "hasRole('service')"
     const val SERVICE_OR_ADMIN: String = "hasAnyRole('service','admin')"
     const val ADMIN: String = "hasRole('admin')"
+    const val ADMIN_OR_WAREHOUSE_MANAGER: String = "hasAnyRole('admin','warehouse_manager')"
 }

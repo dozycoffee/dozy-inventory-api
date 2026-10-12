@@ -91,7 +91,7 @@ class InventoryPersistenceAdapter(
             clauses += clause
             values[name] = value
         }
-        add("i.warehouse_id = :warehouseId", "warehouseId", condition.warehouseId)
+        add("i.warehouse_id IN (:warehouseIds)", "warehouseIds", condition.warehouseIds?.toList())
         add("i.product_id = :productId", "productId", condition.productId)
         add("i.quality_status = :qualityStatus", "qualityStatus", condition.qualityStatus?.name)
         add("l.lot_status = :lotStatus", "lotStatus", condition.lotStatus?.name)

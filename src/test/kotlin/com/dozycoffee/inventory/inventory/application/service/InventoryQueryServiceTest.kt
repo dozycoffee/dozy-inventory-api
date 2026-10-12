@@ -3,7 +3,9 @@ package com.dozycoffee.inventory.inventory.application.service
 import com.dozycoffee.inventory.global.domain.IdempotencyKey
 import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.global.domain.RequesterService
+import com.dozycoffee.inventory.global.domain.WarehouseScope
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
+import com.dozycoffee.inventory.global.error.WarehouseAccessDeniedException
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.SearchInventoriesQuery
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventoryHistoryResult
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventoryResult
@@ -30,6 +32,7 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verifyBlocking
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -79,14 +82,15 @@ class InventoryQueryServiceTest {
         page: Int = 0,
         size: Int = 20,
         warehouseId: Long? = null,
-    ): SearchInventoriesQuery = SearchInventoriesQuery(warehouseId, null, QualityStatus.DEFECTIVE, null, true, page, size)
+        scope: WarehouseScope = WarehouseScope.All,
+    ): SearchInventoriesQuery = SearchInventoriesQuery(warehouseId, null, QualityStatus.DEFECTIVE, null, true, page, size, scope)
 
     @Nested
     inner class `재고 현황` {
         @Test
         fun `조건과 페이지 위치를 저장소에 넘기고 가용 수량을 계산해 페이지 결과로 만든다`() =
             runBlocking<Unit> {
-                val condition = InventorySearchCondition(10L, null, QualityStatus.DEFECTIVE, null, true)
+                val condition = InventorySearchCondition(setOf(10L), null, QualityStatus.DEFECTIVE, null, true)
                 whenever(inventoryRepository.search(condition, 40L, 20)).thenReturn(listOf(row(1L), row(2L, quantity = 5, reserved = 5)))
                 whenever(inventoryRepository.count(condition)).thenReturn(43L)
 
@@ -111,18 +115,50 @@ class InventoryQueryServiceTest {
             }
 
         @Test
+        fun `창고 관리자가 창고를 생략하면 배정된 창고로 제한한다`() =
+            runBlocking<Unit> {
+                val condition = InventorySearchCondition(setOf(10L, 30L), null, QualityStatus.DEFECTIVE, null, true)
+                whenever(inventoryRepository.search(condition, 0L, 20)).thenReturn(listOf(row(1L)))
+                whenever(inventoryRepository.count(condition)).thenReturn(1L)
+
+                val result: PageResult<InventoryResult> = service.search(query(scope = WarehouseScope.Only(setOf(10L, 30L))))
+
+                assertEquals(1, result.items.size)
+            }
+
+        @Test
+        fun `창고 관리자가 배정되지 않은 창고를 지정하면 거부하고 조회하지 않는다`() =
+            runBlocking<Unit> {
+                assertThrows<WarehouseAccessDeniedException> {
+                    service.search(query(warehouseId = 20L, scope = WarehouseScope.Only(setOf(10L, 30L))))
+                }
+
+                verifyNoInteractions(inventoryRepository)
+            }
+
+        @Test
+        fun `배정된 창고를 지정하면 그 창고만 조회한다`() =
+            runBlocking<Unit> {
+                val condition = InventorySearchCondition(setOf(30L), null, QualityStatus.DEFECTIVE, null, true)
+                whenever(inventoryRepository.search(condition, 0L, 20)).thenReturn(emptyList())
+                whenever(inventoryRepository.count(condition)).thenReturn(0L)
+
+                service.search(query(warehouseId = 30L, scope = WarehouseScope.Only(setOf(10L, 30L))))
+            }
+
+        @Test
         fun `ID가 양수가 아니거나 페이지가 음수이거나 크기가 범위를 벗어나면 거부한다`() {
             listOf(
-                { SearchInventoriesQuery(0L, null, null, null, null, 0, 20) },
-                { SearchInventoriesQuery(null, 0L, null, null, null, 0, 20) },
-                { SearchInventoriesQuery(null, null, null, null, null, -1, 20) },
-                { SearchInventoriesQuery(null, null, null, null, null, 0, 0) },
-                { SearchInventoriesQuery(null, null, null, null, null, 0, 101) },
+                { SearchInventoriesQuery(0L, null, null, null, null, 0, 20, WarehouseScope.All) },
+                { SearchInventoriesQuery(null, 0L, null, null, null, 0, 20, WarehouseScope.All) },
+                { SearchInventoriesQuery(null, null, null, null, null, -1, 20, WarehouseScope.All) },
+                { SearchInventoriesQuery(null, null, null, null, null, 0, 0, WarehouseScope.All) },
+                { SearchInventoriesQuery(null, null, null, null, null, 0, 101, WarehouseScope.All) },
             ).forEach { create ->
                 val e: InvalidDomainValueException = assertThrows { create() }
                 assertEquals(InventoryErrorCode.INVALID_INVENTORY_QUERY.code, e.errorCode.code)
             }
-            SearchInventoriesQuery(null, null, null, null, null, 0, 100)
+            SearchInventoriesQuery(null, null, null, null, null, 0, 100, WarehouseScope.All)
         }
     }
 
@@ -133,7 +169,7 @@ class InventoryQueryServiceTest {
             runBlocking<Unit> {
                 whenever(inventoryRepository.findRowById(1L)).thenReturn(row(1L))
 
-                val result: InventoryResult = service.getById(1L)
+                val result: InventoryResult = service.getById(1L, WarehouseScope.All)
 
                 assertEquals(1L, result.inventoryId)
                 assertEquals(LocalDate.of(2027, 1, 1), result.expirationDate)
@@ -141,11 +177,20 @@ class InventoryQueryServiceTest {
             }
 
         @Test
+        fun `배정된 창고의 행이면 보여 주고 아니면 거부한다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.findRowById(1L)).thenReturn(row(1L))
+
+                assertEquals(1L, service.getById(1L, WarehouseScope.Only(setOf(10L))).inventoryId)
+                assertThrows<WarehouseAccessDeniedException> { service.getById(1L, WarehouseScope.Only(setOf(20L))) }
+            }
+
+        @Test
         fun `없는 재고 행이면 거부한다`() =
             runBlocking<Unit> {
                 whenever(inventoryRepository.findRowById(1L)).thenReturn(null)
 
-                assertThrows<InventoryNotFoundException> { service.getById(1L) }
+                assertThrows<InventoryNotFoundException> { service.getById(1L, WarehouseScope.All) }
             }
     }
 
@@ -174,7 +219,7 @@ class InventoryQueryServiceTest {
                 whenever(inventoryHistoryRepository.findPageByInventoryId(1L, 10L, 5)).thenReturn(listOf(history(9L), history(8L)))
                 whenever(inventoryHistoryRepository.countByInventoryId(1L)).thenReturn(12L)
 
-                val result: PageResult<InventoryHistoryResult> = service.getHistories(1L, 2, 5)
+                val result: PageResult<InventoryHistoryResult> = service.getHistories(1L, WarehouseScope.All, 2, 5)
 
                 assertEquals(listOf(9L, 8L), result.items.map { it.inventoryHistoryId })
                 assertEquals(HistoryType.INBOUND, result.items.first().historyType)
@@ -184,11 +229,21 @@ class InventoryQueryServiceTest {
             }
 
         @Test
+        fun `배정되지 않은 창고의 이력은 조회하지 않고 거부한다`() =
+            runBlocking<Unit> {
+                whenever(inventoryRepository.findById(1L)).thenReturn(existing())
+
+                assertThrows<WarehouseAccessDeniedException> { service.getHistories(1L, WarehouseScope.Only(setOf(20L)), 0, 20) }
+
+                verifyNoInteractions(inventoryHistoryRepository)
+            }
+
+        @Test
         fun `없는 재고 행이면 이력을 조회하지 않고 거부한다`() =
             runBlocking<Unit> {
                 whenever(inventoryRepository.findById(1L)).thenReturn(null)
 
-                assertThrows<InventoryNotFoundException> { service.getHistories(1L, 0, 20) }
+                assertThrows<InventoryNotFoundException> { service.getHistories(1L, WarehouseScope.All, 0, 20) }
 
                 verifyBlocking(inventoryHistoryRepository, never()) {
                     findPageByInventoryId(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
@@ -198,10 +253,10 @@ class InventoryQueryServiceTest {
         @Test
         fun `페이지나 크기가 범위를 벗어나면 거부한다`() =
             runBlocking<Unit> {
-                assertThrows<InvalidDomainValueException> { service.getHistories(1L, -1, 20) }
-                assertThrows<InvalidDomainValueException> { service.getHistories(1L, 0, 0) }
-                assertThrows<InvalidDomainValueException> { service.getHistories(1L, 0, 101) }
-                assertThrows<InvalidDomainValueException> { service.getHistories(0L, 0, 20) }
+                assertThrows<InvalidDomainValueException> { service.getHistories(1L, WarehouseScope.All, -1, 20) }
+                assertThrows<InvalidDomainValueException> { service.getHistories(1L, WarehouseScope.All, 0, 0) }
+                assertThrows<InvalidDomainValueException> { service.getHistories(1L, WarehouseScope.All, 0, 101) }
+                assertThrows<InvalidDomainValueException> { service.getHistories(0L, WarehouseScope.All, 0, 20) }
             }
     }
 }

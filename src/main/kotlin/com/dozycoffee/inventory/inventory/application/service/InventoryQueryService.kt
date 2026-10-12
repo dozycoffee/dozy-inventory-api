@@ -1,5 +1,6 @@
 package com.dozycoffee.inventory.inventory.application.service
 
+import com.dozycoffee.inventory.global.domain.WarehouseScope
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryHistoriesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryUseCase
@@ -14,10 +15,14 @@ import com.dozycoffee.inventory.inventory.application.port.out.InventoryRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventorySearchCondition
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryErrorCode
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
+import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 관리자용 재고 현황·상세·이력 조회(ADR-0030). 모두 읽기 전용이라 락을 걸지 않는다 */
+/**
+ * 관리자용 재고 현황·상세·이력 조회(ADR-0030). 모두 읽기 전용이라 락을 걸지 않는다. 요청자의 창고 범위를 적용한다(ADR-0032):
+ * 현황은 범위의 창고로 제한하고, 상세와 이력은 행의 창고가 범위 밖이면 거부한다.
+ */
 @Service
 class InventoryQueryService(
     private val inventoryRepository: InventoryRepository,
@@ -27,27 +32,37 @@ class InventoryQueryService(
     GetInventoryHistoriesUseCase {
     @Transactional(readOnly = true)
     override suspend fun search(query: SearchInventoriesQuery): PageResult<InventoryResult> {
+        val warehouseIds: Set<Long>? = query.scope.narrow(query.warehouseId?.let(::setOf))
+        if (warehouseIds?.isEmpty() == true) return PageResult(emptyList(), query.page, query.size, 0L)
         val condition =
-            InventorySearchCondition(query.warehouseId, query.productId, query.qualityStatus, query.lotStatus, query.allocationHold)
+            InventorySearchCondition(warehouseIds, query.productId, query.qualityStatus, query.lotStatus, query.allocationHold)
         val items: List<InventoryResult> =
             inventoryRepository.search(condition, offsetOf(query.page, query.size), query.size).map(::toResult)
         return PageResult(items, query.page, query.size, inventoryRepository.count(condition))
     }
 
     @Transactional(readOnly = true)
-    override suspend fun getById(inventoryId: Long): InventoryResult =
-        toResult(inventoryRepository.findRowById(inventoryId) ?: throw InventoryNotFoundException())
+    override suspend fun getById(
+        inventoryId: Long,
+        scope: WarehouseScope,
+    ): InventoryResult {
+        val row: InventoryRow = inventoryRepository.findRowById(inventoryId) ?: throw InventoryNotFoundException()
+        scope.require(row.warehouseId)
+        return toResult(row)
+    }
 
     @Transactional(readOnly = true)
     override suspend fun getHistories(
         inventoryId: Long,
+        scope: WarehouseScope,
         page: Int,
         size: Int,
     ): PageResult<InventoryHistoryResult> {
         if (inventoryId < 1 || page < 0 || size !in 1..SearchInventoriesQuery.MAX_SIZE) {
             throw InvalidDomainValueException(InventoryErrorCode.INVALID_INVENTORY_QUERY)
         }
-        if (inventoryRepository.findById(inventoryId) == null) throw InventoryNotFoundException()
+        val inventory: Inventory = inventoryRepository.findById(inventoryId) ?: throw InventoryNotFoundException()
+        scope.require(inventory.warehouseId)
         val items: List<InventoryHistoryResult> =
             inventoryHistoryRepository.findPageByInventoryId(inventoryId, offsetOf(page, size), size).map(InventoryHistoryResult::from)
         return PageResult(items, page, size, inventoryHistoryRepository.countByInventoryId(inventoryId))

@@ -798,13 +798,15 @@ class InventoryPersistenceAdapterTest {
 
                 fun ids(condition: InventorySearchCondition) = runBlocking { adapter.search(condition, 0L, 100).map { it.inventoryId } }
 
-                assertThat(ids(InventorySearchCondition(10L, null, null, null, null))).containsExactlyInAnyOrder(normal, defective, held)
+                assertThat(
+                    ids(InventorySearchCondition(setOf(10L), null, null, null, null)),
+                ).containsExactlyInAnyOrder(normal, defective, held)
                 assertThat(ids(InventorySearchCondition(null, productId, QualityStatus.DEFECTIVE, null, null))).containsExactly(defective)
                 assertThat(ids(InventorySearchCondition(null, null, null, LotStatus.EXPIRING_SOON, null)))
                     .containsExactlyInAnyOrder(held, otherWarehouse)
                 assertThat(ids(InventorySearchCondition(null, null, null, null, true))).containsExactly(held)
-                assertThat(ids(InventorySearchCondition(10L, null, null, LotStatus.EXPIRING_SOON, true))).containsExactly(held)
-                assertThat(ids(InventorySearchCondition(99L, null, null, null, null))).isEmpty()
+                assertThat(ids(InventorySearchCondition(setOf(10L), null, null, LotStatus.EXPIRING_SOON, true))).containsExactly(held)
+                assertThat(ids(InventorySearchCondition(setOf(99L), null, null, null, null))).isEmpty()
                 assertThat(adapter.count(InventorySearchCondition(null, null, null, null, false))).isEqualTo(3L)
             }
 
