@@ -93,8 +93,8 @@
   {
     "id": "F-014",
     "name": "폐기 확정",
-    "description": "DEFECTIVE·DISPOSAL_SCHEDULED 재고를 DISPOSAL 이력으로 차감한다. NORMAL 재고 폐기 요청은 반려. 시나리오 9.2.",
-    "status": "pending",
+    "description": "DEFECTIVE·DISPOSAL_SCHEDULED 재고를 DISPOSAL 이력으로 차감한다. NORMAL 재고 폐기 요청은 반려. 시나리오 9.2. 결정은 ADR-0028.",
+    "status": "completed",
     "dependencies": ["F-007", "F-020"]
   },
   {
