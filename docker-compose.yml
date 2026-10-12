@@ -31,10 +31,12 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092}
+      # PLAINTEXT는 호스트(./gradlew bootRun)용, INTERNAL은 compose 네트워크 안의 컨테이너(app)용이다
+      KAFKA_LISTENERS: PLAINTEXT://:9092,INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092},INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -45,6 +47,47 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+
+  # 컨테이너 이미지 실행 확인용. 평소 개발에는 쓰지 않는다: docker compose --profile app up --build
+  # 이미지 빌드에 GPR_USER, GPR_TOKEN(read:packages)이 환경변수로 필요하다. 이미지에는 남지 않는다.
+  app:
+    profiles: [ "app" ]
+    image: dozy-inventory-api:local
+    build:
+      context: .
+      secrets:
+        - gpr_user
+        - gpr_token
+    container_name: dozy-inventory-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-dozy_inventory}
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD가 필요합니다}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AUTH_ISSUER_BASE_URI: ${AUTH_ISSUER_BASE_URI:-http://localhost:8081}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    ports:
+      - "${SERVER_PORT:-8082}:8082"
+    healthcheck:
+      # 이미지에 curl이 없어 bash의 /dev/tcp로 readiness를 확인한다(CMD-SHELL은 /bin/sh라 /dev/tcp가 없다)
+      test: [ "CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8082 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 6
+
+secrets:
+  gpr_user:
+    environment: GPR_USER
+  gpr_token:
+    environment: GPR_TOKEN
 
 volumes:
   mysql-data:

@@ -90,6 +90,15 @@ docker compose up -d        # MySQL (호스트 포트 3307), Kafka (호스트 �
 curl localhost:8082/actuator/health/readiness   # 헬스 체크(토큰 불필요). liveness는 /actuator/health/liveness
 ```
 
+### 컨테이너 이미지
+
+```bash
+# dozy-auth 스타터를 받으려면 read:packages 자격이 필요하다. BuildKit secret으로만 넘기며 이미지에 남지 않는다
+export GPR_USER=<깃허브 계정> GPR_TOKEN=<read:packages 토큰>
+docker build --secret id=gpr_user,env=GPR_USER --secret id=gpr_token,env=GPR_TOKEN -t dozy-inventory-api:local .
+docker compose --profile app up -d --build   # MySQL, Kafka와 함께 이미지를 띄워 확인한다(평소 개발에는 ./gradlew bootRun을 쓴다)
+```
+
 ### 검증
 
 ```bash

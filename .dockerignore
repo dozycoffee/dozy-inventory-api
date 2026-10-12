@@ -1,0 +1,19 @@
+# 이미지 빌드 컨텍스트에서 제외한다. 비밀(.env)과 빌드 산출물이 이미지에 들어가지 않게 한다
+.git
+.github
+.gradle
+.kotlin
+.idea
+.vscode
+build
+out
+.env
+.env.*
+!.env.example
+*.log
+docs
+scripts
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
