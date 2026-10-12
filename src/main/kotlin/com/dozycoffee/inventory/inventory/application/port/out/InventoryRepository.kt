@@ -1,5 +1,6 @@
 package com.dozycoffee.inventory.inventory.application.port.out
 
+import com.dozycoffee.inventory.global.domain.QualityStatus
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
 import java.time.LocalDate
@@ -35,6 +36,12 @@ interface InventoryRepository {
         productIds: Set<Long>,
         today: LocalDate,
     ): List<AllocationCandidate>
+
+    /** Lot의 [qualityStatus] 행을 모든 창고에서 `inventory_id` 오름차순으로 반환한다 */
+    suspend fun findAllByLot(
+        lotId: Long,
+        qualityStatus: QualityStatus,
+    ): List<Inventory>
 
     /** 재고 행이 속한 Lot의 정보. 없는 재고 행은 결과에 없다 */
     suspend fun findLotInfos(inventoryIds: Set<Long>): List<InventoryLotInfo>

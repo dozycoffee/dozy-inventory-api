@@ -163,6 +163,77 @@ class LotPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `스캔 후보와 조건부 상태 갱신` {
+        private val soonLimit: LocalDate = today.plusDays(30)
+
+        private suspend fun lot(
+            number: String,
+            expirationDate: LocalDate?,
+            status: LotStatus,
+        ): Long {
+            val saved: Lot = adapter.save(newLot(number, expirationDate))
+            val lotId: Long = checkNotNull(saved.lotId)
+            databaseClient
+                .sql("UPDATE lot SET lot_status = :status WHERE lot_id = :id")
+                .bind("status", status.name)
+                .bind("id", lotId)
+                .fetch()
+                .rowsUpdated()
+                .awaitFirst()
+            return lotId
+        }
+
+        @Test
+        fun `상태가 바뀌어야 하는 Lot만 후보에 오르고 유통기한이 없는 Lot은 빠진다`() =
+            runBlocking<Unit> {
+                val soon: Long = lot("SOON", today.plusDays(30), LotStatus.NORMAL)
+                val expired: Long = lot("EXPIRED", today, LotStatus.EXPIRING_SOON)
+                val expiredFromNormal: Long = lot("DIRECT", today.minusDays(1), LotStatus.NORMAL)
+                lot("FAR", today.plusDays(31), LotStatus.NORMAL)
+                lot("ALREADY-SOON", today.plusDays(10), LotStatus.EXPIRING_SOON)
+                lot("NO-DATE", null, LotStatus.NORMAL)
+
+                assertThat(adapter.findScanCandidateIds(today, soonLimit, 100)).containsExactly(soon, expired, expiredFromNormal)
+            }
+
+        @Test
+        fun `이미 경과한 Lot은 정상 품질 행에 가용 수량이 남았을 때만 후보에 오른다`() =
+            runBlocking<Unit> {
+                val withStock: Long = lot("STOCK", today.minusDays(5), LotStatus.EXPIRED)
+                val reservedOnly: Long = lot("RESERVED", today.minusDays(5), LotStatus.EXPIRED)
+                val defectiveOnly: Long = lot("DEFECTIVE", today.minusDays(5), LotStatus.EXPIRED)
+                lot("EMPTY", today.minusDays(5), LotStatus.EXPIRED)
+                fixture.insertInventory(10L, productId, withStock, quantity = 10, reservedQuantity = 4)
+                fixture.insertInventory(10L, productId, reservedOnly, quantity = 10, reservedQuantity = 10)
+                fixture.insertInventory(10L, productId, defectiveOnly, "DEFECTIVE", quantity = 10)
+
+                assertThat(adapter.findScanCandidateIds(today, soonLimit, 100)).containsExactly(withStock)
+            }
+
+        @Test
+        fun `후보는 ID 순서로 개수를 제한한다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> = (1..5).map { lot("L-$it", today.plusDays(1), LotStatus.NORMAL) }
+
+                assertThat(adapter.findScanCandidateIds(today, soonLimit, 3)).containsExactlyElementsOf(ids.take(3))
+            }
+
+        @Test
+        fun `저장된 상태가 기대한 상태일 때만 갱신한다`() =
+            runBlocking<Unit> {
+                val lotId: Long = lot("COND", today.plusDays(10), LotStatus.NORMAL)
+                val loaded: Lot = checkNotNull(adapter.findById(lotId))
+                loaded.refreshStatus(today, 30)
+
+                assertThat(adapter.updateStatus(loaded, LotStatus.EXPIRED)).isFalse()
+                assertThat(adapter.findById(lotId)?.lotStatus).isEqualTo(LotStatus.NORMAL)
+                assertThat(adapter.updateStatus(loaded, LotStatus.NORMAL)).isTrue()
+                assertThat(adapter.findById(lotId)?.lotStatus).isEqualTo(LotStatus.EXPIRING_SOON)
+                assertThat(auditColumns(lotId)["updated_by"]).isEqualTo(LocalActorProvider.LOCAL_USER.auditName)
+            }
+    }
+
+    @Nested
     inner class `스키마` {
         @Test
         fun `LotStatus와 DB CHECK 제약의 값이 일치한다`() =
