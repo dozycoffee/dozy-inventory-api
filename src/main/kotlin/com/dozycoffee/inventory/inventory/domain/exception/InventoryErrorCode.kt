@@ -25,6 +25,11 @@ enum class InventoryErrorCode(
         "INV_INVALID_INBOUND_QUALITY_STATUS",
         "입고 품질 상태는 NORMAL 또는 DEFECTIVE여야 합니다.",
     ),
+    INVALID_DISPOSAL_QUALITY_STATUS(
+        ErrorType.VALIDATION,
+        "INV_INVALID_DISPOSAL_QUALITY_STATUS",
+        "폐기는 불량 또는 폐기 예정 품질 상태의 재고만 할 수 있습니다.",
+    ),
     LOT_MISMATCH(ErrorType.CONFLICT, "INV_LOT_MISMATCH", "이미 등록된 Lot과 제조일자 또는 유통기한이 다릅니다."),
     INVALID_ALLOCATION_REQUEST(
         ErrorType.VALIDATION,

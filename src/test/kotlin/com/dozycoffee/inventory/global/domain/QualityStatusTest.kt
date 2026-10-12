@@ -11,4 +11,11 @@ class QualityStatusTest {
         assertTrue(QualityStatus.DEFECTIVE.isInspectionResult)
         assertFalse(QualityStatus.DISPOSAL_SCHEDULED.isInspectionResult)
     }
+
+    @Test
+    fun `폐기할 수 있는 것은 불량과 폐기 예정이고 정상은 아니다`() {
+        assertFalse(QualityStatus.NORMAL.isDisposable)
+        assertTrue(QualityStatus.DEFECTIVE.isDisposable)
+        assertTrue(QualityStatus.DISPOSAL_SCHEDULED.isDisposable)
+    }
 }
