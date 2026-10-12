@@ -20,7 +20,7 @@
 |------|------|
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | MySQL 주소와 스키마(`dozy_inventory`) |
 | `DB_USERNAME`, `DB_PASSWORD` | MySQL 계정. **비밀**이라 시크릿 매니저 등으로 주입한다 |
-| `KAFKA_BOOTSTRAP_SERVERS` | Kafka 주소. Outbox 이벤트 발행과 직원 소속 이벤트 수신에 쓴다 |
+| `KAFKA_BOOTSTRAP_SERVERS` | Kafka 주소. Outbox 이벤트 발행과 직원 소속 이벤트 수신에 쓴다. 이름이 풀리지 않는 호스트면 컨슈머가 기동 단계에서 실패하고, 이름은 풀리지만 브로커가 죽어 있으면 기동은 되고 재시도한다 |
 | `AUTH_ISSUER_BASE_URI` | `dozy-auth` 주소. 토큰 검증용 JWKS를 여기서 받는다 |
 
 ### 선택
