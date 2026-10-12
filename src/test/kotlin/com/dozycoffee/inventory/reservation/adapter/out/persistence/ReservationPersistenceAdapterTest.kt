@@ -443,6 +443,58 @@ class ReservationPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `재고 행으로 예약 조회` {
+        private suspend fun changeStatus(
+            id: Long,
+            status: String,
+        ) {
+            databaseClient
+                .sql("UPDATE reservation SET status = :status WHERE reservation_id = :id")
+                .bind("status", status)
+                .bind("id", id)
+                .fetch()
+                .rowsUpdated()
+                .awaitSingle()
+        }
+
+        @Test
+        fun `주어진 재고 행에 할당된 지정한 상태의 예약을 ID 순서로 한 번씩만 반환한다`() =
+            runBlocking<Unit> {
+                val first: Long = checkNotNull(adapter.save(reservation("k-1", "ORDER-1")).reservationId)
+                val second: Long = checkNotNull(adapter.save(reservation("k-2", "ORDER-2")).reservationId)
+                val confirmed: Long = checkNotNull(adapter.save(reservation("k-3", "ORDER-3")).reservationId)
+                changeStatus(confirmed, "CONFIRMED")
+
+                assertThat(adapter.findIdsByInventoryIds(setOf(firstInventoryId, secondInventoryId), ReservationStatus.RESERVED))
+                    .containsExactly(first, second)
+                assertThat(adapter.findIdsByInventoryIds(setOf(firstInventoryId), ReservationStatus.CONFIRMED)).containsExactly(confirmed)
+            }
+
+        @Test
+        fun `할당이 없는 재고 행과 빈 집합은 결과가 없다`() =
+            runBlocking<Unit> {
+                adapter.save(reservation())
+                val unused: Long =
+                    fixture.insertInventory(
+                        20L,
+                        productId,
+                        checkNotNull(lotAdapter.findById(1L)?.lotId ?: fixture.seedLot(productId, "Z").lotId),
+                    )
+
+                assertThat(adapter.findIdsByInventoryIds(setOf(unused), ReservationStatus.RESERVED)).isEmpty()
+                assertThat(adapter.findIdsByInventoryIds(emptySet(), ReservationStatus.RESERVED)).isEmpty()
+            }
+
+        @Test
+        fun `다른 상품의 재고 행에 할당된 예약도 그 재고 행으로 찾는다`() =
+            runBlocking<Unit> {
+                val id: Long = checkNotNull(adapter.save(reservation()).reservationId)
+
+                assertThat(adapter.findIdsByInventoryIds(setOf(otherInventoryId), ReservationStatus.RESERVED)).containsExactly(id)
+            }
+    }
+
+    @Nested
     inner class `만료된 예약 조회` {
         private suspend fun saveExpiring(
             orderId: String,
