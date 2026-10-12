@@ -9,7 +9,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 |----|------|-----------|
 | 2 | 재고 모델: 총 수량·예약 수량·가용 수량(= 총 − 예약), 품질 상태 `NORMAL`/`DEFECTIVE`/`DISPOSAL_SCHEDULED` | 아래 요약 + [erd.md](erd.md) |
 | 3 | 입고 확정 반영 (3.1) | 아래 "입고 확정 반영" |
-| 4 | 재고 조회: 가용 재고(채널용), 현황·상세(관리자용), 이력 | 이식 전 |
+| 4 | 재고 조회: 가용 재고(채널용), 현황·상세(관리자용), 이력 | 아래 "가용 재고 조회", "관리자 재고 현황·상세·이력" |
 | 5 | 재고 예약: 요청, 확정 → WMS 출고 지시, 해제 | 이식 전 |
 | 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
 | 7 | 반품 복귀 (7.1) | 아래 "반품 복귀" |
@@ -69,6 +69,15 @@ OMS·가맹점 서비스가 주문 가능 여부를 판단하도록 상품별 �
 - **창고 선택**: 가맹점 기준으로 근처 창고 목록과 최적 창고 선택은 호출 서비스(OMS·Store) 소관이다. inventory는 창고별 수량을 주고 지정한 창고에서 예약한다. 전체 창고×전체 상품 목록은 채널용 조회에 두지 않고 관리자 재고 현황(4.2)이 맡는다.
 - **호출 권한**: `inventory:service`와 `inventory:admin`이다(창고 관리자는 창고 접근 제어(F-021) 이후).
 - **API**: `GET /api/v1/inventories/availability?productIds=1,2,3&warehouseIds=10,20`. 목록은 쉼표로 구분하고(반복 파라미터도 받는다) 중복 ID는 합친다. 응답의 상품은 ID 오름차순, 창고는 ID 오름차순이다. 조건 위반은 400 `INV_INVALID_AVAILABILITY_QUERY`, 파라미터 누락·형식 오류는 400 `VALIDATION_FAILED`이다.
+
+### 관리자 재고 현황·상세·이력 (4.2)
+
+본사 관리자가 재고를 살펴보고 변동을 추적한다. 결정 배경은 [ADR-0030](adr/0030-admin-inventory-query.md)이다.
+
+- **현황**: `GET /api/v1/inventories`. 한 줄은 재고 행(창고 × Lot × 품질 상태)이고 총·예약·가용 수량, 품질 상태, 할당 보류(사유·시각), Lot 번호·제조일자·유통기한·Lot 상태를 준다. 조건(`warehouseId`, `productId`, `qualityStatus`, `lotStatus`, `allocationHold`)은 모두 선택이고 조건 없이 부르면 전체를 준다. 정렬은 `창고, 상품, 유통기한(없는 Lot은 마지막), ID`, 페이지는 `page`(0부터)와 `size`(1~100, 기본 20)다.
+- **상세**: `GET /api/v1/inventories/{inventoryId}`. 없으면 404(`INV_INVENTORY_NOT_FOUND`).
+- **이력**: `GET /api/v1/inventories/{inventoryId}/histories`. 수량 변동 이력을 최신순 페이지로 준다(유형, 변동량, 변경 후 총 수량, 원인 문서, 멱등 키, 요청 주체, 생성 시각).
+- **권한**: `inventory:admin`만. 창고 관리자는 창고 접근 제어(F-021) 이후에 연다. 상품 이름은 주지 않고 `productId`만 준다.
 
 ### 예약 생성 (5.1)
 

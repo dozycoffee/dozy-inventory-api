@@ -8,6 +8,9 @@ import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandidate
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
+import com.dozycoffee.inventory.inventory.application.port.out.InventoryRow
+import com.dozycoffee.inventory.inventory.application.port.out.InventorySearchCondition
+import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
 import com.dozycoffee.inventory.inventory.domain.exception.AllocationHeldException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
@@ -719,6 +722,109 @@ class InventoryPersistenceAdapterTest {
 
                 assertThat(candidates.map { it.productId to it.inventoryId }).containsExactlyInAnyOrder(productId to a, other to b)
                 assertThat(adapter.findAllocationCandidates(10L, emptySet(), today)).isEmpty()
+            }
+    }
+
+    @Nested
+    inner class `관리자 재고 현황 조회` {
+        private val all = InventorySearchCondition(null, null, null, null, null)
+
+        private suspend fun lotOf(
+            product: Long,
+            number: String,
+            expiration: LocalDate?,
+            status: String = "NORMAL",
+        ): Long {
+            val id: Long = checkNotNull(fixture.seedLot(product, number, expiration).lotId)
+            databaseClient
+                .sql("UPDATE lot SET lot_status = :status WHERE lot_id = :id")
+                .bind("status", status)
+                .bind("id", id)
+                .fetch()
+                .rowsUpdated()
+                .awaitFirst()
+            return id
+        }
+
+        @Test
+        fun `Lot 정보와 수량과 보류를 합쳐 한 행으로 조회한다`() =
+            runBlocking<Unit> {
+                val held: Long = fixture.insertInventory(10L, productId, lotId, quantity = 10, reservedQuantity = 4, hold = true)
+
+                val row: InventoryRow = checkNotNull(adapter.findRowById(held))
+
+                assertThat(row.inventoryId).isEqualTo(held)
+                assertThat(row.lotNumber).isEqualTo("LOT-A")
+                assertThat(row.manufactureDate).isNotNull()
+                assertThat(row.expirationDate).isNotNull()
+                assertThat(row.lotStatus).isEqualTo(LotStatus.NORMAL)
+                assertThat(row.qualityStatus).isEqualTo(QualityStatus.NORMAL)
+                assertThat(row.quantity).isEqualTo(10)
+                assertThat(row.reservedQuantity).isEqualTo(4)
+                assertThat(row.availableQuantity).isEqualTo(6)
+                assertThat(row.allocationHold).isTrue()
+                assertThat(row.holdReason).isEqualTo("테스트 보류")
+                assertThat(row.heldAt).isNotNull()
+                assertThat(row.createdAt).isNotNull()
+                assertThat(adapter.findRowById(held + 1000)).isNull()
+            }
+
+        @Test
+        fun `조건이 없으면 전체를 창고 상품 유통기한 순서로 주고 유통기한이 없는 Lot은 마지막이다`() =
+            runBlocking<Unit> {
+                val other: Long = fixture.seedProduct("BEAN-002")
+                val noDate: Long = lotOf(productId, "ND", null)
+                val late: Long = lotOf(productId, "LATE", LocalDate.of(2027, 6, 1))
+                val early: Long = lotOf(productId, "EARLY", LocalDate.of(2027, 1, 1))
+                val otherLot: Long = lotOf(other, "O", LocalDate.of(2027, 1, 1))
+                val w20: Long = fixture.insertInventory(20L, productId, early)
+                val a: Long = fixture.insertInventory(10L, productId, noDate)
+                val b: Long = fixture.insertInventory(10L, productId, late)
+                val c: Long = fixture.insertInventory(10L, productId, early)
+                val d: Long = fixture.insertInventory(10L, other, otherLot)
+
+                assertThat(adapter.search(all, 0L, 100).map { it.inventoryId }).containsExactly(c, b, a, d, w20)
+                assertThat(adapter.count(all)).isEqualTo(5L)
+            }
+
+        @Test
+        fun `조건을 모두 만족하는 행만 준다`() =
+            runBlocking<Unit> {
+                val expiring: Long = lotOf(productId, "SOON", LocalDate.of(2027, 1, 1), "EXPIRING_SOON")
+                val normal: Long = fixture.insertInventory(10L, productId, lotId)
+                val defective: Long = fixture.insertInventory(10L, productId, lotId, "DEFECTIVE")
+                val held: Long = fixture.insertInventory(10L, productId, expiring, hold = true)
+                val otherWarehouse: Long = fixture.insertInventory(20L, productId, expiring)
+
+                fun ids(condition: InventorySearchCondition) = runBlocking { adapter.search(condition, 0L, 100).map { it.inventoryId } }
+
+                assertThat(ids(InventorySearchCondition(10L, null, null, null, null))).containsExactlyInAnyOrder(normal, defective, held)
+                assertThat(ids(InventorySearchCondition(null, productId, QualityStatus.DEFECTIVE, null, null))).containsExactly(defective)
+                assertThat(ids(InventorySearchCondition(null, null, null, LotStatus.EXPIRING_SOON, null)))
+                    .containsExactlyInAnyOrder(held, otherWarehouse)
+                assertThat(ids(InventorySearchCondition(null, null, null, null, true))).containsExactly(held)
+                assertThat(ids(InventorySearchCondition(10L, null, null, LotStatus.EXPIRING_SOON, true))).containsExactly(held)
+                assertThat(ids(InventorySearchCondition(99L, null, null, null, null))).isEmpty()
+                assertThat(adapter.count(InventorySearchCondition(null, null, null, null, false))).isEqualTo(3L)
+            }
+
+        @Test
+        fun `페이지 위치와 크기로 나눠 주고 전체 개수는 필터에 맞게 센다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> =
+                    (1..5).map {
+                        fixture.insertInventory(
+                            10L,
+                            productId,
+                            checkNotNull(fixture.seedLot(productId, "P$it", LocalDate.of(2027, 1, it)).lotId),
+                        )
+                    }
+
+                assertThat(adapter.search(all, 0L, 2).map { it.inventoryId }).containsExactlyElementsOf(ids.take(2))
+                assertThat(adapter.search(all, 2L, 2).map { it.inventoryId }).containsExactlyElementsOf(ids.slice(2..3))
+                assertThat(adapter.search(all, 4L, 2).map { it.inventoryId }).containsExactly(ids[4])
+                assertThat(adapter.search(all, 10L, 2)).isEmpty()
+                assertThat(adapter.count(all)).isEqualTo(5L)
             }
     }
 

@@ -37,6 +37,22 @@ interface InventoryRepository {
         today: LocalDate,
     ): List<AllocationCandidate>
 
+    /**
+     * 재고 현황을 `창고, 상품, 유통기한(없는 Lot은 마지막), 재고 행 ID` 순서로 [offset]부터 최대 [limit]개 반환한다.
+     * 읽기 전용이며 락을 걸지 않는다.
+     */
+    suspend fun search(
+        condition: InventorySearchCondition,
+        offset: Long,
+        limit: Int,
+    ): List<InventoryRow>
+
+    /** [condition]을 만족하는 재고 행의 개수 */
+    suspend fun count(condition: InventorySearchCondition): Long
+
+    /** 재고 행과 그 Lot을 합쳐 하나 조회한다 */
+    suspend fun findRowById(inventoryId: Long): InventoryRow?
+
     /** Lot의 [qualityStatus] 행을 모든 창고에서 `inventory_id` 오름차순으로 반환한다 */
     suspend fun findAllByLot(
         lotId: Long,
