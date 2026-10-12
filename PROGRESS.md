@@ -7,6 +7,7 @@
 - 패키지 구조 확정(ADR-0010): 도메인 모델과 영속성 엔티티 분리(도메인은 감사 필드를 모름), 다른 도메인은 UseCase로만 호출, 도메인 패키지 6개, `/api/v1`. F-005(상품 마스터)는 사용자가 직접 구현한다.
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
 - 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겨 완료했다. `dozy-auth` 서버에 `inventory` audience, role 3개, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`). 실제 서버와 연동을 확인하거나 배포하기 전에 관리자 API로 등록한다.
+- 진행 중: F-023(공통 이벤트 형식). 설계는 ADR-0038과 `docs/events.md`로 확정했고(1단계), 구현은 2~4단계가 남았다.
 - 미확정: `reservation.channel` 값(채널 종류), 캐시 도입 시점.
 
 ## 세션 로그
@@ -58,9 +59,14 @@
 - 마이그레이션을 정리했다(ADR-0021): 서비스 첫 배포 전까지는 파일을 합치거나 고칠 수 있다. V1 = 테이블·유니크·CHECK(`inventory_quantity`를 처음부터 올바른 이름으로), V2 = 인덱스(16개, 외래키보다 먼저), V3 = 외래키. 이전 V3(컬럼 이름 변경)·V4(인덱스)는 없앴고 이전/이후 스키마가 같음을 별도 MySQL로 비교해 확인했다. 첫 배포 이후에는 다시 새 버전 파일만 추가한다. **로컬 DB는 체크섬 불일치로 기동이 실패하므로 `docker compose down -v`로 다시 만든다.**
 - Outbox 데드 레터(ADR-0037): 발행기가 영구 실패 이벤트 하나 때문에 뒤를 모두 막던 문제를 풀었다. `outbox_event.status`에 `DEAD`를 더하고 `last_error`·`dead_at`을 남긴다(V1 직접 수정, ADR-0021). 같은 토픽의 다른 이벤트가 같은 실행에서 성공했는데 이 이벤트만 실패하면(이벤트 고유의 실패, 사용자 확인) 시도 횟수를 세고 `inventory.outbox.publisher.max-attempts`(기본 20)에 이르면 격리하며 `OUTBOX_EVENT_DEAD` ERROR 로그를 남긴다. 브로커 장애처럼 토픽 전체가 실패하면 세지 않아 이벤트를 잃지 않는다. 실패한 이벤트와 같은 키의 뒤 이벤트는 그 실행에서만 건너뛰고 다른 키는 계속 발행하며(격리된 뒤 같은 키의 뒤 이벤트는 그대로 계속 발행, 사용자 확인) 연속 5건 실패하면 그 실행을 끝낸다. 복구 수단은 관리자 API(사용자 확인): `GET /api/v1/outbox-events`(격리 목록), `GET .../{id}`, `POST .../{id}/requeue`(`inventory:admin`). 런북·설정·ERD 문서를 갱신했다. 한계: 한 토픽 전체가 영구 실패하면 격리되지 않고(알림 대상), 격리 이벤트 삭제 정책은 🔶 미정이다.
 
+### 2026-10-12
+
+- F-023 1단계: MSA 공통 이벤트 형식을 확정했다(ADR-0038, 사용자 확인). 이벤트 ID는 Long(`outbox_event_id`)에서 UUID(v7 권장, 저장 시점 생성, 재발행해도 유지)로 바꾸고 헤더와 payload에 같은 값을 둔다. 값은 공통 메타(`eventId`, `eventType`, `eventVersion`, `occurredAt`, `source`)를 최상위에, 도메인 본문을 `data`에 두는 envelope이다. 헤더는 `event-version`, `source`, W3C `traceparent`를 더하고 `aggregate-id`·파티션 키는 문자열로 규정한다. `null` 필드는 생략한다. `eventType`·토픽 이름 규칙은 유지한다. 배포 전이라 호환 계층 없이 한 번에 전환한다. `docs/events.md`를 새 형식으로 고쳤다(실제 발행은 2~4단계 구현 전까지 이전 형식). 코드는 바꾸지 않았다.
+
 ## 다음 세션에서 할 일
 
-1. 로드맵의 모든 기능이 완료됐다. WMS 프로젝트에서 직원 창고 소속 변경 이벤트 발행(`docs/events.md`)과 창고 수량 조회 API(`docs/adr/0033-reconciliation.md`)를 구현해 연동한다. 변경 API는 `Idempotency-Key` 헤더를 쓴다. 테스트는 `@Nested`로 묶는다.
+0. F-023 2단계: `outbox_event`에 `event_id`(UUID v7)·추적 컨텍스트 컬럼을 V1에 추가하고 헤더(`event-version`, `source`, `traceparent`)를 확장한다. 3단계(envelope 직렬화 공통화), 4단계(발행기별 이전·테스트 갱신)가 이어진다. 시작 전에 OMS·WMS·Store가 운영 중이 아닌지, WMS `WAREHOUSE_ACCESS_CHANGED`의 envelope 전환 여부를 확인한다.
+1. 로드맵의 나머지 기능은 완료됐다. WMS 프로젝트에서 직원 창고 소속 변경 이벤트 발행(`docs/events.md`)과 창고 수량 조회 API(`docs/adr/0033-reconciliation.md`)를 구현해 연동한다. 변경 API는 `Idempotency-Key` 헤더를 쓴다. 테스트는 `@Nested`로 묶는다.
 2. 실제 서버 연동 확인·배포 전에 `dozy-auth`에 `inventory` audience, `inventory:service`·`inventory:warehouse_manager`·`inventory:admin` role, system client(`svc-wms`, `svc-oms`, `svc-store`)를 등록한다(사용자 작업).
 3. 운영 환경의 Kafka 클러스터 주소(`KAFKA_BOOTSTRAP_SERVERS`)와 토픽 파티션·복제 수를 정한다(🔶 미확정).
 4. Dependabot이 제외 규칙대로 동작하는지 다음 점검 때 확인한다.
