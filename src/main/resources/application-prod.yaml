@@ -1,0 +1,20 @@
+# 운영(prod) 프로필. 기본 설정(application.yaml)의 로컬 개발용 기본값(localhost, root 등)을 없애,
+# 환경변수를 빠뜨리면 엉뚱한 곳(localhost)에 붙는 대신 기동 단계에서 바로 실패하게 한다(ADR-0036).
+# local 프로필은 인증을 우회하므로 이 프로필과 함께 켤 수 없다(LocalProfileGuard).
+spring:
+  r2dbc:
+    url: r2dbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  flyway:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    user: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+dozy:
+  auth:
+    issuer-base-uri: ${AUTH_ISSUER_BASE_URI}

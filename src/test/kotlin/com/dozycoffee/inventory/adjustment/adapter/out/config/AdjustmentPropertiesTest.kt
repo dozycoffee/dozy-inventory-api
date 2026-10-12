@@ -37,6 +37,19 @@ class AdjustmentPropertiesTest {
     }
 
     @Test
+    fun `카테고리 이름은 대소문자를 구분하지 않고 찾는다(환경변수로 넘기면 맵 키가 소문자가 된다)`() {
+        val properties: AdjustmentProperties =
+            bind(
+                "inventory.adjustment.approval-threshold.default" to "100",
+                "inventory.adjustment.approval-threshold.categories.bean" to "20",
+            )
+
+        assertEquals(20, properties.approvalThreshold.forCategory("BEAN"))
+        assertEquals(20, properties.approvalThreshold.forCategory("bean"))
+        assertEquals(100, properties.approvalThreshold.forCategory("SYRUP"))
+    }
+
+    @Test
     fun `임계치는 0 이상이어야 한다`() {
         assertThrows<IllegalArgumentException> { AdjustmentProperties.ApprovalThreshold(-1) }
         assertThrows<IllegalArgumentException> { AdjustmentProperties.ApprovalThreshold(10, mapOf("BEAN" to -1)) }

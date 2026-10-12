@@ -14,6 +14,9 @@ data class ReservationProperties(
         @DefaultValue("1h") val default: Duration,
         val channels: Map<String, Duration> = emptyMap(),
     ) {
-        fun forChannel(channel: String): Duration = channels[channel] ?: default
+        /** 환경변수로 넘기면 맵 키가 소문자가 되므로 채널 이름은 대소문자를 구분하지 않고 찾는다 */
+        private val byChannel: Map<String, Duration> = channels.mapKeys { it.key.lowercase() }
+
+        fun forChannel(channel: String): Duration = byChannel[channel.lowercase()] ?: default
     }
 }

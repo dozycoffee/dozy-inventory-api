@@ -32,6 +32,19 @@ class ReservationPropertiesTest {
     }
 
     @Test
+    fun `채널 이름은 대소문자를 구분하지 않고 찾는다(환경변수로 넘기면 맵 키가 소문자가 된다)`() {
+        val properties: ReservationProperties =
+            bind(
+                "inventory.reservation.max-ttl.default" to "1h",
+                "inventory.reservation.max-ttl.channels.store" to "48h",
+            )
+
+        assertEquals(Duration.ofHours(48), properties.maxTtl.forChannel("STORE"))
+        assertEquals(Duration.ofHours(48), properties.maxTtl.forChannel("store"))
+        assertEquals(Duration.ofHours(1), properties.maxTtl.forChannel("OMS"))
+    }
+
+    @Test
     fun `아무 설정이 없어도 기본값은 1시간이다`() {
         assertEquals(Duration.ofHours(1), bind().maxTtl.default)
     }
