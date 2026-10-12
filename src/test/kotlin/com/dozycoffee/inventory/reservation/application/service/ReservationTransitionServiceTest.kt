@@ -409,4 +409,66 @@ class ReservationTransitionServiceTest {
                 verifyBlocking(publisher, never()) { publish(any()) }
             }
     }
+
+    @Nested
+    inner class `강제 해제` {
+        @Test
+        fun `확정 전 예약을 해제하고 수량을 되돌리며 사유가 있는 이력과 이벤트를 남긴다`() =
+            runBlocking<Unit> {
+                found(reservation())
+
+                assertEquals(true, service.forceRelease(1L, "LOT_EXPIRED"))
+
+                verifyBlocking(reservationRepository) { updateState(any(), eq(ReservationStatus.RESERVED)) }
+                val command = argumentCaptor<ReleaseInventoryCommand>()
+                verifyBlocking(releaseInventoryUseCase) { release(command.capture()) }
+                assertEquals(3, command.firstValue.items.size)
+                val history = argumentCaptor<ReservationEvent>()
+                verifyBlocking(reservationEventRepository) { save(history.capture()) }
+                assertEquals(ReservationEventType.FORCE_RELEASED, history.firstValue.eventType)
+                assertEquals("""{"reason":"LOT_EXPIRED"}""", history.firstValue.detail)
+                val published = argumentCaptor<ReservationChangedEvent>()
+                verifyBlocking(publisher) { publish(published.capture()) }
+                assertEquals(ReservationChangeType.FORCE_RELEASED, published.firstValue.changeType)
+                assertEquals("LOT_EXPIRED", published.firstValue.reason)
+            }
+
+        @Test
+        fun `없는 예약과 확정된 예약과 이미 해제된 예약은 처리하지 않고 false다`() =
+            runBlocking<Unit> {
+                whenever(reservationRepository.findById(1L))
+                    .thenReturn(null)
+                    .thenReturn(reservation(ReservationStatus.CONFIRMED, null))
+                    .thenReturn(reservation(ReservationStatus.RELEASED, null))
+
+                assertEquals(false, service.forceRelease(1L, "LOT_EXPIRED"))
+                assertEquals(false, service.forceRelease(1L, "LOT_EXPIRED"))
+                assertEquals(false, service.forceRelease(1L, "LOT_EXPIRED"))
+
+                verifyNothingWritten()
+            }
+
+        @Test
+        fun `확정과 겹쳐 저장에서 밀리면 수량을 되돌리지 않고 false다`() =
+            runBlocking<Unit> {
+                whenever(reservationRepository.findById(1L)).thenReturn(reservation())
+                whenever(reservationRepository.updateState(any(), any())).thenReturn(false)
+
+                assertEquals(false, service.forceRelease(1L, "LOT_EXPIRED"))
+
+                verifyBlocking(releaseInventoryUseCase, never()) { release(any()) }
+                verifyBlocking(reservationEventRepository, never()) { save(any()) }
+                verifyBlocking(publisher, never()) { publish(any()) }
+            }
+
+        @Test
+        fun `사유가 비어 있거나 형식이 맞지 않으면 거부한다`() =
+            runBlocking<Unit> {
+                listOf("", " ", "lot_expired", "LOT EXPIRED", "1LOT", "A".repeat(51), "LOT\"X").forEach { reason ->
+                    assertThrows<InvalidDomainValueException> { service.forceRelease(1L, reason) }
+                }
+
+                verifyBlocking(reservationRepository, never()) { findById(any()) }
+            }
+    }
 }

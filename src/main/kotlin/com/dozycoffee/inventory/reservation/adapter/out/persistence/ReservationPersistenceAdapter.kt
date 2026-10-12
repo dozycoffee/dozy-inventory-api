@@ -128,6 +128,20 @@ class ReservationPersistenceAdapter(
             .flow()
             .toList()
 
+    override suspend fun findIdsByInventoryIds(
+        inventoryIds: Set<Long>,
+        status: ReservationStatus,
+    ): List<Long> {
+        if (inventoryIds.isEmpty()) return emptyList()
+        return databaseClient
+            .sql(FIND_IDS_BY_INVENTORY_IDS)
+            .bind("inventoryIds", inventoryIds.toList())
+            .bind("status", status.name)
+            .map { row, _ -> checkNotNull(row.get("reservation_id", Long::class.javaObjectType)) }
+            .flow()
+            .toList()
+    }
+
     override suspend fun findByIdempotencyKey(idempotencyKey: IdempotencyKey): Reservation? =
         reservationR2dbcRepository.findByIdempotencyKey(idempotencyKey.value)?.let { load(it) }
 
@@ -162,6 +176,16 @@ class ReservationPersistenceAdapter(
             UPDATE reservation_allocation
                SET fulfilled_quantity = :fulfilledQuantity, updated_at = :now, updated_by = :actor
              WHERE reservation_allocation_id = :allocationId
+            """
+
+        const val FIND_IDS_BY_INVENTORY_IDS: String =
+            """
+            SELECT DISTINCT r.reservation_id
+              FROM reservation r
+              JOIN reservation_item ri ON ri.reservation_id = r.reservation_id
+              JOIN reservation_allocation ra ON ra.reservation_item_id = ri.reservation_item_id
+             WHERE ra.inventory_id IN (:inventoryIds) AND r.status = :status
+             ORDER BY r.reservation_id
             """
 
         const val FIND_EXPIRED_IDS: String =

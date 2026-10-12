@@ -39,6 +39,12 @@ interface ReservationRepository {
         expectedStatus: ReservationStatus,
     ): Boolean
 
+    /** 주어진 재고 행에 수량을 할당받은 [status] 상태의 예약 ID를 ID 오름차순으로 반환한다 */
+    suspend fun findIdsByInventoryIds(
+        inventoryIds: Set<Long>,
+        status: ReservationStatus,
+    ): List<Long>
+
     /** 만료 시각이 [now] 이하인 확정 전 예약의 ID를 만료 시각이 이른 순으로 최대 [limit]개 반환한다 */
     suspend fun findExpiredIds(
         now: LocalDateTime,

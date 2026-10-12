@@ -134,6 +134,14 @@ class Reservation private constructor(
         shipments.keys == allocations.map(ReservationAllocation::inventoryId).toSet() &&
             allocations.all { shipments[it.inventoryId] == it.fulfilledQuantity }
 
+    /** 확정 전 예약을 시스템이 강제로 해제한다(유통기한 경과 등). 확정 전이 아니면 바꾸지 않고 false를 반환한다 */
+    fun forceRelease(): Boolean {
+        if (status != ReservationStatus.RESERVED) return false
+        status = ReservationStatus.RELEASED
+        expiry = expiry.cleared()
+        return true
+    }
+
     /** 만료 시각이 지난 확정 전 예약을 만료 처리한다. 대상이 아니면 바꾸지 않고 false를 반환한다 */
     fun expire(now: LocalDateTime): Boolean {
         if (status != ReservationStatus.RESERVED || !expiry.isExpiredAt(now)) return false

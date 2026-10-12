@@ -21,6 +21,11 @@ enum class ReservationErrorCode(
         "INV_INVALID_RESERVATION_ITEMS",
         "예약 상품은 1개 이상 100개 이하이고 중복될 수 없으며 수량은 1 이상이고 할당 수량의 합과 같아야 합니다.",
     ),
+    INVALID_FORCE_RELEASE_REASON(
+        ErrorType.VALIDATION,
+        "INV_INVALID_FORCE_RELEASE_REASON",
+        "강제 해제 사유는 영문 대문자로 시작하는 영문 대문자, 숫자, 밑줄 50자 이하여야 합니다.",
+    ),
     INVALID_RESERVATION_STATE(
         ErrorType.CONFLICT,
         "INV_INVALID_RESERVATION_STATE",

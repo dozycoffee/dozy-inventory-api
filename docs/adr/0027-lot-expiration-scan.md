@@ -16,6 +16,7 @@ Accepted (2026-10-11). 구현은 계층별 PR로 나눈다: (1) inventory의 Lot
 4. **전환 이력은 `QUALITY_TRANSFER`로 전환 전 행에 −N, 전환 후 행에 +N을 남긴다.** 원인 문서는 `LOT_EXPIRATION`(Lot ID)이고 멱등 키는 `lot-expiration-{lotId}-{날짜}`다. 같은 날 같은 Lot을 다시 처리하면 이력의 유니크 제약에 걸려 한 번만 반영된다. 재고 증감 이벤트는 발행하지 않는다(시나리오 결정 13). 요청 주체는 `scheduler`다.
 5. **확정 전(`RESERVED`) 예약은 강제 해제하고 확정된(`CONFIRMED`) 예약은 건너뛰며 이벤트로 알린다**(시나리오 결정 6). 알림은 별도 예약 이벤트가 아니라 `Lot 경과` 이벤트 하나에 확정 예약 ID 목록을 담는다. 이벤트와 강제 해제는 2, 3단계에서 구현한다.
 6. **`Lot 경과` 이벤트로 WMS가 폐기 신청을 만든다**(시나리오 결정 7). 이벤트(집계 `LOT`)는 Lot의 상태가 경과로 바뀌었거나 이번 스캔에서 전환한 수량이 있을 때 Lot마다 한 건 발행하고 행별 전환 수량과 건너뛴 확정 예약 ID를 담는다(3단계에서 계약을 확정한다).
+7. **강제 해제는 예약 하나씩 `ForceReleaseReservationUseCase.forceRelease(예약 ID, 사유)`로 한다.** 확정 전(`RESERVED`) 예약만 `RELEASED`로 바꾸고 예약 수량을 되돌리며, 이미 확정·해제·만료·출고되었거나 확정과 겹쳐 조건부 UPDATE에서 밀리면 아무것도 하지 않고 false다(확정이 이긴다). 이력은 `FORCE_RELEASED`(상세에 사유), 이벤트는 `RESERVATION_FORCE_RELEASED`이며 payload에 사유 코드 `reason`을 담는다(다른 예약 이벤트에는 필드가 없다). 사유는 `LOT_EXPIRED` 같은 영문 대문자·숫자·밑줄 50자 이하의 코드다. 대상 예약은 `FindReservationsByInventoryUseCase`로 재고 행 ID에서 찾는다(확정 전과 확정을 나눠서). 잠금 순서는 예약 행 → 재고 행 `inventory_id` 오름차순으로 기존과 같다.
 
 ## 결과 (Consequences)
 

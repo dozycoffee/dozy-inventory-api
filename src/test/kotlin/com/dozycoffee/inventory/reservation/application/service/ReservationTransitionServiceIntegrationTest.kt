@@ -7,6 +7,8 @@ import com.dozycoffee.inventory.reservation.application.port.`in`.ConfirmReserva
 import com.dozycoffee.inventory.reservation.application.port.`in`.CreateReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ExpireReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ExtendReservationUseCase
+import com.dozycoffee.inventory.reservation.application.port.`in`.FindReservationsByInventoryUseCase
+import com.dozycoffee.inventory.reservation.application.port.`in`.ForceReleaseReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.ReleaseReservationUseCase
 import com.dozycoffee.inventory.reservation.application.port.`in`.command.CreateReservationCommand
 import com.dozycoffee.inventory.reservation.application.port.`in`.command.ExtendReservationCommand
@@ -49,6 +51,12 @@ class ReservationTransitionServiceIntegrationTest {
 
     @Autowired
     private lateinit var expireReservationUseCase: ExpireReservationUseCase
+
+    @Autowired
+    private lateinit var forceReleaseReservationUseCase: ForceReleaseReservationUseCase
+
+    @Autowired
+    private lateinit var findReservationsByInventoryUseCase: FindReservationsByInventoryUseCase
 
     @Autowired
     private lateinit var databaseClient: DatabaseClient
@@ -322,6 +330,96 @@ class ReservationTransitionServiceIntegrationTest {
 
                 assertThat(totalReserved()).isEqualTo(3L)
                 assertThat(events("EXPIRED") + events("RELEASED")).isEqualTo(1L)
+            }
+    }
+
+    @Nested
+    inner class `강제 해제` {
+        @Test
+        fun `확정 전 예약을 해제하고 수량을 되돌리며 사유가 있는 이력과 이벤트를 남긴다`() =
+            runBlocking<Unit> {
+                val created: ReservationResult = reserve()
+
+                assertThat(forceReleaseReservationUseCase.forceRelease(created.reservationId, "LOT_EXPIRED")).isTrue()
+
+                assertThat(
+                    scalar("SELECT COUNT(*) FROM reservation WHERE reservation_id = ${created.reservationId} AND status = 'RELEASED'"),
+                ).isEqualTo(1L)
+                assertThat(totalReserved()).isEqualTo(0L)
+                assertThat(events("FORCE_RELEASED")).isEqualTo(1L)
+                assertThat(
+                    scalar(
+                        "SELECT COUNT(*) FROM reservation_event WHERE event_type = 'FORCE_RELEASED' AND detail->>'$.reason' = 'LOT_EXPIRED'",
+                    ),
+                ).isEqualTo(1L)
+                assertThat(
+                    scalar(
+                        "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'RESERVATION_FORCE_RELEASED' AND payload->>'$.reason' = 'LOT_EXPIRED'",
+                    ),
+                ).isEqualTo(1L)
+            }
+
+        @Test
+        fun `확정된 예약은 강제 해제하지 않는다`() =
+            runBlocking<Unit> {
+                val created: ReservationResult = reserve()
+                confirmReservationUseCase.confirm(created.reservationId)
+
+                assertThat(forceReleaseReservationUseCase.forceRelease(created.reservationId, "LOT_EXPIRED")).isFalse()
+
+                assertThat(totalReserved()).isEqualTo(6L)
+                assertThat(events("FORCE_RELEASED")).isEqualTo(0L)
+            }
+
+        @Test
+        fun `같은 예약을 동시에 강제 해제해도 한 번만 처리되고 수량은 한 번만 돌아간다`() =
+            runBlocking<Unit> {
+                val created: ReservationResult = reserve()
+
+                val results: List<Boolean> =
+                    (1..10)
+                        .map {
+                            async(
+                                Dispatchers.IO,
+                            ) { forceReleaseReservationUseCase.forceRelease(created.reservationId, "LOT_EXPIRED") }
+                        }.awaitAll()
+
+                assertThat(results.count { it }).isEqualTo(1)
+                assertThat(totalReserved()).isEqualTo(0L)
+                assertThat(events("FORCE_RELEASED")).isEqualTo(1L)
+            }
+
+        @Test
+        fun `확정과 강제 해제가 겹치면 한쪽만 이긴다`() =
+            runBlocking<Unit> {
+                val created: ReservationResult = reserve()
+
+                val forced: Boolean =
+                    listOf(
+                        async(Dispatchers.IO) { forceReleaseReservationUseCase.forceRelease(created.reservationId, "LOT_EXPIRED") },
+                        async(Dispatchers.IO) { runCatching { confirmReservationUseCase.confirm(created.reservationId) }.isSuccess },
+                    ).awaitAll()[0]
+
+                val status: Long = scalar("SELECT COUNT(*) FROM reservation WHERE status = 'RELEASED'")
+                assertThat(status).isEqualTo(if (forced) 1L else 0L)
+                assertThat(totalReserved()).isEqualTo(if (forced) 0L else 6L)
+            }
+    }
+
+    @Nested
+    inner class `재고 행으로 예약 조회` {
+        @Test
+        fun `재고 행에 할당된 확정 전 예약과 확정된 예약을 나눠서 찾는다`() =
+            runBlocking<Unit> {
+                val unconfirmed: ReservationResult = reserve(quantity = 6, orderId = "ORDER-1")
+                val confirmed: ReservationResult = reserve(quantity = 2, orderId = "ORDER-2")
+                confirmReservationUseCase.confirm(confirmed.reservationId)
+
+                assertThat(
+                    findReservationsByInventoryUseCase.findUnconfirmedIds(setOf(early, late)),
+                ).containsExactly(unconfirmed.reservationId)
+                assertThat(findReservationsByInventoryUseCase.findConfirmedIds(setOf(early, late))).containsExactly(confirmed.reservationId)
+                assertThat(findReservationsByInventoryUseCase.findConfirmedIds(emptySet())).isEmpty()
             }
     }
 }

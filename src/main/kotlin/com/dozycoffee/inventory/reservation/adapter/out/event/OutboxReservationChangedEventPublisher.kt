@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.outbox.application.port.`in`.RecordOutboxEventUs
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangedEvent
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangedEventPublisher
+import com.fasterxml.jackson.annotation.JsonInclude
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
@@ -52,6 +53,7 @@ class OutboxReservationChangedEventPublisher(
         val externalOrderId: String,
         val items: List<Item>,
         val idempotencyKey: String,
+        @get:JsonInclude(JsonInclude.Include.NON_NULL) val reason: String? = null,
     ) {
         data class Item(
             val productId: Long,
@@ -85,6 +87,7 @@ class OutboxReservationChangedEventPublisher(
                         Item(item.productId, item.quantity, item.allocations.map { allocation -> allocationOf(allocation, lots) })
                     },
                     event.idempotencyKey,
+                    event.reason,
                 )
 
             private fun allocationOf(
