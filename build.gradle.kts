@@ -53,6 +53,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-kafka")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.flywaydb:flyway-mysql")
     implementation("com.dozycoffee.auth:auth-spring-boot-starter:$dozyAuthVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")

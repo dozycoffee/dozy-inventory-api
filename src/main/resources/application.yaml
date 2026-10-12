@@ -2,6 +2,10 @@ spring:
   application:
     name: dozy-inventory-api
 
+  lifecycle:
+    # 종료 신호를 받은 뒤 진행 중인 요청을 기다리는 최대 시간
+    timeout-per-shutdown-phase: 30s
+
   r2dbc:
     url: r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_NAME:dozy_inventory}?useSSL=false&serverTimezone=Asia/Seoul
     username: ${DB_USERNAME:root}
@@ -42,6 +46,10 @@ dozy:
   auth:
     audience: inventory
     accepted-realms: [internal]
+    # 헬스 체크는 배포 플랫폼의 probe와 로드밸런서가 토큰 없이 호출한다. 다른 actuator 엔드포인트는 노출하지 않는다
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
     # 다른 서비스(WMS)를 system client로 호출할 때 쓴다. 켜면 AUTH_CLIENT_ID·AUTH_CLIENT_SECRET이 필요하다(비밀은 환경변수로만 주입한다)
     client:
       enabled: ${AUTH_CLIENT_ENABLED:false}
@@ -105,3 +113,25 @@ inventory:
 
 server:
   port: ${SERVER_PORT:8082}
+  # SIGTERM을 받으면 새 요청을 거절하고(readiness 실패) 진행 중인 요청이 끝나길 기다린 뒤 종료한다
+  shutdown: graceful
+
+# 헬스 체크만 노출한다(메트릭 등은 관측성 작업에서 정한다). 상세 정보는 숨겨 상태(UP/DOWN)만 응답한다
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        # liveness는 프로세스가 살아 있는지만 본다. 외부 의존성이 죽었다고 재시작하면 장애가 커진다
+        liveness:
+          include: livenessState
+        # readiness는 요청을 받을 수 있는지다. DB가 없으면 조회·예약을 처리할 수 없다.
+        # Kafka는 넣지 않는다. 브로커가 죽어도 Outbox에 쌓아 두었다가 복구되면 발행하므로 요청 처리에는 영향이 없다
+        readiness:
+          include: readinessState,r2dbc
