@@ -20,46 +20,46 @@ class OutboxPublishSchedulerTest {
 
     @BeforeEach
     fun setUp() {
-        scheduler = OutboxPublishScheduler(publishOutboxEventsUseCase, 3)
+        scheduler = OutboxPublishScheduler(publishOutboxEventsUseCase, 3, 7)
     }
 
     @Test
     fun `묶음 크기보다 적게 발행하면 한 번만 호출하고 끝낸다`() =
         runBlocking<Unit> {
-            whenever(publishOutboxEventsUseCase.publishPending(3)).thenReturn(2)
+            whenever(publishOutboxEventsUseCase.publishPending(3, 7)).thenReturn(2)
 
             scheduler.publish()
 
-            verifyBlocking(publishOutboxEventsUseCase, times(1)) { publishPending(3) }
+            verifyBlocking(publishOutboxEventsUseCase, times(1)) { publishPending(3, 7) }
         }
 
     @Test
     fun `묶음이 가득 차면 이어서 다음 묶음을 발행한다`() =
         runBlocking<Unit> {
-            whenever(publishOutboxEventsUseCase.publishPending(3)).thenReturn(3).thenReturn(3).thenReturn(1)
+            whenever(publishOutboxEventsUseCase.publishPending(3, 7)).thenReturn(3).thenReturn(3).thenReturn(1)
 
             scheduler.publish()
 
-            verifyBlocking(publishOutboxEventsUseCase, times(3)) { publishPending(3) }
+            verifyBlocking(publishOutboxEventsUseCase, times(3)) { publishPending(3, 7) }
         }
 
     @Test
     fun `한 번에 최대 10묶음까지만 발행한다`() =
         runBlocking<Unit> {
-            whenever(publishOutboxEventsUseCase.publishPending(3)).thenReturn(3)
+            whenever(publishOutboxEventsUseCase.publishPending(3, 7)).thenReturn(3)
 
             scheduler.publish()
 
-            verifyBlocking(publishOutboxEventsUseCase, times(10)) { publishPending(3) }
+            verifyBlocking(publishOutboxEventsUseCase, times(10)) { publishPending(3, 7) }
         }
 
     @Test
     fun `발행이 실패해도 예외를 밖으로 던지지 않는다`() =
         runBlocking<Unit> {
-            whenever(publishOutboxEventsUseCase.publishPending(3)).thenThrow(IllegalStateException("db down"))
+            whenever(publishOutboxEventsUseCase.publishPending(3, 7)).thenThrow(IllegalStateException("db down"))
 
             scheduler.publish()
 
-            verifyBlocking(publishOutboxEventsUseCase, times(1)) { publishPending(3) }
+            verifyBlocking(publishOutboxEventsUseCase, times(1)) { publishPending(3, 7) }
         }
 }

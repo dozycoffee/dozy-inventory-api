@@ -141,7 +141,7 @@ class OutboxPublishIntegrationTest {
                     .awaitFirst()
                     .map { it["outbox_event_id"].toString().toLong() }
 
-            assertThat(publishOutboxEventsUseCase.publishPending(100)).isEqualTo(4)
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 20)).isEqualTo(4)
 
             val records: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("e2e.inventory", "e2e.reservation"), 4)
             assertThat(records).hasSize(4)
@@ -170,9 +170,9 @@ class OutboxPublishIntegrationTest {
     fun `이미 발행한 이벤트는 다시 발행하지 않는다`() =
         runBlocking<Unit> {
             reservationLifecycle()
-            publishOutboxEventsUseCase.publishPending(100)
+            publishOutboxEventsUseCase.publishPending(100, 20)
 
-            assertThat(publishOutboxEventsUseCase.publishPending(100)).isEqualTo(0)
+            assertThat(publishOutboxEventsUseCase.publishPending(100, 20)).isEqualTo(0)
         }
 
     @Test
@@ -180,9 +180,9 @@ class OutboxPublishIntegrationTest {
         runBlocking<Unit> {
             reservationLifecycle()
 
-            assertThat(publishOutboxEventsUseCase.publishPending(3)).isEqualTo(3)
+            assertThat(publishOutboxEventsUseCase.publishPending(3, 20)).isEqualTo(3)
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PENDING'")).isEqualTo("1")
-            assertThat(publishOutboxEventsUseCase.publishPending(3)).isEqualTo(1)
+            assertThat(publishOutboxEventsUseCase.publishPending(3, 20)).isEqualTo(1)
         }
 
     @Test
@@ -190,7 +190,13 @@ class OutboxPublishIntegrationTest {
         runBlocking<Unit> {
             (1..30).forEach { registerProductUseCase.register(RegisterProductCommand("P-$it", "상품 $it", ProductCategory.BEAN, "KG", 180)) }
 
-            val published: List<Int> = (1..5).map { async(Dispatchers.IO) { publishOutboxEventsUseCase.publishPending(100) } }.awaitAll()
+            val published: List<Int> =
+                (1..5)
+                    .map {
+                        async(
+                            Dispatchers.IO,
+                        ) { publishOutboxEventsUseCase.publishPending(100, 20) }
+                    }.awaitAll()
 
             assertThat(published.sum()).isEqualTo(30)
             val records: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("e2e.product"), 30)

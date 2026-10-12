@@ -18,12 +18,13 @@ import org.springframework.stereotype.Component
 class OutboxPublishScheduler(
     private val publishOutboxEventsUseCase: PublishOutboxEventsUseCase,
     @Value("\${inventory.outbox.publisher.batch-size:100}") private val batchSize: Int,
+    @Value("\${inventory.outbox.publisher.max-attempts:20}") private val maxAttempts: Int,
 ) {
     @Scheduled(fixedDelayString = "\${inventory.outbox.publisher.interval:PT1S}")
     suspend fun publish() {
         try {
             repeat(MAX_BATCHES) {
-                val published: Int = publishOutboxEventsUseCase.publishPending(batchSize)
+                val published: Int = publishOutboxEventsUseCase.publishPending(batchSize, maxAttempts)
                 if (published > 0) log.info("Outbox 이벤트 {}건을 발행했다", published)
                 if (published < batchSize) return
             }
