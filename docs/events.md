@@ -1,18 +1,48 @@
 # 이벤트 계약 (구독자용)
 
 inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독하는 서비스(OMS, WMS, Store)는 이 문서를 기준으로 한다.
-발행 방식의 배경은 [ADR-0025](adr/0025-outbox-event-publishing.md)에 있다. payload 필드 이름과 이벤트 유형은 계약이라 함부로 바꾸지 않는다.
+발행 방식의 배경은 [ADR-0025](adr/0025-outbox-event-publishing.md), 공통 형식(envelope)의 배경은 [ADR-0038](adr/0038-common-event-format.md)에 있다. `data`의 필드 이름과 이벤트 유형은 계약이라 함부로 바꾸지 않는다.
+
+> **전환 중**: 아래는 ADR-0038에서 확정한 공통 형식이다. 코드 구현은 단계별로 진행 중이며(`feature_list.json` F-023) 구현 전까지 실제 발행은 이전 형식(평면 payload, `event-id`가 숫자)이다.
 
 ## 전달 방식
 
 - 상태를 바꾸는 트랜잭션 안에서 `outbox_event`에 저장되고, 별도 발행기가 순서대로 Kafka로 내보낸다. 수량·예약이 바뀌었는데 이벤트가 빠지거나, 롤백되었는데 이벤트만 나가는 일은 없다.
-- **최소 한 번(at-least-once) 전달**이다. 발행 직후 서비스가 죽으면 같은 이벤트가 다시 나갈 수 있으므로 **구독자는 `event-id` 헤더로 중복을 걸러야 한다.**
+- **최소 한 번(at-least-once) 전달**이다. 발행 직후 서비스가 죽으면 같은 이벤트가 다시 나갈 수 있으므로 **구독자는 `event-id` 헤더(UUID)로 중복을 걸러야 한다.** 격리된 이벤트를 재발행해도 `event-id`는 같다.
 - 같은 파티션 키의 이벤트는 저장된 순서대로 발행된다. 다른 키 사이의 순서는 보장하지 않는다.
 - 발행에 영구히 실패하는 이벤트는 격리(`DEAD`)되어 나가지 않을 수 있고(운영자가 확인해 재발행한다), 이때 같은 키의 뒤 이벤트는 그대로 발행된다. 구독자는 빠진 이벤트를 만날 수 있고, 재발행된 이벤트는 그 사이 나간 이벤트보다 늦게 도착한다. 상태를 다시 확인해야 하면 조회 API(가용 재고 조회 등)로 맞춘다(ADR-0037).
 - 발행이 끝난 이벤트는 보관 기간(기본 7일) 뒤 서비스의 DB에서 지워진다. Kafka의 보관은 브로커 설정을 따른다.
-- 값(value)은 JSON 문자열이다. 시각은 오프셋을 포함한 ISO-8601이다.
+- 값(value)은 JSON 문자열이다. 필드 이름은 camelCase, 시각은 오프셋을 포함한 ISO-8601, 날짜는 `yyyy-MM-dd`이다. **값이 `null`인 필드는 내보내지 않는다.** 구독자는 필드가 없는 것과 `null`을 같게 처리한다.
+
+## 공통 형식(envelope)
+
+모든 이벤트의 값은 공통 메타를 최상위에 두고 도메인 본문을 `data` 안에 둔다. 아래 각 이벤트 절의 표는 `data`의 필드다.
+
+```json
+{
+  "eventId": "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73",
+  "eventType": "RESERVATION_CREATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-12T10:00:00+09:00",
+  "source": "inventory",
+  "data": { "reservationId": 1 }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| eventId | 이벤트 고유 ID(UUID, 36자). 헤더 `event-id`와 같은 값. 서비스 전체에서 유일하다 |
+| eventType | 이벤트 유형. 헤더 `event-type`과 같은 값. `{집계}_{과거형 동사}` 대문자 스네이크 |
+| eventVersion | 스키마 버전(정수, 1부터). 필드 삭제·이름 변경·의미 변경처럼 호환되지 않는 변경에만 올린다. 필드 추가는 올리지 않는다 |
+| occurredAt | 이벤트를 트랜잭션 안에서 Outbox에 기록한 시각. Kafka 발행 시각이 아니다 |
+| source | 발행 서비스 이름(`inventory`) |
+| data | 이벤트별 본문 |
+
+구독자는 알 수 없는 필드를 무시해야 한다(필드 추가는 `eventVersion`을 올리지 않는다).
 
 ## 토픽, 키, 헤더
+
+파티션 키와 `aggregate-id`는 모두 **문자열**이다. 구독자는 숫자로 파싱하지 않는다.
 
 | 집계 | 토픽 | 파티션 키(메시지 키) |
 |------|------|-----------------------|
@@ -25,10 +55,13 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 | 헤더 | 내용 |
 |------|------|
-| `event-id` | 이벤트의 고유 ID(`outbox_event_id`). 중복 제거에 쓴다 |
+| `event-id` | 이벤트의 고유 ID(UUID). 중복 제거에 쓴다 |
 | `event-type` | 이벤트 유형 |
+| `event-version` | 스키마 버전(정수를 문자열로) |
+| `source` | 발행 서비스 이름(`inventory`) |
 | `aggregate-type` | `INVENTORY`, `RESERVATION`, `LOT`, `PRODUCT` |
-| `aggregate-id` | 집계의 ID(재고 행, 예약, Lot, 상품) |
+| `aggregate-id` | 집계의 ID(재고 행, 예약, Lot, 상품)를 문자열로 |
+| `traceparent` | W3C 분산 추적 헤더. 저장 시점의 추적 컨텍스트가 있을 때만 붙는다 |
 
 ## 재고 이벤트
 
@@ -36,7 +69,6 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 | 필드 | 설명 |
 |------|------|
-| eventType, occurredAt | 이벤트 유형, 발생 시각 |
 | inventoryId, warehouseId, productId, lotId | 재고 행과 그 키 |
 | qualityStatus | `NORMAL` 또는 `DEFECTIVE` |
 | quantityChange | 총 수량의 변화량(양수) |
@@ -52,13 +84,12 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 | 필드 | 설명 |
 |------|------|
-| eventType, occurredAt | 이벤트 유형, 발생 시각 |
 | reservationId, warehouseId, channel, externalOrderId | 예약과 호출 서비스가 보낸 주문 정보 |
 | idempotencyKey | 예약을 만든 요청의 멱등 키 |
 | reason | `RESERVATION_FORCE_RELEASED`에만 있는 사유 코드(예: `LOT_EXPIRED` 유통기한 경과). 다른 유형에는 필드가 없다 |
 | items[].productId, items[].quantity | 상품별 요청 수량 |
 | items[].allocations[].inventoryId, quantity | 수량이 할당된 재고 행과 수량 |
-| items[].allocations[].lotId, lotNumber, expirationDate | 그 재고 행의 Lot 정보. 이벤트를 만든 시점의 값이며 유통기한이 없는 Lot이면 `expirationDate`가 null이다 |
+| items[].allocations[].lotId, lotNumber, expirationDate | 그 재고 행의 Lot 정보. 이벤트를 만든 시점의 값이며 유통기한이 없는 Lot이면 `expirationDate` 필드가 없다 |
 
 `RESERVATION_FORCE_RELEASED`는 inventory 서비스가 확정 전 예약을 강제로 해제했다는 뜻이며 예약 수량은 이미 돌아갔다. OMS는 주문을 다시 예약해 다른 Lot을 할당받을 수 있다.
 
@@ -72,7 +103,6 @@ WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 �
 
 | 필드 | 설명 |
 |------|------|
-| eventType, occurredAt | 이벤트 유형, 발생 시각 |
 | lotId, productId, lotNumber, expirationDate | Lot 정보 |
 | transfers[].warehouseId | 창고 |
 | transfers[].sourceInventoryId | 정상 품질이던 재고 행 |
@@ -84,7 +114,7 @@ WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 �
 
 ## 수신 이벤트: 직원 창고 소속 (WMS → inventory)
 
-inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한다(ADR-0032). 창고 관리자(`inventory:warehouse_manager`)가 접근할 수 있는 창고를 판단하는 데 쓴다.
+inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한다(ADR-0032). **이 이벤트는 아직 공통 형식(ADR-0038)이 아닌 평면 형식이다.** WMS가 공통 형식으로 전환하는 것을 제안했고(WMS 프로젝트에서 결정), 전환 전까지 inventory는 아래 형식을 받는다. 창고 관리자(`inventory:warehouse_manager`)가 접근할 수 있는 창고를 판단하는 데 쓴다.
 
 | 항목 | 내용 |
 |------|------|
@@ -121,5 +151,4 @@ inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한�
 
 | 필드 | 설명 |
 |------|------|
-| eventType, occurredAt | 이벤트 유형, 발생 시각 |
 | productId, productCode, productName, category, unit, shelfLifeDays, productStatus | 변경 후 상품 스냅샷. 구독자는 이것으로 상품 사본을 갱신한다 |
