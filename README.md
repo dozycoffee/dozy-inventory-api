@@ -97,6 +97,7 @@ curl localhost:8082/actuator/health/readiness   # 헬스 체크(토큰 불필요
 export GPR_USER=<깃허브 계정> GPR_TOKEN=<read:packages 토큰>
 docker build --secret id=gpr_user,env=GPR_USER --secret id=gpr_token,env=GPR_TOKEN -t dozy-inventory-api:local .
 docker compose --profile app up -d --build   # MySQL, Kafka와 함께 이미지를 띄워 확인한다(평소 개발에는 ./gradlew bootRun을 쓴다)
+./scripts/image-smoke-test.sh dozy-inventory-api:local   # CI와 같은 이미지 스모크 테스트(임시 MySQL을 띄우고 지운다)
 ```
 
 ### 검증

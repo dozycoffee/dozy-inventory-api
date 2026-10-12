@@ -17,6 +17,7 @@ Accepted (2026-10-12). 배포 플랫폼이 아직 정해지지 않아 이미지 
 5. **JVM 메모리는 컨테이너 한도의 비율로 정한다**(`-XX:MaxRAMPercentage=75.0`, `-XX:+ExitOnOutOfMemoryError`로 OOM이면 종료해 플랫폼이 재시작하게 한다). `JAVA_TOOL_OPTIONS`로 덮어쓸 수 있다.
 6. **이미지에는 설정과 비밀을 넣지 않는다.** DB, Kafka, 인증 서버 주소와 비밀은 모두 환경변수로 주입한다(`.dockerignore`가 `.env`를 컨텍스트에서 제외한다).
 7. **이미지에 헬스 체크를 넣지 않는다.** 플랫폼마다 probe 방식이 다르다. 로컬 확인용 `docker-compose.yml`의 `app` 서비스(프로필 `app`, 평소 개발에는 쓰지 않는다)가 이미지에 `curl`이 없어 bash의 `/dev/tcp`로 `readiness`를 확인한다. 컨테이너에서 Kafka에 접근하도록 로컬 Kafka에 compose 네트워크용 리스너(`INTERNAL`, `kafka:29092`)를 추가했다(호스트용 `localhost:9092`는 그대로다).
+8. **CI가 PR마다 이미지를 빌드하고 스모크 테스트를 한다**(`image` 잡). 이미지는 어디에도 올리지 않는다. `scripts/image-smoke-test.sh`가 임시 MySQL과 함께 `prod` 프로필로 이미지를 띄워 readiness·liveness UP, 헬스 외 actuator 엔드포인트 비노출, 비루트 실행, 마이그레이션 적용, 필수 환경변수 누락 시 기동 실패, SIGTERM 정상 종료(종료 코드 143)를 확인한다. 로컬에서도 같은 스크립트를 쓴다. Dependabot이 베이스 이미지(자바 메이저 제외)를 주 1회 확인한다.
 
 ## 결과 (Consequences)
 
