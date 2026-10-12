@@ -25,6 +25,11 @@ enum class InventoryErrorCode(
         "INV_INVALID_INBOUND_QUALITY_STATUS",
         "입고 품질 상태는 NORMAL 또는 DEFECTIVE여야 합니다.",
     ),
+    INVALID_RETURN_QUALITY_STATUS(
+        ErrorType.VALIDATION,
+        "INV_INVALID_RETURN_QUALITY_STATUS",
+        "반품 품질 상태는 NORMAL 또는 DEFECTIVE여야 합니다.",
+    ),
     INVALID_DISPOSAL_QUALITY_STATUS(
         ErrorType.VALIDATION,
         "INV_INVALID_DISPOSAL_QUALITY_STATUS",
