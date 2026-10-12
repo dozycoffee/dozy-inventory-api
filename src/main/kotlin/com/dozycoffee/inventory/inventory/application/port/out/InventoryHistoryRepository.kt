@@ -17,4 +17,13 @@ interface InventoryHistoryRepository {
 
     /** 한 요청이 여러 재고 행을 바꾼 경우의 이력 전체. 재고 행 식별자 오름차순이다 */
     suspend fun findAllByIdempotencyKey(idempotencyKey: IdempotencyKey): List<InventoryHistory>
+
+    /** 재고 행의 이력을 최신순(`created_at`, ID 내림차순)으로 [offset]부터 최대 [limit]개 반환한다 */
+    suspend fun findPageByInventoryId(
+        inventoryId: Long,
+        offset: Long,
+        limit: Int,
+    ): List<InventoryHistory>
+
+    suspend fun countByInventoryId(inventoryId: Long): Long
 }

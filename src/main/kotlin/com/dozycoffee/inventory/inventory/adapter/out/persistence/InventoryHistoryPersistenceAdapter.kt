@@ -26,4 +26,12 @@ class InventoryHistoryPersistenceAdapter(
 
     override suspend fun findAllByIdempotencyKey(idempotencyKey: IdempotencyKey): List<InventoryHistory> =
         inventoryHistoryR2dbcRepository.findAllByIdempotencyKeyOrderByInventoryIdAsc(idempotencyKey.value).toList().map { it.toDomain() }
+
+    override suspend fun findPageByInventoryId(
+        inventoryId: Long,
+        offset: Long,
+        limit: Int,
+    ): List<InventoryHistory> = inventoryHistoryR2dbcRepository.findPage(inventoryId, offset, limit).toList().map { it.toDomain() }
+
+    override suspend fun countByInventoryId(inventoryId: Long): Long = inventoryHistoryR2dbcRepository.countByInventoryId(inventoryId)
 }

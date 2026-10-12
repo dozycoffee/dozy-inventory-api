@@ -74,6 +74,39 @@ class InventoryHistoryPersistenceAdapterTest {
         InventoryHistory.create(inventoryId, type, change, after, reference, 77L, IdempotencyKey.of(key), RequesterService.of("svc-wms"))
 
     @Nested
+    inner class `이력 페이지 조회` {
+        private suspend fun saveMany(count: Int): List<Long> =
+            (1..count).map { i: Int -> checkNotNull(adapter.save(history(key = "k-$i", change = i, after = 10 + i)).inventoryHistoryId) }
+
+        @Test
+        fun `재고 행의 이력을 최신순으로 페이지를 나눠 반환한다`() =
+            runBlocking<Unit> {
+                val ids: List<Long> = saveMany(5)
+                adapter.save(history(key = "other", inventoryId = otherInventoryId))
+
+                val first: List<InventoryHistory> = adapter.findPageByInventoryId(inventoryId, 0L, 2)
+                val second: List<InventoryHistory> = adapter.findPageByInventoryId(inventoryId, 2L, 2)
+                val last: List<InventoryHistory> = adapter.findPageByInventoryId(inventoryId, 4L, 2)
+
+                assertThat(first.map { it.inventoryHistoryId }).containsExactly(ids[4], ids[3])
+                assertThat(second.map { it.inventoryHistoryId }).containsExactly(ids[2], ids[1])
+                assertThat(last.map { it.inventoryHistoryId }).containsExactly(ids[0])
+                assertThat(adapter.countByInventoryId(inventoryId)).isEqualTo(5L)
+                assertThat(adapter.countByInventoryId(otherInventoryId)).isEqualTo(1L)
+            }
+
+        @Test
+        fun `이력이 없거나 범위를 넘으면 빈 목록이다`() =
+            runBlocking<Unit> {
+                saveMany(2)
+
+                assertThat(adapter.findPageByInventoryId(inventoryId, 10L, 5)).isEmpty()
+                assertThat(adapter.findPageByInventoryId(otherInventoryId, 0L, 5)).isEmpty()
+                assertThat(adapter.countByInventoryId(otherInventoryId)).isEqualTo(0L)
+            }
+    }
+
+    @Nested
     inner class `저장과 조회` {
         @Test
         fun `저장하면 식별자와 생성 시각이 부여되고 같은 값으로 조회된다`() =

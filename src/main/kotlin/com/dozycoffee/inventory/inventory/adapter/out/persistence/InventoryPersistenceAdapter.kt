@@ -7,12 +7,18 @@ import com.dozycoffee.inventory.inventory.application.port.out.AllocationCandida
 import com.dozycoffee.inventory.inventory.application.port.out.AvailabilityRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
+import com.dozycoffee.inventory.inventory.application.port.out.InventoryRow
+import com.dozycoffee.inventory.inventory.application.port.out.InventorySearchCondition
+import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InventoryNotFoundException
 import com.dozycoffee.inventory.inventory.domain.model.Inventory
 import com.dozycoffee.inventory.inventory.domain.valueobject.InventoryKey
+import io.r2dbc.spi.Readable
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.reactive.awaitSingle
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.awaitRowsUpdated
 import org.springframework.r2dbc.core.flow
@@ -39,6 +45,88 @@ class InventoryPersistenceAdapter(
         inventoryR2dbcRepository
             .findByWarehouseIdAndLotIdAndQualityStatus(key.warehouseId, key.lotId, key.qualityStatus)
             ?.toDomain()
+
+    override suspend fun search(
+        condition: InventorySearchCondition,
+        offset: Long,
+        limit: Int,
+    ): List<InventoryRow> {
+        val filter: Filter = filterOf(condition)
+        return filter
+            .bindAll(databaseClient.sql(SEARCH_HEAD + filter.where + SEARCH_ORDER))
+            .bind("limit", limit)
+            .bind("offset", offset)
+            .map { row, _ -> toInventoryRow(row) }
+            .flow()
+            .toList()
+    }
+
+    override suspend fun count(condition: InventorySearchCondition): Long {
+        val filter: Filter = filterOf(condition)
+        return filter
+            .bindAll(databaseClient.sql(COUNT_HEAD + filter.where))
+            .map { row, _ -> checkNotNull(row.get("c", Long::class.javaObjectType)) }
+            .one()
+            .awaitSingle()
+    }
+
+    override suspend fun findRowById(inventoryId: Long): InventoryRow? =
+        databaseClient
+            .sql(SEARCH_HEAD + " WHERE i.inventory_id = :inventoryId")
+            .bind("inventoryId", inventoryId)
+            .map { row, _ -> toInventoryRow(row) }
+            .one()
+            .awaitFirstOrNull()
+
+    private fun filterOf(condition: InventorySearchCondition): Filter {
+        val clauses: MutableList<String> = mutableListOf()
+        val values: MutableMap<String, Any> = linkedMapOf()
+
+        fun add(
+            clause: String,
+            name: String,
+            value: Any?,
+        ) {
+            if (value == null) return
+            clauses += clause
+            values[name] = value
+        }
+        add("i.warehouse_id = :warehouseId", "warehouseId", condition.warehouseId)
+        add("i.product_id = :productId", "productId", condition.productId)
+        add("i.quality_status = :qualityStatus", "qualityStatus", condition.qualityStatus?.name)
+        add("l.lot_status = :lotStatus", "lotStatus", condition.lotStatus?.name)
+        add("i.allocation_hold = :allocationHold", "allocationHold", condition.allocationHold)
+        return Filter(if (clauses.isEmpty()) "" else clauses.joinToString(separator = " AND ", prefix = " WHERE "), values)
+    }
+
+    private fun toInventoryRow(row: Readable): InventoryRow =
+        InventoryRow(
+            inventoryId = checkNotNull(row.get("inventory_id", Long::class.javaObjectType)),
+            warehouseId = checkNotNull(row.get("warehouse_id", Long::class.javaObjectType)),
+            productId = checkNotNull(row.get("product_id", Long::class.javaObjectType)),
+            lotId = checkNotNull(row.get("lot_id", Long::class.javaObjectType)),
+            lotNumber = checkNotNull(row.get("lot_number", String::class.java)),
+            manufactureDate = row.get("manufacture_date", LocalDate::class.java),
+            expirationDate = row.get("expiration_date", LocalDate::class.java),
+            lotStatus = LotStatus.valueOf(checkNotNull(row.get("lot_status", String::class.java))),
+            qualityStatus = QualityStatus.valueOf(checkNotNull(row.get("quality_status", String::class.java))),
+            quantity = checkNotNull(row.get("quantity", Int::class.javaObjectType)),
+            reservedQuantity = checkNotNull(row.get("reserved_quantity", Int::class.javaObjectType)),
+            allocationHold = checkNotNull(row.get("allocation_hold", Boolean::class.javaObjectType)),
+            holdReason = row.get("hold_reason", String::class.java),
+            heldAt = row.get("held_at", LocalDateTime::class.java),
+            createdAt = checkNotNull(row.get("created_at", LocalDateTime::class.java)),
+            updatedAt = checkNotNull(row.get("updated_at", LocalDateTime::class.java)),
+        )
+
+    /** 값이 있는 조건만 담은 WHERE 절과 바인딩할 값. 값은 이름 붙은 파라미터로만 넣어 SQL에 직접 이어 붙이지 않는다 */
+    private class Filter(
+        val where: String,
+        private val values: Map<String, Any>,
+    ) {
+        fun bindAll(spec: DatabaseClient.GenericExecuteSpec): DatabaseClient.GenericExecuteSpec =
+            values.entries.fold(spec) { acc, (name, value) -> acc.bind(name, value) }
+    }
 
     override suspend fun findAllByLot(
         lotId: Long,
@@ -232,6 +320,27 @@ class InventoryPersistenceAdapter(
                AND warehouse_id IN (:warehouseIds)
              GROUP BY warehouse_id, product_id
              ORDER BY product_id, warehouse_id
+            """
+
+        const val SEARCH_HEAD: String =
+            """
+            SELECT i.inventory_id, i.warehouse_id, i.product_id, i.lot_id, l.lot_number, l.manufacture_date, l.expiration_date, l.lot_status,
+                   i.quality_status, i.quantity, i.reserved_quantity, i.allocation_hold, i.hold_reason, i.held_at, i.created_at, i.updated_at
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
+            """
+
+        const val SEARCH_ORDER: String =
+            """
+             ORDER BY i.warehouse_id, i.product_id, l.expiration_date IS NULL, l.expiration_date, i.inventory_id
+             LIMIT :limit OFFSET :offset
+            """
+
+        const val COUNT_HEAD: String =
+            """
+            SELECT COUNT(*) AS c
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
             """
 
         const val ALLOCATION_CANDIDATES: String =

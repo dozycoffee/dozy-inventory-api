@@ -56,6 +56,11 @@ enum class InventoryErrorCode(
         "INV_INVALID_ADJUST_REQUEST",
         "조정 항목은 1개 이상 500개 이하이고 ID는 양수이며 변동량은 0이 아니고 같은 Lot과 품질 상태, 같은 원인 문서가 중복되면 안 됩니다.",
     ),
+    INVALID_INVENTORY_QUERY(
+        ErrorType.VALIDATION,
+        "INV_INVALID_INVENTORY_QUERY",
+        "조회 조건의 ID는 양수이고 페이지는 0 이상, 크기는 1 이상 100 이하여야 합니다.",
+    ),
     INVALID_AVAILABILITY_QUERY(
         ErrorType.VALIDATION,
         "INV_INVALID_AVAILABILITY_QUERY",
