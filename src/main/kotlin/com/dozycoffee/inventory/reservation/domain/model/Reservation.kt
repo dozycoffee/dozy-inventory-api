@@ -134,6 +134,42 @@ class Reservation private constructor(
         shipments.keys == allocations.map(ReservationAllocation::inventoryId).toSet() &&
             allocations.all { shipments[it.inventoryId] == it.fulfilledQuantity }
 
+    /**
+     * 확정된 예약에서 피킹할 수 없는 Lot의 재할당에 필요한 상품별 수량을 구한다(ADR-0031). [shortages]는 재고 행 ID별 부족 수량이며
+     * 비어 있지 않고 예약에 할당된 행이어야 하고 각 수량은 1 이상 그 할당 수량 이하여야 한다(어기면 입력 오류).
+     * 확정(`CONFIRMED`)이 아닌 예약은 [InvalidReservationStateException]이다. 예약을 바꾸지 않는다.
+     */
+    fun reallocationDemand(shortages: Map<Long, Int>): Map<Long, Int> {
+        if (status != ReservationStatus.CONFIRMED) throw InvalidReservationStateException()
+        if (shortages.isEmpty()) throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+        val demand: MutableMap<Long, Int> = mutableMapOf()
+        shortages.forEach { (inventoryId: Long, quantity: Int) ->
+            val item: ReservationItem =
+                items.firstOrNull { it.hasAllocation(inventoryId) }
+                    ?: throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+            if (quantity < 1 || quantity > item.allocationOf(inventoryId).quantity) {
+                throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+            }
+            demand.merge(item.productId, quantity, Int::plus)
+        }
+        return demand
+    }
+
+    /**
+     * [shortages]의 수량을 [replacements]의 새 재고 행으로 옮긴다. [replacements]는 상품 ID별 (재고 행 ID, 수량) 목록이며
+     * 상품별 합계가 [reallocationDemand]와 같아야 한다. 수량 0이 된 할당은 지워지고 요청 수량은 바뀌지 않는다.
+     */
+    fun reallocate(
+        shortages: Map<Long, Int>,
+        replacements: Map<Long, List<Pair<Long, Int>>>,
+    ) {
+        val demand: Map<Long, Int> = reallocationDemand(shortages)
+        if (replacements.keys != demand.keys) throw InvalidDomainValueException(ReservationErrorCode.INVALID_REALLOCATION)
+        items.filter { it.productId in demand }.forEach { item: ReservationItem ->
+            item.reallocate(shortages.filterKeys(item::hasAllocation), replacements.getValue(item.productId))
+        }
+    }
+
     /** 확정 전 예약을 시스템이 강제로 해제한다(유통기한 경과 등). 확정 전이 아니면 바꾸지 않고 false를 반환한다 */
     fun forceRelease(): Boolean {
         if (status != ReservationStatus.RESERVED) return false

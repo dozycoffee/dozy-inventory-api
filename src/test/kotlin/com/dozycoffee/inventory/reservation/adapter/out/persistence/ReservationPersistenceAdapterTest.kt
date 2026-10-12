@@ -10,6 +10,7 @@ import com.dozycoffee.inventory.inventory.fixture.InventoryDbFixture
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationEventType
 import com.dozycoffee.inventory.reservation.domain.enumeration.ReservationStatus
 import com.dozycoffee.inventory.reservation.domain.exception.DuplicateReservationKeyException
+import com.dozycoffee.inventory.reservation.domain.exception.ReservationChangedConcurrentlyException
 import com.dozycoffee.inventory.reservation.domain.model.Reservation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationAllocation
 import com.dozycoffee.inventory.reservation.domain.model.ReservationEvent
@@ -443,6 +444,103 @@ class ReservationPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `재할당 저장` {
+        private suspend fun confirmedReservation(): Reservation {
+            val saved: Reservation = adapter.save(reservation())
+            saved.confirm(now.plusMinutes(1))
+            assertThat(adapter.updateState(saved, ReservationStatus.RESERVED)).isTrue()
+            return checkNotNull(adapter.findById(checkNotNull(saved.reservationId)))
+        }
+
+        private fun quantities(reservation: Reservation): Map<Long, Int> =
+            reservation.items.flatMap { it.allocations }.associate { it.inventoryId to it.quantity }
+
+        private fun before(reservation: Reservation): Map<Long, Int> =
+            reservation.items.flatMap { it.allocations }.associate { checkNotNull(it.reservationAllocationId) to it.quantity }
+
+        private suspend fun reload(reservation: Reservation): Reservation =
+            checkNotNull(adapter.findById(checkNotNull(reservation.reservationId)))
+
+        @Test
+        fun `저장된 수량이 기대와 정확히 같을 때만 할당을 잠그고 true다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val expected: Map<Long, Int> = before(reservation)
+
+                assertThat(adapter.lockAllocations(reservation, expected)).isTrue()
+                assertThat(adapter.lockAllocations(reservation, expected.mapValues { it.value + 1 })).isFalse()
+                assertThat(adapter.lockAllocations(reservation, expected.minus(expected.keys.first()))).isFalse()
+                assertThat(adapter.lockAllocations(reservation, expected.plus(999_999L to 1))).isFalse()
+            }
+
+        @Test
+        fun `수량 변경과 새 할당 추가를 함께 저장하고 상태는 건드리지 않는다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val expected: Map<Long, Int> = before(reservation)
+                val spare: Long = fixture.insertInventory(10L, productId, checkNotNull(fixture.seedLot(productId, "D").lotId))
+                reservation.reallocate(mapOf(firstInventoryId to 2), mapOf(productId to listOf(spare to 2)))
+
+                assertThat(adapter.updateAllocations(reservation, expected)).isTrue()
+
+                val loaded: Reservation = reload(reservation)
+                assertThat(loaded.status).isEqualTo(ReservationStatus.CONFIRMED)
+                assertThat(
+                    quantities(loaded),
+                ).containsEntry(firstInventoryId, 4).containsEntry(spare, 2).containsEntry(secondInventoryId, 4)
+            }
+
+        @Test
+        fun `수량이 0이 된 할당은 지운다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val expected: Map<Long, Int> = before(reservation)
+                reservation.reallocate(mapOf(firstInventoryId to 6), mapOf(productId to listOf(secondInventoryId to 6)))
+
+                assertThat(adapter.updateAllocations(reservation, expected)).isTrue()
+
+                assertThat(quantities(reload(reservation))).containsEntry(secondInventoryId, 10).doesNotContainKey(firstInventoryId)
+                assertThat(count("reservation_allocation")).isEqualTo(2L)
+            }
+
+        @Test
+        fun `그 사이 다른 요청이 수량을 바꿨으면 아무것도 바꾸지 않고 false다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val expected: Map<Long, Int> = before(reservation)
+                databaseClient
+                    .sql("UPDATE reservation_allocation SET quantity = quantity - 1 WHERE inventory_id = $firstInventoryId")
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+                reservation.reallocate(mapOf(firstInventoryId to 2), mapOf(productId to listOf(secondInventoryId to 2)))
+
+                assertThat(adapter.updateAllocations(reservation, expected)).isFalse()
+
+                assertThat(quantities(reload(reservation))).containsEntry(firstInventoryId, 5).containsEntry(secondInventoryId, 4)
+            }
+
+        @Test
+        fun `수정 시각과 수정자를 갱신한다`() =
+            runBlocking<Unit> {
+                val reservation: Reservation = confirmedReservation()
+                val expected: Map<Long, Int> = before(reservation)
+                reservation.reallocate(mapOf(firstInventoryId to 2), mapOf(productId to listOf(secondInventoryId to 2)))
+
+                adapter.updateAllocations(reservation, expected)
+
+                val updatedBy: String =
+                    databaseClient
+                        .sql("SELECT updated_by FROM reservation_allocation WHERE inventory_id = $firstInventoryId")
+                        .fetch()
+                        .one()
+                        .awaitFirst()["updated_by"]
+                        .toString()
+                assertThat(updatedBy).isNotEqualTo("test")
+            }
+    }
+
+    @Nested
     inner class `재고 행으로 예약 조회` {
         private suspend fun changeStatus(
             id: Long,
@@ -593,6 +691,36 @@ class ReservationPersistenceAdapterTest {
                 assertThat(events.first().detail).contains("2026-10-07T12:30:00")
                 assertThat(events.last().detail).isNull()
                 assertThat(events).allMatch { it.reservationEventId != null }
+            }
+
+        @Test
+        fun `멱등 키를 저장하고 예약과 키로 조회한다`() =
+            runBlocking<Unit> {
+                val reservationId: Long = checkNotNull(adapter.save(reservation()).reservationId)
+                eventAdapter.save(
+                    ReservationEvent.create(reservationId, ReservationEventType.REALLOCATED, """{"shortages":[]}""", "wms-realloc-1"),
+                )
+
+                val found: ReservationEvent? = eventAdapter.findByIdempotencyKey(reservationId, "wms-realloc-1")
+
+                assertThat(found?.idempotencyKey).isEqualTo("wms-realloc-1")
+                assertThat(found?.eventType).isEqualTo(ReservationEventType.REALLOCATED)
+                assertThat(eventAdapter.findByIdempotencyKey(reservationId, "other")).isNull()
+                assertThat(eventAdapter.findByIdempotencyKey(reservationId + 1, "wms-realloc-1")).isNull()
+            }
+
+        @Test
+        fun `같은 예약에 같은 멱등 키를 다시 저장하면 동시 변경 예외이고 키가 없는 이력은 여러 개 저장된다`() =
+            runBlocking<Unit> {
+                val reservationId: Long = checkNotNull(adapter.save(reservation()).reservationId)
+                eventAdapter.save(ReservationEvent.create(reservationId, ReservationEventType.REALLOCATED, null, "wms-realloc-1"))
+
+                assertThrows<ReservationChangedConcurrentlyException> {
+                    eventAdapter.save(ReservationEvent.create(reservationId, ReservationEventType.REALLOCATED, null, "wms-realloc-1"))
+                }
+                eventAdapter.save(ReservationEvent.create(reservationId, ReservationEventType.CONFIRMED, null))
+                eventAdapter.save(ReservationEvent.create(reservationId, ReservationEventType.RELEASED, null))
+                assertThat(eventAdapter.findAllByReservationId(reservationId)).hasSize(3)
             }
 
         @Test

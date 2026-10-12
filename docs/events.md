@@ -47,7 +47,7 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 ## 예약 이벤트
 
-유형: `RESERVATION_CREATED`, `RESERVATION_CONFIRMED`, `RESERVATION_EXTENDED`, `RESERVATION_RELEASED`, `RESERVATION_EXPIRED`, `RESERVATION_FORCE_RELEASED`, `RESERVATION_FULFILLED`
+유형: `RESERVATION_CREATED`, `RESERVATION_CONFIRMED`, `RESERVATION_EXTENDED`, `RESERVATION_RELEASED`, `RESERVATION_EXPIRED`, `RESERVATION_FORCE_RELEASED`, `RESERVATION_REALLOCATED`, `RESERVATION_FULFILLED`
 
 | 필드 | 설명 |
 |------|------|
@@ -60,6 +60,8 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 | items[].allocations[].lotId, lotNumber, expirationDate | 그 재고 행의 Lot 정보. 이벤트를 만든 시점의 값이며 유통기한이 없는 Lot이면 `expirationDate`가 null이다 |
 
 `RESERVATION_FORCE_RELEASED`는 inventory 서비스가 확정 전 예약을 강제로 해제했다는 뜻이며 예약 수량은 이미 돌아갔다. OMS는 주문을 다시 예약해 다른 Lot을 할당받을 수 있다.
+
+`RESERVATION_REALLOCATED`는 확정된 예약에서 피킹할 수 없는 Lot의 수량을 다른 Lot으로 옮겼다는 뜻이다. `allocations[]`는 재할당 뒤의 전체 할당이며 수량이 0이 된 재고 행은 빠진다. `idempotencyKey`는 예약을 만든 요청의 키이고 재할당을 요청한 키가 아니다.
 
 WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 없이 알 수 있다. 한 예약이 여러 상품에 걸치므로 키는 `창고ID:예약ID`이고, 같은 예약의 이벤트(생성 → 확정 → 출고 확정 등)는 순서가 지켜진다.
 

@@ -351,6 +351,115 @@ class ReservationTest {
         }
 
         @Nested
+        inner class `재할당` {
+            private fun confirmed(vararg items: ReservationItem): Reservation =
+                Reservation.reconstitute(
+                    1L,
+                    10L,
+                    ReservationChannel.of("OMS"),
+                    ExternalOrderId.of("ORDER-1"),
+                    ReservationStatus.CONFIRMED,
+                    ReservationExpiry.reconstitute(null, now.plusHours(1)),
+                    now.minusMinutes(5),
+                    key,
+                    RequesterService.of("svc-oms"),
+                    items.toList().ifEmpty { listOf(item()) },
+                )
+
+            private fun quantities(reservation: Reservation): Map<Long, Int> =
+                reservation.items.flatMap { it.allocations }.associate { it.inventoryId to it.quantity }
+
+            @Test
+            fun `상품별로 옮겨야 할 수량을 구하고 예약은 바꾸지 않는다`() {
+                val reservation: Reservation = confirmed(item(1L, 10, 5L to 6, 7L to 4), item(2L, 3, 9L to 3))
+
+                val demand: Map<Long, Int> = reservation.reallocationDemand(mapOf(5L to 2, 7L to 1, 9L to 3))
+
+                assertEquals(mapOf(1L to 3, 2L to 3), demand)
+                assertEquals(mapOf(5L to 6, 7L to 4, 9L to 3), quantities(reservation))
+            }
+
+            @Test
+            fun `부족 수량을 새 재고 행으로 옮기고 요청 수량은 그대로다`() {
+                val reservation: Reservation = confirmed()
+
+                reservation.reallocate(mapOf(5L to 2), mapOf(1L to listOf(11L to 2)))
+
+                assertEquals(mapOf(5L to 4, 7L to 4, 11L to 2), quantities(reservation))
+                assertEquals(10, reservation.items.single().requestedQuantity)
+            }
+
+            @Test
+            fun `이미 할당된 재고 행으로 옮기면 그 할당의 수량이 늘어난다`() {
+                val reservation: Reservation = confirmed()
+
+                reservation.reallocate(mapOf(5L to 3), mapOf(1L to listOf(7L to 3)))
+
+                assertEquals(mapOf(5L to 3, 7L to 7), quantities(reservation))
+            }
+
+            @Test
+            fun `전량을 옮기면 그 할당은 지워진다`() {
+                val reservation: Reservation = confirmed()
+
+                reservation.reallocate(mapOf(5L to 6), mapOf(1L to listOf(11L to 4, 12L to 2)))
+
+                assertEquals(mapOf(7L to 4, 11L to 4, 12L to 2), quantities(reservation))
+            }
+
+            @Test
+            fun `확정이 아닌 예약은 재할당할 수 없다`() {
+                listOf(ReservationStatus.RESERVED, ReservationStatus.RELEASED, ReservationStatus.EXPIRED, ReservationStatus.FULFILLED)
+                    .forEach { status ->
+                        assertState { restored(status).reallocationDemand(mapOf(5L to 1)) }
+                    }
+            }
+
+            @Test
+            fun `부족 내역이 비었거나 예약에 없는 행이거나 수량이 범위를 벗어나면 입력 오류다`() {
+                val reservation: Reservation = confirmed()
+
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) { reservation.reallocationDemand(emptyMap()) }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) { reservation.reallocationDemand(mapOf(99L to 1)) }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) { reservation.reallocationDemand(mapOf(5L to 0)) }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) { reservation.reallocationDemand(mapOf(5L to 7)) }
+            }
+
+            @Test
+            fun `대체 할당이 부족 수량과 맞지 않으면 입력 오류이고 예약은 바뀌지 않는다`() {
+                val reservation: Reservation = confirmed()
+
+                // 합계 불일치, 상품 불일치, 부족 행으로 되돌리기, 같은 행 중복, 수량 0
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) {
+                    reservation.reallocate(
+                        mapOf(5L to 2),
+                        mapOf(1L to listOf(11L to 1)),
+                    )
+                }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) {
+                    reservation.reallocate(
+                        mapOf(5L to 2),
+                        mapOf(2L to listOf(11L to 2)),
+                    )
+                }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) {
+                    reservation.reallocate(
+                        mapOf(5L to 2),
+                        mapOf(1L to listOf(5L to 2)),
+                    )
+                }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) {
+                    reservation.reallocate(mapOf(5L to 2), mapOf(1L to listOf(11L to 1, 11L to 1)))
+                }
+                assertRejected(ReservationErrorCode.INVALID_REALLOCATION) {
+                    reservation.reallocate(mapOf(5L to 2), mapOf(1L to listOf(11L to 2, 12L to 0)))
+                }
+
+                assertEquals(mapOf(5L to 6, 7L to 4), quantities(reservation))
+            }
+        }
+
+        @Nested
         inner class `만료` {
             @Test
             fun `만료 시각이 지난 확정 전 예약은 EXPIRED가 되고 만료 시각은 남는다`() {

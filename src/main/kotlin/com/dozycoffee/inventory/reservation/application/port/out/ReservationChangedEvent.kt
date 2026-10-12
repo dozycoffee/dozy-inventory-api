@@ -58,5 +58,6 @@ enum class ReservationChangeType {
     RELEASED,
     EXPIRED,
     FORCE_RELEASED,
+    REALLOCATED,
     FULFILLED,
 }

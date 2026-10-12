@@ -5,4 +5,9 @@ import org.springframework.data.repository.kotlin.CoroutineCrudRepository
 
 interface ReservationEventR2dbcRepository : CoroutineCrudRepository<ReservationEventEntity, Long> {
     fun findAllByReservationIdOrderByReservationEventIdAsc(reservationId: Long): Flow<ReservationEventEntity>
+
+    suspend fun findByReservationIdAndIdempotencyKey(
+        reservationId: Long,
+        idempotencyKey: String,
+    ): ReservationEventEntity?
 }

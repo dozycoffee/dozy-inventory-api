@@ -265,7 +265,7 @@ erDiagram
 | reservation_allocation_id | BIGINT PK | N | |
 | reservation_item_id | BIGINT FK | N | |
 | inventory_id | BIGINT FK | N | 할당된 재고 행(Lot) |
-| quantity | INT | N | 현재 할당 수량. 재할당으로 줄 수 있음(0 이상) |
+| quantity | INT | N | 현재 할당 수량. 재할당으로 줄 수 있고 0이 되면 행을 지운다(CHECK는 0 이상) |
 | fulfilled_quantity | INT | N | 출고 확정된 수량, 기본 0 |
 | (감사 컬럼 4개) | | N | |
 
@@ -281,7 +281,10 @@ erDiagram
 | reservation_id | BIGINT FK | N | |
 | event_type | VARCHAR(50) | N | `CREATED`, `EXTENDED`, `CONFIRMED`, `RELEASED`, `EXPIRED`, `FORCE_RELEASED`, `REALLOCATED`, `FULFILLED` |
 | detail | JSON | Y | 사유, 변경 전·후 만료 시각, 재할당 Lot 등 |
+| idempotency_key | VARCHAR(100) `ascii_bin` | Y | 재할당(`REALLOCATED`)을 요청한 멱등 키. 다른 유형은 NULL (ADR-0031) |
 | created_at, created_by | DATETIME(6), VARCHAR(100) | N | 변경 불가 |
+
+제약: `uq_reservation_event_idempotency (reservation_id, idempotency_key)`(NULL은 중복 허용)
 
 인덱스: `idx_reservation_event (reservation_id, created_at)`
 

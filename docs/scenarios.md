@@ -11,7 +11,7 @@ inventory 서비스가 하는 일을 시나리오 단위로 정리한 색인이�
 | 3 | 입고 확정 반영 (3.1) | 아래 "입고 확정 반영" |
 | 4 | 재고 조회: 가용 재고(채널용), 현황·상세(관리자용), 이력 | 아래 "가용 재고 조회", "관리자 재고 현황·상세·이력" |
 | 5 | 재고 예약: 요청, 확정 → WMS 출고 지시, 해제 | 이식 전 |
-| 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 이식 전 |
+| 6 | 출고 반영: 출고 확정(6.1), Lot 재할당(6.2) | 아래 "출고 확정", "Lot 재할당" |
 | 7 | 반품 복귀 (7.1) | 아래 "반품 복귀" |
 | 8 | 조정: 실사 조정(8.1), 수동 조정 불허(8.2), 대사 보정(8.3) | 8.1은 아래 "실사 조정", 나머지는 이식 전 |
 | 9 | 유통기한 스캔(9.1), 폐기 확정(9.2) | 아래 "유통기한 스캔", "폐기 확정" |
@@ -111,6 +111,17 @@ WMS가 피킹을 마친 출고를 예약에 반영한다. 결정 배경은 [ADR-
 - **응답**: 재고 행별 할당·출고·결품 수량과 처리 후 총 수량을 담아 WMS가 자기 수량과 즉시 비교한다.
 - **멱등**: `Idempotency-Key`가 필수이다. 같은 키·같은 수량의 재요청은 새로 반영하지 않고 처음과 같은 결과를 200으로 반환한다. 다른 키는 `INV_IDEMPOTENCY_KEY_CONFLICT`, 다른 수량은 `INV_INVALID_RESERVATION_STATE`(409)이다.
 - **API**: `POST /api/v1/reservations/{id}/fulfillment`(`inventory:service`만). 본문은 `allocations[{inventoryId, shippedQuantity}]`이다.
+
+### Lot 재할당 (6.2)
+
+WMS가 확정된 예약에서 피킹할 수 없는 Lot을 보고하면 그 수량을 다른 Lot으로 옮긴다. 결정 배경은 [ADR-0031](adr/0031-lot-reallocation.md)이다.
+
+- **요청 단위**: 예약 하나와 재고 행별 부족 수량(`shortages[{inventoryId, shortageQuantity}]`). 확정(`CONFIRMED`)된 예약만 대상이고 부족 수량은 그 행의 할당 수량 이하이다.
+- **할당 보류**: 부족이 보고된 재고 행은 신규 할당에서 제외된다(`allocationHold`). 재할당이 실패해도 보류는 남고, 실사 조정 또는 대사 보정이 그 행을 정리하면 풀린다.
+- **대체 Lot**: inventory가 예약 생성과 같은 FEFO 규칙으로 같은 창고·같은 상품에서 고른다. 모자라면 재할당만 실패한다(409 `INV_INSUFFICIENT_AVAILABLE_QUANTITY`).
+- **반영**: 대체 Lot의 예약 수량을 잡고 부족 행의 예약 수량을 되돌린다. 총 수량은 그대로이고 원인은 실사 조정·대사로 정리한다. `REALLOCATED` 이력과 `RESERVATION_REALLOCATED` 이벤트를 남긴다.
+- **멱등**: `Idempotency-Key`가 필수이다. 같은 키·같은 내용의 재요청은 처음과 같은 응답을 주고, 내용이 다르면 `INV_IDEMPOTENCY_KEY_CONFLICT`(409)이다.
+- **API**: `POST /api/v1/reservations/{id}/reallocation`(`inventory:service`만). 응답은 재할당 뒤의 전체 할당(Lot 번호·유통기한 포함)과 새로 보류된 재고 행이다.
 
 ### 실사 조정 (8.1)
 
