@@ -17,6 +17,9 @@ data class AdjustmentProperties(
             require(default >= 0 && categories.values.all { it >= 0 }) { "승인 임계치는 0 이상이어야 한다" }
         }
 
-        fun forCategory(category: String): Int = categories[category] ?: default
+        /** 환경변수로 넘기면 맵 키가 소문자가 되므로 카테고리 이름은 대소문자를 구분하지 않고 찾는다 */
+        private val byCategory: Map<String, Int> = categories.mapKeys { it.key.uppercase() }
+
+        fun forCategory(category: String): Int = byCategory[category.uppercase()] ?: default
     }
 }
