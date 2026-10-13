@@ -134,13 +134,13 @@ class LotExpirationScanServiceIntegrationTest {
             assertThat(scalar("SELECT COUNT(*) FROM lot WHERE lot_id = $lotId AND lot_status = 'EXPIRED'")).isEqualTo(1L)
             assertThat(
                 scalar(
-                    "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'RESERVATION_FORCE_RELEASED' AND payload->>'$.reason' = 'LOT_EXPIRED'",
+                    "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'RESERVATION_FORCE_RELEASED' AND payload->>'$.data.reason' = 'LOT_EXPIRED'",
                 ),
             ).isEqualTo(1L)
             assertThat(
-                scalar("SELECT payload->>'$.transfers[0].quantity' FROM outbox_event WHERE event_type = 'LOT_EXPIRED'"),
+                scalar("SELECT payload->>'$.data.transfers[0].quantity' FROM outbox_event WHERE event_type = 'LOT_EXPIRED'"),
             ).isEqualTo(80L)
-            assertThat(scalar("SELECT payload->>'$.confirmedReservationIds[0]' FROM outbox_event WHERE event_type = 'LOT_EXPIRED'"))
+            assertThat(scalar("SELECT payload->>'$.data.confirmedReservationIds[0]' FROM outbox_event WHERE event_type = 'LOT_EXPIRED'"))
                 .isEqualTo(confirmed.reservationId)
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE event_type LIKE 'INVENTORY_%'")).isEqualTo(0L)
         }

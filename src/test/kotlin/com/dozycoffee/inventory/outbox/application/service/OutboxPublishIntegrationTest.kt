@@ -174,10 +174,20 @@ class OutboxPublishIntegrationTest {
             assertThat(records.map { eventId(it, byEventId) }.sorted()).isEqualTo(ids)
             assertThat(reservation.map { it.value() }).allMatch { it.contains("\"reservationId\"") }
             val allocations: List<JsonNode> =
-                reservation.map { JsonMapper.builder().build().readTree(it.value())["items"][0]["allocations"][0] }
+                reservation.map { JsonMapper.builder().build().readTree(it.value())["data"]["items"][0]["allocations"][0] }
             assertThat(allocations).allSatisfy { allocation ->
                 assertThat(allocation["lotNumber"].asString()).isEqualTo("A")
                 assertThat(allocation["expirationDate"].asString()).isEqualTo("2027-01-01")
+            }
+            records.forEach { record ->
+                val envelope: JsonNode = JsonMapper.builder().build().readTree(record.value())
+
+                fun header(name: String): String = String(record.headers().lastHeader(name).value(), Charsets.UTF_8)
+                assertThat(envelope["eventId"].asString()).isEqualTo(header("event-id"))
+                assertThat(envelope["eventType"].asString()).isEqualTo(header("event-type"))
+                assertThat(envelope["eventVersion"].asInt().toString()).isEqualTo(header("event-version"))
+                assertThat(envelope["source"].asString()).isEqualTo(header("source")).isEqualTo("inventory")
+                assertThat(envelope["occurredAt"].asString()).matches(".+[+-]\\d{2}:\\d{2}|.+Z")
             }
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PUBLISHED' AND published_at IS NOT NULL")).isEqualTo("4")
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PENDING'")).isEqualTo("0")

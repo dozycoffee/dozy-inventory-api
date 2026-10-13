@@ -236,10 +236,10 @@ class LotExpirationServiceIntegrationTest {
                     ),
                 ).isEqualTo(1L)
                 assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE partition_key = '$lotId'")).isEqualTo(1L)
-                assertThat(scalar("SELECT payload->>'$.transfers[0].quantity' FROM outbox_event")).isEqualTo(70L)
-                assertThat(scalar("SELECT payload->>'$.lotNumber' = 'EXP' FROM outbox_event")).isEqualTo(1L)
-                assertThat(scalar("SELECT payload->>'$.confirmedReservationIds[0]' FROM outbox_event")).isEqualTo(40L)
-                assertThat(scalar("SELECT JSON_LENGTH(payload->'$.confirmedReservationIds') FROM outbox_event")).isEqualTo(2L)
+                assertThat(scalar("SELECT payload->>'$.data.transfers[0].quantity' FROM outbox_event")).isEqualTo(70L)
+                assertThat(scalar("SELECT payload->>'$.data.lotNumber' = 'EXP' FROM outbox_event")).isEqualTo(1L)
+                assertThat(scalar("SELECT payload->>'$.data.confirmedReservationIds[0]' FROM outbox_event")).isEqualTo(40L)
+                assertThat(scalar("SELECT JSON_LENGTH(payload->'$.data.confirmedReservationIds') FROM outbox_event")).isEqualTo(2L)
             }
 
         @Test

@@ -10,32 +10,64 @@ import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxErrorCode
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
 import org.springframework.stereotype.Service
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
 import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /**
- * 호출한 서비스의 트랜잭션 안에서 이벤트를 저장한다. 트랜잭션을 직접 열지 않는다. 이벤트 ID(UUID v7)를 이때 만들고, 요청의 추적 컨텍스트가
- * 있으면 함께 저장해 발행기가 다른 스레드에서 헤더로 싣게 한다(ADR-0038).
+ * 호출한 서비스의 트랜잭션 안에서 이벤트를 저장한다. 트랜잭션을 직접 열지 않는다. 이벤트 ID(UUID v7)와 발생 시각을 이때 만들고,
+ * 호출한 쪽이 넘긴 도메인 본문(JSON)을 공통 형식(envelope)으로 감싸 `payload`에 저장한다. 요청의 추적 컨텍스트가 있으면
+ * 함께 저장해 발행기가 다른 스레드에서 헤더로 싣게 한다(ADR-0038).
  */
 @Service
 class OutboxService(
     private val outboxEventRepository: OutboxEventRepository,
     private val clock: Clock,
+    private val jsonMapper: JsonMapper,
 ) : RecordOutboxEventUseCase {
     override suspend fun record(command: RecordOutboxEventCommand) {
         val aggregateType: AggregateType =
             AggregateType.entries.firstOrNull { it.name == command.aggregateType }
                 ?: throw InvalidDomainValueException(OutboxErrorCode.INVALID_OUTBOX_EVENT)
+        val eventId: String = UuidV7.generate(clock.millis())
         outboxEventRepository.save(
             OutboxEvent.create(
                 aggregateType,
                 command.aggregateId,
                 command.eventType,
                 command.partitionKey,
-                command.payload,
-                UuidV7.generate(clock.millis()),
+                envelopeOf(command, eventId),
+                eventId,
                 command.eventVersion,
                 TraceContext.current(),
             ),
         )
+    }
+
+    /** 본문이 JSON 객체가 아니거나 이벤트 유형·버전이 잘못되면 거부한다(저장할 때의 검증은 [OutboxEvent.create]가 한 번 더 한다) */
+    private fun envelopeOf(
+        command: RecordOutboxEventCommand,
+        eventId: String,
+    ): String? {
+        if (command.payload.isBlank() || command.eventType.isBlank() || command.eventVersion < 1) return null
+        val data: JsonNode =
+            try {
+                jsonMapper.readTree(command.payload)
+            } catch (e: JacksonException) {
+                throw InvalidDomainValueException(OutboxErrorCode.INVALID_OUTBOX_EVENT)
+            }
+        if (!data.isObject) throw InvalidDomainValueException(OutboxErrorCode.INVALID_OUTBOX_EVENT)
+        val envelope: ObjectNode = jsonMapper.createObjectNode()
+        envelope.put("eventId", eventId)
+        envelope.put("eventType", command.eventType)
+        envelope.put("eventVersion", command.eventVersion)
+        envelope.put("occurredAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(OffsetDateTime.now(clock)))
+        envelope.put("source", OutboxEvent.SOURCE)
+        envelope.set("data", data)
+        return jsonMapper.writeValueAsString(envelope)
     }
 }

@@ -85,6 +85,9 @@ class OutboxEvent private constructor(
         const val MAX_ERROR_LENGTH: Int = 500
         const val DEFAULT_EVENT_VERSION: Int = 1
 
+        /** 이 서비스가 발행하는 이벤트의 `source` 값(헤더와 값의 envelope이 같다) */
+        const val SOURCE: String = "inventory"
+
         private val EVENT_ID_PATTERN: Regex = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         private val TRACEPARENT_PATTERN: Regex = Regex("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}")
 

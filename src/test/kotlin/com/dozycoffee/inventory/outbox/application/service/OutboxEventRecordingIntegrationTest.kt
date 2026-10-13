@@ -117,7 +117,7 @@ class OutboxEventRecordingIntegrationTest {
 
             assertThat(types()).containsExactly("INVENTORY_INCREASED")
             assertThat(scalar("SELECT partition_key FROM outbox_event")).isEqualTo("10:$productId")
-            assertThat(scalar("SELECT JSON_EXTRACT(payload, '$.quantityAfter') FROM outbox_event")).isEqualTo("5")
+            assertThat(scalar("SELECT JSON_EXTRACT(payload, '$.data.quantityAfter') FROM outbox_event")).isEqualTo("5")
         }
 
     @Test

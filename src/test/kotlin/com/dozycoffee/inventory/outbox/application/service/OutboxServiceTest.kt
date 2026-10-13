@@ -24,6 +24,8 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
 import reactor.util.context.Context
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -35,9 +37,12 @@ class OutboxServiceTest {
 
     private lateinit var service: OutboxService
 
+    private val jsonMapper: JsonMapper = JsonMapper.builder().build()
+
     @BeforeEach
     fun setUp() {
-        service = OutboxService(outboxEventRepository, Clock.fixed(Instant.parse("2026-10-13T01:00:00Z"), ZoneOffset.UTC))
+        service =
+            OutboxService(outboxEventRepository, Clock.fixed(Instant.parse("2026-10-13T01:00:00Z"), ZoneOffset.ofHours(9)), jsonMapper)
     }
 
     private fun command(aggregateType: String = "INVENTORY"): RecordOutboxEventCommand =
@@ -56,7 +61,7 @@ class OutboxServiceTest {
             assertEquals(5L, saved.firstValue.aggregateId)
             assertEquals("INVENTORY_INCREASED", saved.firstValue.eventType)
             assertEquals("10:100", saved.firstValue.partitionKey)
-            assertEquals("""{"a":1}""", saved.firstValue.payload)
+            assertEquals("""{"a":1}""", jsonMapper.readTree(saved.firstValue.payload)["data"].toString())
             assertEquals(OutboxStatus.PENDING, saved.firstValue.status)
         }
 
@@ -105,6 +110,35 @@ class OutboxServiceTest {
             verifyBlocking(outboxEventRepository, org.mockito.kotlin.times(2)) { save(saved.capture()) }
             assertEquals(null, saved.firstValue.traceparent)
             assertEquals(traceparent, saved.secondValue.traceparent)
+        }
+
+    @Test
+    fun `payload는 공통 형식으로 감싸고 최상위 메타는 헤더와 같은 값이다`() =
+        runBlocking<Unit> {
+            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
+
+            service.record(command().copy(eventVersion = 2))
+
+            val saved = argumentCaptor<OutboxEvent>()
+            verifyBlocking(outboxEventRepository) { save(saved.capture()) }
+            val envelope: JsonNode = jsonMapper.readTree(saved.firstValue.payload)
+            assertEquals(setOf("eventId", "eventType", "eventVersion", "occurredAt", "source", "data"), envelope.propertyNames().toSet())
+            assertEquals(saved.firstValue.eventId, envelope["eventId"].asString())
+            assertEquals("INVENTORY_INCREASED", envelope["eventType"].asString())
+            assertEquals(2, envelope["eventVersion"].asInt())
+            assertEquals("inventory", envelope["source"].asString())
+            assertEquals("2026-10-13T10:00:00+09:00", envelope["occurredAt"].asString())
+            assertEquals(1, envelope["data"]["a"].asInt())
+        }
+
+    @Test
+    fun `본문이 JSON 객체가 아니면 저장하지 않고 거부한다`() =
+        runBlocking<Unit> {
+            listOf("not json", "[1]", "\"x\"", "1", "null").forEach { payload ->
+                val e: InvalidDomainValueException = assertThrows { runBlocking { service.record(command().copy(payload = payload)) } }
+                assertEquals(OutboxErrorCode.INVALID_OUTBOX_EVENT, e.errorCode)
+            }
+            verifyBlocking(outboxEventRepository, never()) { save(any()) }
         }
 
     @Test
