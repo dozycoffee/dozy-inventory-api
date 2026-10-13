@@ -10,7 +10,7 @@ ADR-0006은 직원의 창고 소속을 WMS가 소유하고 inventory 서비스�
 
 ## 결정 (Decision)
 
-1. **소속 변경 이벤트는 직원별 소속 전체 목록이다**(사용자 확인). WMS가 `dozy.wms.warehouse-access` 토픽에 메시지 키 `principalId`, 값 `{eventType: "WAREHOUSE_ACCESS_CHANGED", eventId, occurredAt, principalId, warehouseIds: [...]}`를 보낸다. 받으면 그 직원의 소속을 이 목록으로 통째로 교체한다(없는 창고는 지우고 새 창고는 추가, 빈 목록은 소속 없음). 같은 이벤트를 다시 받아도 결과가 같고, 놓치거나 순서가 꼬여도 다음 이벤트로 바로잡히며, 처음 채우기는 WMS가 전 직원에게 같은 이벤트를 한 번씩 보내면 된다. 같은 직원의 이벤트는 같은 키라 순서가 지켜진다.
+1. **소속 변경 이벤트는 직원별 소속 전체 목록이다**(사용자 확인). WMS가 `dozy.wms.warehouse-access` 토픽에 메시지 키 `principalId`, 값 `{eventType: "WAREHOUSE_ACCESS_CHANGED", eventId, occurredAt, principalId, warehouseIds: [...]}`를 보낸다(처음 정한 평면 형식. 이후 공통 envelope으로 바뀌어 `principalId`와 `warehouseIds`는 `data` 아래에 있다. ADR-0038, `docs/events.md`). 받으면 그 직원의 소속을 이 목록으로 통째로 교체한다(없는 창고는 지우고 새 창고는 추가, 빈 목록은 소속 없음). 같은 이벤트를 다시 받아도 결과가 같고, 놓치거나 순서가 꼬여도 다음 이벤트로 바로잡히며, 처음 채우기는 WMS가 전 직원에게 같은 이벤트를 한 번씩 보내면 된다. 같은 직원의 이벤트는 같은 키라 순서가 지켜진다.
 2. **수신 실패는 세 번 다시 시도한 뒤 `{토픽}.dlt`로 보낸다.** JSON이 아니거나 필드가 잘못된 메시지는 다시 시도하지 않고 바로 보낸다. 소속은 요청 때마다 DB에서 읽으므로 수신이 늦어도 그 사이에만 거부된다.
 3. **role로 범위를 나눈다.** `admin`·`service`는 모든 창고이고, `warehouse_manager`만 사본에 있는 창고로 제한한다. 둘 다 가지면 모든 창고다. 요청 밖 작업(`SystemActor`)은 모든 창고다.
 4. **창고 관리자에게 열리는 API는 관리자 재고 조회(현황·상세·이력)와 가용 재고 조회이다**(사용자 확인). 변경 API(입고, 예약, 출고, 조정, 폐기, 반품, 재할당)는 서비스 전용 그대로다.

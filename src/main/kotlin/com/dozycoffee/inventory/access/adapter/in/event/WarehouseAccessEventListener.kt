@@ -32,7 +32,12 @@ class WarehouseAccessEventListener(
     fun onMessage(record: ConsumerRecord<String, String>) {
         val message: WarehouseAccessChangedMessage = jsonMapper.readValue(record.value(), WarehouseAccessChangedMessage::class.java)
         runBlocking { ActorContext.with(SystemActor) { replaceWarehouseAccessUseCase.replace(message.toCommand()) } }
-        log.info("직원 창고 소속을 교체했다: principalId={}, 창고 {}개, eventId={}", message.principalId, message.warehouseIds?.size, message.eventId)
+        log.info(
+            "직원 창고 소속을 교체했다: principalId={}, 창고 {}개, eventId={}",
+            message.data?.principalId,
+            message.data?.warehouseIds?.size,
+            message.eventId,
+        )
     }
 
     private companion object {
