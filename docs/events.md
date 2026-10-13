@@ -114,7 +114,7 @@ WMS는 `allocations[]`로 어느 Lot에서 몇 개를 꺼낼지 추가 조회 �
 
 ## 수신 이벤트: 직원 창고 소속 (WMS → inventory)
 
-inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한다(ADR-0032). **이 이벤트는 아직 공통 형식(ADR-0038)이 아닌 평면 형식이다.** WMS가 공통 형식으로 전환하는 것을 제안했고(WMS 프로젝트에서 결정), 전환 전까지 inventory는 아래 형식을 받는다. 창고 관리자(`inventory:warehouse_manager`)가 접근할 수 있는 창고를 판단하는 데 쓴다.
+inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한다(ADR-0032). **이 이벤트도 공통 형식(envelope, ADR-0038)이다.** WMS가 이 형식으로 발행하며(WMS ADR-0020) inventory는 envelope만 받는다. 최상위에 `principalId`가 있는 이전 평면 형식은 받지 않고 DLT로 보낸다. 창고 관리자(`inventory:warehouse_manager`)가 접근할 수 있는 창고를 판단하는 데 쓴다.
 
 | 항목 | 내용 |
 |------|------|
@@ -124,21 +124,27 @@ inventory 서비스가 구독하는 이벤트의 계약이다. WMS가 발행한�
 
 ```json
 {
-  "eventType": "WAREHOUSE_ACCESS_CHANGED",
   "eventId": "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b73",
+  "eventType": "WAREHOUSE_ACCESS_CHANGED",
+  "eventVersion": 1,
   "occurredAt": "2026-10-12T10:00:00+09:00",
-  "principalId": "0199a3c2-1111-7f30-8c4b-9d1e2f6a0b73",
-  "warehouseIds": [10, 20]
+  "source": "wms",
+  "data": {
+    "principalId": "0199a3c2-1111-7f30-8c4b-9d1e2f6a0b73",
+    "warehouseIds": [10, 20]
+  }
 }
 ```
 
 | 필드 | 설명 |
 |------|------|
-| eventType | `WAREHOUSE_ACCESS_CHANGED`만 있다 |
 | eventId | 이벤트 고유 ID(UUID). 추적용이다 |
-| occurredAt | 발생 시각(오프셋 포함 ISO-8601) |
-| principalId | `dozy-auth`의 직원 principalId(UUID, 36자) |
-| warehouseIds | 그 직원이 **지금** 소속된 창고 ID 전체. 중복 없는 양수이고 최대 1000개. 소속이 모두 없어지면 빈 배열 |
+| eventType | `WAREHOUSE_ACCESS_CHANGED`만 받는다 |
+| eventVersion | `1`만 받는다. 다른 버전은 DLT로 보낸다 |
+| occurredAt | 발생 시각(오프셋 포함 ISO-8601). 처리에는 쓰지 않는다 |
+| source | `wms`만 받는다 |
+| data.principalId | `dozy-auth`의 직원 principalId(UUID, 36자) |
+| data.warehouseIds | 그 직원이 **지금** 소속된 창고 ID 전체. 중복 없는 양수이고 최대 1000개. 소속이 모두 없어지면 빈 배열 |
 
 - **교체 의미**: 받으면 그 직원의 소속을 `warehouseIds`로 통째로 바꾼다. 같은 이벤트를 다시 받아도 결과가 같다(중복 전달에 안전).
 - **WMS가 보내는 시점**: 직원의 창고 소속이 추가·삭제될 때마다 그 직원의 전체 목록을 보낸다. 처음 연동할 때는 모든 직원에게 한 번씩 보내 사본을 채운다. 사본이 어긋났다고 의심되면 같은 이벤트를 다시 보내면 복구된다.
