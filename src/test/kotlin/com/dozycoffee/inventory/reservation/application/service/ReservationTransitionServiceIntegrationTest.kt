@@ -354,7 +354,7 @@ class ReservationTransitionServiceIntegrationTest {
                 ).isEqualTo(1L)
                 assertThat(
                     scalar(
-                        "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'RESERVATION_FORCE_RELEASED' AND payload->>'$.reason' = 'LOT_EXPIRED'",
+                        "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'RESERVATION_FORCE_RELEASED' AND payload->>'$.data.reason' = 'LOT_EXPIRED'",
                     ),
                 ).isEqualTo(1L)
             }

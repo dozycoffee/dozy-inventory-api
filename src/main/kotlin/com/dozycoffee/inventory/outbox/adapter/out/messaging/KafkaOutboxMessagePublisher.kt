@@ -25,7 +25,7 @@ class KafkaOutboxMessagePublisher(
                 headers().add(HEADER_EVENT_ID, bytes(event.eventId))
                 headers().add(HEADER_EVENT_TYPE, bytes(event.eventType))
                 headers().add(HEADER_EVENT_VERSION, bytes(event.eventVersion.toString()))
-                headers().add(HEADER_SOURCE, bytes(SOURCE))
+                headers().add(HEADER_SOURCE, bytes(OutboxEvent.SOURCE))
                 headers().add(HEADER_AGGREGATE_TYPE, bytes(event.aggregateType.name))
                 headers().add(HEADER_AGGREGATE_ID, bytes(event.aggregateId.toString()))
                 event.traceparent?.let { headers().add(HEADER_TRACEPARENT, bytes(it)) }
@@ -45,6 +45,5 @@ class KafkaOutboxMessagePublisher(
         const val HEADER_EVENT_VERSION: String = "event-version"
         const val HEADER_SOURCE: String = "source"
         const val HEADER_TRACEPARENT: String = "traceparent"
-        const val SOURCE: String = "inventory"
     }
 }
