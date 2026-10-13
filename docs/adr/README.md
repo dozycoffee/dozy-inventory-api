@@ -42,6 +42,7 @@
 | [0036](0036-configuration.md) | 설정과 운영 프로필 | Accepted |
 | [0037](0037-outbox-dead-letter.md) | Outbox 데드 레터(영구 실패 이벤트 격리) | Accepted |
 | [0038](0038-common-event-format.md) | 공통 이벤트 형식(envelope) | Accepted |
+| [0039](0039-event-metadata-in-payload.md) | 이벤트 메타데이터를 값(payload)에만 둔다 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 

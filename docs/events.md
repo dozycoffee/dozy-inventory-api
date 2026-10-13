@@ -1,14 +1,14 @@
 # 이벤트 계약 (구독자용)
 
 inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독하는 서비스(OMS, WMS, Store)는 이 문서를 기준으로 한다.
-발행 방식의 배경은 [ADR-0025](adr/0025-outbox-event-publishing.md), 공통 형식(envelope)의 배경은 [ADR-0038](adr/0038-common-event-format.md)에 있다. `data`의 필드 이름과 이벤트 유형은 계약이라 함부로 바꾸지 않는다.
+발행 방식의 배경은 [ADR-0025](adr/0025-outbox-event-publishing.md), 공통 형식(envelope)의 배경은 [ADR-0038](adr/0038-common-event-format.md)과 [ADR-0039](adr/0039-event-metadata-in-payload.md)에 있다. `data`의 필드 이름과 이벤트 유형은 계약이라 함부로 바꾸지 않는다.
 
-> 이 문서의 공통 형식(ADR-0038)은 모두 적용되었다. 값은 envelope(`eventId`, `eventType`, `eventVersion`, `occurredAt`, `source`, `data`)이고 `data`에는 이벤트별 도메인 필드만 있다. 헤더의 `event-id`는 UUID이다.
+> **전환 중**: 아래는 ADR-0039에서 확정한 형식이다. 메타데이터는 값(JSON)에만 두고 Kafka 헤더는 쓰지 않는다. 코드 구현은 진행 중이며(`feature_list.json` F-024) 구현 전까지 실제 발행은 이전 형식(값의 `traceparent` 없음, Kafka 헤더 7종이 함께 나감)이다. 구독자는 헤더를 쓰지 말고 값의 필드만 읽어야 한다.
 
 ## 전달 방식
 
 - 상태를 바꾸는 트랜잭션 안에서 `outbox_event`에 저장되고, 별도 발행기가 순서대로 Kafka로 내보낸다. 수량·예약이 바뀌었는데 이벤트가 빠지거나, 롤백되었는데 이벤트만 나가는 일은 없다.
-- **최소 한 번(at-least-once) 전달**이다. 발행 직후 서비스가 죽으면 같은 이벤트가 다시 나갈 수 있으므로 **구독자는 `event-id` 헤더(UUID)로 중복을 걸러야 한다.** 격리된 이벤트를 재발행해도 `event-id`는 같다.
+- **최소 한 번(at-least-once) 전달**이다. 발행 직후 서비스가 죽으면 같은 이벤트가 다시 나갈 수 있으므로 **구독자는 값의 `eventId`(UUID)로 중복을 걸러야 한다.** 격리된 이벤트를 재발행해도 `eventId`는 같다.
 - 같은 파티션 키의 이벤트는 저장된 순서대로 발행된다. 다른 키 사이의 순서는 보장하지 않는다.
 - 발행에 영구히 실패하는 이벤트는 격리(`DEAD`)되어 나가지 않을 수 있고(운영자가 확인해 재발행한다), 이때 같은 키의 뒤 이벤트는 그대로 발행된다. 구독자는 빠진 이벤트를 만날 수 있고, 재발행된 이벤트는 그 사이 나간 이벤트보다 늦게 도착한다. 상태를 다시 확인해야 하면 조회 API(가용 재고 조회 등)로 맞춘다(ADR-0037).
 - 발행이 끝난 이벤트는 보관 기간(기본 7일) 뒤 서비스의 DB에서 지워진다. Kafka의 보관은 브로커 설정을 따른다.
@@ -16,7 +16,7 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 ## 공통 형식(envelope)
 
-모든 이벤트의 값은 공통 메타를 최상위에 두고 도메인 본문을 `data` 안에 둔다. 아래 각 이벤트 절의 표는 `data`의 필드다.
+모든 이벤트의 값은 공통 메타를 최상위에 두고 도메인 본문을 `data` 안에 둔다. **메타데이터는 값에만 있고 Kafka 헤더는 쓰지 않는다.** 아래 각 이벤트 절의 표는 `data`의 필드다.
 
 ```json
 {
@@ -25,24 +25,26 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
   "eventVersion": 1,
   "occurredAt": "2026-10-12T10:00:00+09:00",
   "source": "inventory",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
   "data": { "reservationId": 1 }
 }
 ```
 
 | 필드 | 설명 |
 |------|------|
-| eventId | 이벤트 고유 ID(UUID, 36자). 헤더 `event-id`와 같은 값. 서비스 전체에서 유일하다 |
-| eventType | 이벤트 유형. 헤더 `event-type`과 같은 값. `{집계}_{과거형 동사}` 대문자 스네이크 |
+| eventId | 이벤트 고유 ID(UUID, 36자). 서비스 전체에서 유일하고 구독자의 중복 제거 키다 |
+| eventType | 이벤트 유형. `{집계}_{과거형 동사}` 대문자 스네이크. 접두사가 집계(토픽)다 |
 | eventVersion | 스키마 버전(정수, 1부터). 필드 삭제·이름 변경·의미 변경처럼 호환되지 않는 변경에만 올린다. 필드 추가는 올리지 않는다 |
 | occurredAt | 이벤트를 트랜잭션 안에서 Outbox에 기록한 시각. Kafka 발행 시각이 아니다 |
 | source | 발행 서비스 이름(`inventory`) |
+| traceparent | (선택) W3C Trace Context(`00-{trace-id 32자}-{span-id 16자}-{flags 2자}`). 요청 안에서 저장한 이벤트에만 있고 없으면 필드를 보내지 않는다 |
 | data | 이벤트별 본문 |
 
 구독자는 알 수 없는 필드를 무시해야 한다(필드 추가는 `eventVersion`을 올리지 않는다).
 
-## 토픽, 키, 헤더
+## 토픽과 키
 
-파티션 키와 `aggregate-id`는 모두 **문자열**이다. 구독자는 숫자로 파싱하지 않는다.
+파티션 키는 **문자열**이다. 구독자는 숫자로 파싱하지 않는다. 집계와 집계 ID는 헤더나 별도 필드가 아니라 토픽 이름, `eventType`의 접두사, `data`의 필드(`reservationId`, `inventoryId` 등)로 알 수 있다.
 
 | 집계 | 토픽 | 파티션 키(메시지 키) |
 |------|------|-----------------------|
@@ -53,15 +55,7 @@ inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독�
 
 토픽 접두사 `dozy.inventory`는 설정(`inventory.outbox.publisher.topic-prefix`)이다.
 
-| 헤더 | 내용 |
-|------|------|
-| `event-id` | 이벤트의 고유 ID(UUID). 중복 제거에 쓴다 |
-| `event-type` | 이벤트 유형 |
-| `event-version` | 스키마 버전(정수를 문자열로) |
-| `source` | 발행 서비스 이름(`inventory`) |
-| `aggregate-type` | `INVENTORY`, `RESERVATION`, `LOT`, `PRODUCT` |
-| `aggregate-id` | 집계의 ID(재고 행, 예약, Lot, 상품)를 문자열로 |
-| `traceparent` | W3C 분산 추적 헤더. 저장 시점의 추적 컨텍스트가 있을 때만 붙는다 |
+**Kafka 헤더는 쓰지 않는다**(ADR-0039). 구독자는 헤더가 아니라 값만 읽는다.
 
 ## 재고 이벤트
 

@@ -159,5 +159,12 @@
     "description": "MSA 공통 이벤트 형식을 도입한다. 결정은 ADR-0038, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0038, events.md) 완료, (2) 완료: outbox_event에 event_id(UUID v7)·event_version·traceparent 컬럼 추가(V1 수정)와 헤더 확장(event-version, source, traceparent), (3) 완료: envelope 직렬화 공통화(OutboxService가 도메인 본문을 envelope으로 감싼다), (4) 완료: 발행기별 data 정리(중복 eventType·occurredAt 제거)와 null 필드 생략. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS WAREHOUSE_ACCESS_CHANGED의 envelope 전환은 WMS 프로젝트와 협의한다.",
     "status": "completed",
     "dependencies": ["F-018"]
+  },
+  {
+    "id": "F-024",
+    "name": "이벤트 메타데이터를 값에만 두기",
+    "description": "Kafka 헤더를 없애고 이벤트 메타데이터를 값(JSON)에만 둔다. 결정은 ADR-0039, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0039, events.md) 완료, (2) OutboxService가 traceparent를 envelope 최상위(선택)에 넣고, 발행기는 헤더 없이 값과 키만 보내며, outbox_event의 traceparent·event_version 컬럼을 V1에서 제거하고 테스트·runbook을 갱신한다. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS의 같은 전환은 WMS 프로젝트와 협의한다.",
+    "status": "pending",
+    "dependencies": ["F-023"]
   }
 ]
