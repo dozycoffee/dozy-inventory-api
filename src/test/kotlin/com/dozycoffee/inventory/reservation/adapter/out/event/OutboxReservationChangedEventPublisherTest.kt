@@ -22,10 +22,7 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
-import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 
 @ExtendWith(MockitoExtension::class)
 class OutboxReservationChangedEventPublisherTest {
@@ -45,7 +42,6 @@ class OutboxReservationChangedEventPublisherTest {
                 recordOutboxEventUseCase,
                 getInventoryLotsUseCase,
                 mapper,
-                Clock.fixed(Instant.parse("2026-10-08T03:00:00Z"), ZoneId.of("Asia/Seoul")),
             )
     }
 
@@ -98,7 +94,7 @@ class OutboxReservationChangedEventPublisherTest {
         runBlocking<Unit> {
             val json: JsonNode = mapper.readTree(recorded(event()).payload)
 
-            assertEquals("RESERVATION_CONFIRMED", json["eventType"].asString())
+            assertEquals(false, json.has("eventType"))
             assertEquals(7L, json["reservationId"].asLong())
             assertEquals(10L, json["warehouseId"].asLong())
             assertEquals("OMS", json["channel"].asString())
@@ -114,7 +110,7 @@ class OutboxReservationChangedEventPublisherTest {
             assertEquals(4, allocations[1]["quantity"].asInt())
             assertEquals(9L, json["items"][1]["allocations"][0]["inventoryId"].asLong())
             assertEquals("svc-oms-order-1", json["idempotencyKey"].asString())
-            assertEquals("2026-10-08T12:00:00+09:00", json["occurredAt"].asString())
+            assertEquals(false, json.has("occurredAt"))
         }
 
     @Test
@@ -151,9 +147,9 @@ class OutboxReservationChangedEventPublisherTest {
                 )
             val normal: JsonNode = mapper.readTree(recorded(event(ReservationChangeType.RELEASED)).payload)
 
-            assertEquals("RESERVATION_FORCE_RELEASED", forced["eventType"].asString())
+            assertEquals(false, forced.has("eventType"))
             assertEquals("LOT_EXPIRED", forced["reason"].asString())
-            assertEquals(false, normal.has("reason"))
+            assertTrue(normal["reason"]?.isNull ?: true)
         }
 
     @Test

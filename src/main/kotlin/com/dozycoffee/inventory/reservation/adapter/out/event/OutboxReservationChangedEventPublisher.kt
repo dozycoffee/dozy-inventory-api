@@ -6,12 +6,9 @@ import com.dozycoffee.inventory.outbox.application.port.`in`.RecordOutboxEventUs
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangedEvent
 import com.dozycoffee.inventory.reservation.application.port.out.ReservationChangedEventPublisher
-import com.fasterxml.jackson.annotation.JsonInclude
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
-import java.time.Clock
 import java.time.LocalDate
-import java.time.OffsetDateTime
 
 /**
  * 예약 변경 이벤트를 호출한 서비스의 트랜잭션 안에서 Outbox에 저장한다(ADR-0025). 한 예약이 여러 상품에 걸치므로
@@ -24,7 +21,6 @@ class OutboxReservationChangedEventPublisher(
     private val recordOutboxEventUseCase: RecordOutboxEventUseCase,
     private val getInventoryLotsUseCase: GetInventoryLotsUseCase,
     private val jsonMapper: JsonMapper,
-    private val clock: Clock,
 ) : ReservationChangedEventPublisher {
     override suspend fun publish(event: ReservationChangedEvent) {
         val eventType: String = "RESERVATION_${event.changeType.name}"
@@ -38,22 +34,20 @@ class OutboxReservationChangedEventPublisher(
                 aggregateId = event.reservationId,
                 eventType = eventType,
                 partitionKey = "${event.warehouseId}:${event.reservationId}",
-                payload = jsonMapper.writeValueAsString(Payload.of(eventType, event, lots, OffsetDateTime.now(clock))),
+                payload = jsonMapper.writeValueAsString(Payload.of(event, lots)),
             ),
         )
     }
 
-    /** 구독자에게 보이는 이벤트 본문. 필드 이름은 계약이라 함부로 바꾸지 않는다 */
+    /** 구독자에게 보이는 이벤트 본문(envelope의 `data`). 필드 이름은 계약이라 함부로 바꾸지 않는다. `null` 필드는 서비스가 지운다 */
     data class Payload(
-        val eventType: String,
-        val occurredAt: OffsetDateTime,
         val reservationId: Long,
         val warehouseId: Long,
         val channel: String,
         val externalOrderId: String,
         val items: List<Item>,
         val idempotencyKey: String,
-        @get:JsonInclude(JsonInclude.Include.NON_NULL) val reason: String? = null,
+        val reason: String? = null,
     ) {
         data class Item(
             val productId: Long,
@@ -71,14 +65,10 @@ class OutboxReservationChangedEventPublisher(
 
         companion object {
             fun of(
-                eventType: String,
                 event: ReservationChangedEvent,
                 lots: Map<Long, InventoryLotResult>,
-                occurredAt: OffsetDateTime,
             ): Payload =
                 Payload(
-                    eventType,
-                    occurredAt,
                     event.reservationId,
                     event.warehouseId,
                     event.channel,

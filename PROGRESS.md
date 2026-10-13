@@ -7,7 +7,7 @@
 - 패키지 구조 확정(ADR-0010): 도메인 모델과 영속성 엔티티 분리(도메인은 감사 필드를 모름), 다른 도메인은 UseCase로만 호출, 도메인 패키지 6개, `/api/v1`. F-005(상품 마스터)는 사용자가 직접 구현한다.
 - `main`은 보호되어 있다(PR과 CI `verify` 필수, Rebase and merge만 허용). Kotlin·Spring Boot·Gradle wrapper의 마이너·메이저 업데이트는 Dependabot에서 제외했다(WMS와 버전 정렬).
 - 로드맵 변경: 인증 연동(F-020)을 첫 API(F-008) 앞으로 옮겨 완료했다. `dozy-auth` 서버에 `inventory` audience, role 3개, system client를 등록하는 것은 개발·테스트의 선행 조건이 아니다(테스트는 `auth-test`). 실제 서버와 연동을 확인하거나 배포하기 전에 관리자 API로 등록한다.
-- 진행 중: F-023(공통 이벤트 형식). 설계는 ADR-0038과 `docs/events.md`로 확정했고(1단계), 구현은 2~4단계가 남았다.
+- 완료: F-023(공통 이벤트 형식, ADR-0038).
 - 미확정: `reservation.channel` 값(채널 종류), 캐시 도입 시점.
 
 ## 세션 로그
@@ -64,10 +64,11 @@
 - F-023 1단계: MSA 공통 이벤트 형식을 확정했다(ADR-0038, 사용자 확인). 이벤트 ID는 Long(`outbox_event_id`)에서 UUID(v7 권장, 저장 시점 생성, 재발행해도 유지)로 바꾸고 헤더와 payload에 같은 값을 둔다. 값은 공통 메타(`eventId`, `eventType`, `eventVersion`, `occurredAt`, `source`)를 최상위에, 도메인 본문을 `data`에 두는 envelope이다. 헤더는 `event-version`, `source`, W3C `traceparent`를 더하고 `aggregate-id`·파티션 키는 문자열로 규정한다. `null` 필드는 생략한다. `eventType`·토픽 이름 규칙은 유지한다. 배포 전이라 호환 계층 없이 한 번에 전환한다. `docs/events.md`를 새 형식으로 고쳤다(실제 발행은 2~4단계 구현 전까지 이전 형식). 코드는 바꾸지 않았다.
 - F-023 2단계(ADR-0038): `outbox_event`에 `event_id`(CHAR(36), 유니크, UUID v7), `event_version`(기본 1), `traceparent`를 V1에 추가했다. 이벤트 ID는 `OutboxService`가 저장할 때 `Clock` 시각으로 만들고(`UuidV7`, 재발행해도 유지), 발행기는 헤더 `event-id`에 `outbox_event_id` 대신 이 UUID를 싣고 `event-version`·`source`(`inventory`)·`traceparent`(있을 때만)를 더한다. 추적 컨텍스트는 `TraceIdWebFilter`가 요청마다 만들어 Reactor Context에 싣는다(`TraceContext`): 요청의 올바른 `traceparent`가 있으면 trace-id를 이어받고, 없으면 32자리 16진수 `X-Trace-Id`, 그것도 아니면 새 값이며 span-id는 새로 만든다. 요청 밖(스케줄러)에서 저장한 이벤트는 `traceparent`가 없다. payload는 아직 이전 형식이다(3~4단계). **로컬 DB는 `docker compose down -v`로 다시 만든다.**
 - F-023 3단계(ADR-0038): envelope 직렬화를 `OutboxService`로 모았다. 발행기 4개는 도메인 본문(JSON 객체)만 넘기고(`RecordOutboxEventCommand.payload`), 서비스가 `eventId`·`eventType`·`eventVersion`·`occurredAt`(Outbox 기록 시각, ISO 오프셋)·`source`(`inventory`)와 `data`로 감싸 `outbox_event.payload`에 저장한다. 본문이 JSON 객체가 아니면 저장하지 않고 거부한다. 값의 `eventId`·`eventType`·`eventVersion`·`source`는 Kafka 헤더와 같은 값임을 통합 테스트로 확인한다. `data`에는 이전 형식의 `eventType`·`occurredAt`이 중복으로 남아 있고 `null` 필드도 아직 내보낸다(4단계에서 정리).
+- F-023 4단계(완료, ADR-0038): 발행기 4개의 `data`에서 중복이던 `eventType`·`occurredAt`을 지우고 `Clock` 의존도 없앴다. `null` 필드는 `OutboxService`가 `data` 전체(중첩 객체, 배열 안 객체)에서 지운다(배열 원소 자체와 `0`·`""`·`[]`는 그대로). 그래서 `expirationDate`가 없는 Lot과 `reason`이 없는 예약 이벤트는 필드가 없다. 통합 테스트로 발행된 값에 `null`이 없고 `data`에 `eventType`·`occurredAt`이 없음을 확인한다. `docs/events.md`의 전환 안내를 지웠다. 남은 일: WMS의 `WAREHOUSE_ACCESS_CHANGED` envelope 전환 협의(WMS 프로젝트), 구독자(OMS, WMS, Store)가 새 형식(`data` 아래 필드, `event-id` UUID)으로 읽도록 맞추기.
 
 ## 다음 세션에서 할 일
 
-0. F-023 4단계(발행기별 `data` 정리: 중복 `eventType`·`occurredAt` 제거, `null` 생략, 문서·테스트 갱신)가 이어진다. 시작 전에 OMS·WMS·Store가 운영 중이 아닌지, WMS `WAREHOUSE_ACCESS_CHANGED`의 envelope 전환 여부를 확인한다.
+0. WMS·OMS·Store가 `docs/events.md`의 공통 형식(envelope, `event-id` UUID)으로 읽도록 맞추고, WMS의 `WAREHOUSE_ACCESS_CHANGED` envelope 전환 여부를 정한다(WMS 프로젝트와 협의).
 1. 로드맵의 나머지 기능은 완료됐다. WMS 프로젝트에서 직원 창고 소속 변경 이벤트 발행(`docs/events.md`)과 창고 수량 조회 API(`docs/adr/0033-reconciliation.md`)를 구현해 연동한다. 변경 API는 `Idempotency-Key` 헤더를 쓴다. 테스트는 `@Nested`로 묶는다.
 2. 실제 서버 연동 확인·배포 전에 `dozy-auth`에 `inventory` audience, `inventory:service`·`inventory:warehouse_manager`·`inventory:admin` role, system client(`svc-wms`, `svc-oms`, `svc-store`)를 등록한다(사용자 작업).
 3. 운영 환경의 Kafka 클러스터 주소(`KAFKA_BOOTSTRAP_SERVERS`)와 토픽 파티션·복제 수를 정한다(🔶 미확정).

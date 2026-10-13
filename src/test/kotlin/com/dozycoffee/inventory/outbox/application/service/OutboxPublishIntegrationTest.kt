@@ -183,6 +183,8 @@ class OutboxPublishIntegrationTest {
                 val envelope: JsonNode = JsonMapper.builder().build().readTree(record.value())
 
                 fun header(name: String): String = String(record.headers().lastHeader(name).value(), Charsets.UTF_8)
+                assertThat(envelope["data"].propertyNames().toList()).doesNotContain("eventType", "occurredAt")
+                assertThat(envelope.toString()).doesNotContain(":null")
                 assertThat(envelope["eventId"].asString()).isEqualTo(header("event-id"))
                 assertThat(envelope["eventType"].asString()).isEqualTo(header("event-type"))
                 assertThat(envelope["eventVersion"].asInt().toString()).isEqualTo(header("event-version"))

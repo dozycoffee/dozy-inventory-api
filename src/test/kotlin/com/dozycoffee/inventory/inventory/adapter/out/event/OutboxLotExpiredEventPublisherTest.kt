@@ -15,10 +15,7 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.verifyBlocking
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
-import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 
 @ExtendWith(MockitoExtension::class)
 class OutboxLotExpiredEventPublisherTest {
@@ -34,7 +31,6 @@ class OutboxLotExpiredEventPublisherTest {
             OutboxLotExpiredEventPublisher(
                 recordOutboxEventUseCase,
                 mapper,
-                Clock.fixed(Instant.parse("2026-10-12T03:00:00Z"), ZoneId.of("Asia/Seoul")),
             )
     }
 
@@ -71,8 +67,8 @@ class OutboxLotExpiredEventPublisherTest {
         runBlocking<Unit> {
             val json: JsonNode = mapper.readTree(recorded(event).payload)
 
-            assertEquals("LOT_EXPIRED", json["eventType"].asString())
-            assertEquals("2026-10-12T12:00:00+09:00", json["occurredAt"].asString())
+            assertEquals(false, json.has("eventType"))
+            assertEquals(false, json.has("occurredAt"))
             assertEquals(7L, json["lotId"].asLong())
             assertEquals(100L, json["productId"].asLong())
             assertEquals("LOT-A", json["lotNumber"].asString())
