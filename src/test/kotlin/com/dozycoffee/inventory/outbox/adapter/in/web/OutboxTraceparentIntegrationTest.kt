@@ -15,6 +15,8 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.http.MediaType
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.test.web.reactive.server.WebTestClient
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
 /** 실제 보안 체인, 서비스, MySQL을 거쳐 요청의 추적 컨텍스트가 Outbox 이벤트에 함께 저장되는지 검증한다(ADR-0038) */
 @SpringBootTest
@@ -28,6 +30,8 @@ class OutboxTraceparentIntegrationTest {
 
     @Autowired
     private lateinit var databaseClient: DatabaseClient
+
+    private val jsonMapper: JsonMapper = JsonMapper.builder().build()
 
     @Autowired
     private lateinit var lotPersistenceAdapter: LotPersistenceAdapter
@@ -57,24 +61,26 @@ class OutboxTraceparentIntegrationTest {
             .isCreated
     }
 
-    private suspend fun rows(): List<Map<String, Any?>> =
+    private suspend fun envelopes(): List<Pair<String, JsonNode>> =
         databaseClient
-            .sql("SELECT event_id, event_version, traceparent FROM outbox_event ORDER BY outbox_event_id")
+            .sql("SELECT event_id, payload FROM outbox_event ORDER BY outbox_event_id")
             .fetch()
             .all()
             .collectList()
             .awaitFirst()
+            .map { it["event_id"].toString() to jsonMapper.readTree(it["payload"].toString()) }
 
     @Test
-    fun `요청의 traceparent의 trace-id를 이어받아 이벤트와 함께 저장한다`() =
+    fun `요청의 traceparent의 trace-id를 이어받아 envelope 최상위에 저장한다`() =
         runBlocking<Unit> {
             register("TRACE-1", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 
-            val row: Map<String, Any?> = rows().single()
-            assertThat(row["traceparent"].toString()).matches("00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01")
-            assertThat(row["traceparent"].toString()).doesNotContain("00f067aa0ba902b7")
-            assertThat(row["event_id"].toString()).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
-            assertThat(row["event_version"].toString()).isEqualTo("1")
+            val (eventId: String, envelope: JsonNode) = envelopes().single()
+            assertThat(envelope["traceparent"].asString()).matches("00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01")
+            assertThat(envelope["traceparent"].asString()).doesNotContain("00f067aa0ba902b7")
+            assertThat(envelope["eventId"].asString()).isEqualTo(eventId)
+            assertThat(eventId).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+            assertThat(envelope["eventVersion"].asInt()).isEqualTo(1)
         }
 
     @Test
@@ -83,8 +89,10 @@ class OutboxTraceparentIntegrationTest {
             register("TRACE-2", null)
             register("TRACE-3", "garbage")
 
-            val rows: List<Map<String, Any?>> = rows()
-            assertThat(rows.map { it["traceparent"].toString() }).allMatch { it.matches(Regex("00-[0-9a-f]{32}-[0-9a-f]{16}-01")) }
-            assertThat(rows.map { it["event_id"].toString() }.toSet()).hasSize(2)
+            val envelopes: List<Pair<String, JsonNode>> = envelopes()
+            assertThat(
+                envelopes.map { it.second["traceparent"].asString() },
+            ).allMatch { it.matches(Regex("00-[0-9a-f]{32}-[0-9a-f]{16}-01")) }
+            assertThat(envelopes.map { it.first }.toSet()).hasSize(2)
         }
 }

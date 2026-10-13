@@ -10,14 +10,12 @@ import java.time.LocalDateTime
 /**
  * 발행 대기 이벤트. 수량 변경과 같은 트랜잭션으로 저장하고 별도 발행기가 Kafka로 내보낸다(ADR-0025).
  * [payload]는 JSON 문자열이고 같은 [partitionKey]는 [outboxEventId] 순서로 발행한다. [eventId]는 구독자가 중복을 거르는 UUID이며
- * 재발행해도 바뀌지 않는다(ADR-0038). [outboxEventId]는 내부 키와 발행 순서의 기준이라 밖으로 내보내지 않는다. [traceparent]는 저장 시점의
- * W3C 추적 컨텍스트이고 요청 밖에서 만든 이벤트는 null이다.
+ * 재발행해도 바뀌지 않는다(ADR-0038). [outboxEventId]는 내부 키와 발행 순서의 기준이라 밖으로 내보내지 않는다.
+ * 이벤트 유형·버전·추적 컨텍스트 같은 메타데이터는 저장할 때 [payload]의 envelope에 담기므로 따로 갖지 않는다(ADR-0039).
  */
 class OutboxEvent private constructor(
     val outboxEventId: Long?,
     val eventId: String,
-    val eventVersion: Int,
-    val traceparent: String?,
     val aggregateType: AggregateType,
     val aggregateId: Long,
     val eventType: String,
@@ -83,13 +81,11 @@ class OutboxEvent private constructor(
     companion object {
         const val MAX_KEY_LENGTH: Int = 100
         const val MAX_ERROR_LENGTH: Int = 500
-        const val DEFAULT_EVENT_VERSION: Int = 1
 
         /** 이 서비스가 발행하는 이벤트의 `source` 값(헤더와 값의 envelope이 같다) */
         const val SOURCE: String = "inventory"
 
         private val EVENT_ID_PATTERN: Regex = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-        private val TRACEPARENT_PATTERN: Regex = Regex("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}")
 
         fun create(
             aggregateType: AggregateType,
@@ -98,13 +94,9 @@ class OutboxEvent private constructor(
             partitionKey: String?,
             payload: String?,
             eventId: String,
-            eventVersion: Int = DEFAULT_EVENT_VERSION,
-            traceparent: String? = null,
         ): OutboxEvent {
             if (aggregateId < 1 ||
                 !EVENT_ID_PATTERN.matches(eventId) ||
-                eventVersion < 1 ||
-                (traceparent != null && !TRACEPARENT_PATTERN.matches(traceparent)) ||
                 eventType.isNullOrBlank() ||
                 eventType.length > MAX_KEY_LENGTH ||
                 partitionKey.isNullOrBlank() ||
@@ -116,8 +108,6 @@ class OutboxEvent private constructor(
             return OutboxEvent(
                 null,
                 eventId,
-                eventVersion,
-                traceparent,
                 aggregateType,
                 aggregateId,
                 eventType,
@@ -146,14 +136,10 @@ class OutboxEvent private constructor(
             publishedAt: LocalDateTime?,
             lastError: String? = null,
             deadAt: LocalDateTime? = null,
-            eventVersion: Int = DEFAULT_EVENT_VERSION,
-            traceparent: String? = null,
         ): OutboxEvent =
             OutboxEvent(
                 outboxEventId,
                 eventId,
-                eventVersion,
-                traceparent,
                 aggregateType,
                 aggregateId,
                 eventType,

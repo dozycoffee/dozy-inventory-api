@@ -20,8 +20,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * 호출한 서비스의 트랜잭션 안에서 이벤트를 저장한다. 트랜잭션을 직접 열지 않는다. 이벤트 ID(UUID v7)와 발생 시각을 이때 만들고,
- * 호출한 쪽이 넘긴 도메인 본문(JSON)을 공통 형식(envelope)으로 감싸 `payload`에 저장한다. 요청의 추적 컨텍스트가 있으면
- * 함께 저장해 발행기가 다른 스레드에서 헤더로 싣게 한다(ADR-0038).
+ * 호출한 쪽이 넘긴 도메인 본문(JSON)을 공통 형식(envelope)으로 감싸 `payload`에 저장한다. 요청의 추적 컨텍스트가
+ * 있으면 envelope의 `traceparent`에 담는다. 메타데이터는 값에만 있고 Kafka 헤더는 쓰지 않는다(ADR-0038, ADR-0039).
  */
 @Service
 class OutboxService(
@@ -42,14 +42,12 @@ class OutboxService(
                 command.partitionKey,
                 envelopeOf(command, eventId),
                 eventId,
-                command.eventVersion,
-                TraceContext.current(),
             ),
         )
     }
 
     /** 본문이 JSON 객체가 아니거나 이벤트 유형·버전이 잘못되면 거부한다(저장할 때의 검증은 [OutboxEvent.create]가 한 번 더 한다) */
-    private fun envelopeOf(
+    private suspend fun envelopeOf(
         command: RecordOutboxEventCommand,
         eventId: String,
     ): String? {
@@ -67,6 +65,7 @@ class OutboxService(
         envelope.put("eventVersion", command.eventVersion)
         envelope.put("occurredAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(OffsetDateTime.now(clock)))
         envelope.put("source", OutboxEvent.SOURCE)
+        TraceContext.current()?.let { envelope.put("traceparent", it) }
         envelope.set("data", withoutNulls(data))
         return jsonMapper.writeValueAsString(envelope)
     }

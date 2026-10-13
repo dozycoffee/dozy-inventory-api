@@ -80,21 +80,14 @@ class OutboxEventPersistenceAdapterTest {
             }
 
         @Test
-        fun `이벤트 ID와 버전과 추적 컨텍스트를 저장하고 그대로 읽는다`() =
+        fun `이벤트 ID를 저장하고 그대로 읽는다`() =
             runBlocking<Unit> {
                 val id: String = newEventId()
-                val trace = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
-                val saved: OutboxEvent =
-                    adapter.save(OutboxEvent.create(AggregateType.PRODUCT, 3L, "PRODUCT_REGISTERED", "3", "{}", id, 2, trace))
+                val saved: OutboxEvent = adapter.save(OutboxEvent.create(AggregateType.PRODUCT, 3L, "PRODUCT_REGISTERED", "3", "{}", id))
 
                 val loaded: OutboxEvent = checkNotNull(adapter.findById(checkNotNull(saved.outboxEventId)))
-                val plain: OutboxEvent = checkNotNull(adapter.findById(checkNotNull(adapter.save(event()).outboxEventId)))
 
                 assertThat(loaded.eventId).isEqualTo(id)
-                assertThat(loaded.eventVersion).isEqualTo(2)
-                assertThat(loaded.traceparent).isEqualTo(trace)
-                assertThat(plain.eventVersion).isEqualTo(1)
-                assertThat(plain.traceparent).isNull()
             }
 
         @Test

@@ -235,7 +235,6 @@ CREATE TABLE outbox_event
 (
     outbox_event_id BIGINT NOT NULL AUTO_INCREMENT,
     event_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-    event_version INT NOT NULL DEFAULT 1,
     aggregate_type VARCHAR(50) NOT NULL,
     aggregate_id BIGINT NOT NULL,
     event_type VARCHAR(100) NOT NULL,
@@ -244,13 +243,11 @@ CREATE TABLE outbox_event
     status VARCHAR(50) NOT NULL,
     attempt_count INT NOT NULL DEFAULT 0,
     last_error VARCHAR(500) DEFAULT NULL,
-    traceparent VARCHAR(55) CHARACTER SET ascii DEFAULT NULL,
     created_at DATETIME(6) NOT NULL,
     published_at DATETIME(6) DEFAULT NULL,
     dead_at DATETIME(6) DEFAULT NULL,
     PRIMARY KEY (outbox_event_id),
     CONSTRAINT uq_outbox_event_id UNIQUE (event_id),
-    CONSTRAINT chk_outbox_event_version CHECK (event_version >= 1),
     CONSTRAINT chk_outbox_attempt_count CHECK (attempt_count >= 0),
     CONSTRAINT ck_outbox_aggregate_type CHECK (aggregate_type IN ('INVENTORY', 'RESERVATION', 'LOT', 'PRODUCT', 'ADJUSTMENT')),
     CONSTRAINT ck_outbox_status CHECK (status IN ('PENDING', 'PUBLISHED', 'DEAD'))
