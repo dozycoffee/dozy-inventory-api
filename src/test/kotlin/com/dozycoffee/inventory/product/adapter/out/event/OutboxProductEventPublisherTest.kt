@@ -19,9 +19,6 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.verifyBlocking
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
 
 @ExtendWith(MockitoExtension::class)
 class OutboxProductEventPublisherTest {
@@ -37,7 +34,6 @@ class OutboxProductEventPublisherTest {
             OutboxProductEventPublisher(
                 recordOutboxEventUseCase,
                 mapper,
-                Clock.fixed(Instant.parse("2026-10-08T03:00:00Z"), ZoneId.of("Asia/Seoul")),
             )
     }
 
@@ -70,7 +66,7 @@ class OutboxProductEventPublisherTest {
                     recorded(ProductEvent(ProductEventType.STATUS_CHANGED, product(shelfLifeDays = null))).payload,
                 )
 
-            assertEquals("PRODUCT_STATUS_CHANGED", json["eventType"].asString())
+            assertEquals(false, json.has("eventType"))
             assertEquals(100L, json["productId"].asLong())
             assertEquals("BEAN-001", json["productCode"].asString())
             assertEquals("원두", json["productName"].asString())
@@ -78,6 +74,6 @@ class OutboxProductEventPublisherTest {
             assertEquals("KG", json["unit"].asString())
             assertTrue(json["shelfLifeDays"].isNull)
             assertEquals("ACTIVE", json["productStatus"].asString())
-            assertEquals("2026-10-08T12:00:00+09:00", json["occurredAt"].asString())
+            assertEquals(false, json.has("occurredAt"))
         }
 }

@@ -67,7 +67,25 @@ class OutboxService(
         envelope.put("eventVersion", command.eventVersion)
         envelope.put("occurredAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(OffsetDateTime.now(clock)))
         envelope.put("source", OutboxEvent.SOURCE)
-        envelope.set("data", data)
+        envelope.set("data", withoutNulls(data))
         return jsonMapper.writeValueAsString(envelope)
+    }
+
+    /** 값이 `null`인 객체 필드를 중첩 객체와 배열 안까지 지운다(공통 형식은 `null`을 내보내지 않는다). 배열의 원소는 그대로 둔다 */
+    private fun withoutNulls(node: JsonNode): JsonNode {
+        when {
+            node.isObject -> {
+                val fields: ObjectNode = node as ObjectNode
+                fields.propertyNames().toList().forEach { name ->
+                    val child: JsonNode = fields.get(name)
+                    if (child.isNull) fields.remove(name) else withoutNulls(child)
+                }
+            }
+
+            node.isArray -> {
+                node.forEach { withoutNulls(it) }
+            }
+        }
+        return node
     }
 }

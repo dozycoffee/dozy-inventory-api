@@ -132,6 +132,20 @@ class OutboxServiceTest {
         }
 
     @Test
+    fun `값이 null인 필드는 중첩 객체와 배열 안까지 지우고 배열 원소와 빈 값은 그대로 둔다`() =
+        runBlocking<Unit> {
+            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
+            val payload = """{"a":null,"b":0,"c":"","d":[],"e":{"f":null,"g":1},"items":[{"x":null,"y":2},null,{"z":[{"w":null}]}]}"""
+
+            service.record(command().copy(payload = payload))
+
+            val saved = argumentCaptor<OutboxEvent>()
+            verifyBlocking(outboxEventRepository) { save(saved.capture()) }
+            val data: JsonNode = jsonMapper.readTree(saved.firstValue.payload)["data"]
+            assertEquals("""{"b":0,"c":"","d":[],"e":{"g":1},"items":[{"y":2},null,{"z":[{}]}]}""", data.toString())
+        }
+
+    @Test
     fun `본문이 JSON 객체가 아니면 저장하지 않고 거부한다`() =
         runBlocking<Unit> {
             listOf("not json", "[1]", "\"x\"", "1", "null").forEach { payload ->
