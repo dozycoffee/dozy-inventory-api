@@ -79,7 +79,16 @@ class WarehouseAccessEventListenerIntegrationTest {
         principalId: String,
         warehouseIds: String,
     ): String =
-        """{"eventType":"WAREHOUSE_ACCESS_CHANGED","eventId":"${UUID.randomUUID()}","occurredAt":"2026-10-12T10:00:00+09:00","principalId":"$principalId","warehouseIds":$warehouseIds}"""
+        """{"eventId":"${UUID.randomUUID()}","eventType":"WAREHOUSE_ACCESS_CHANGED","eventVersion":1,""" +
+            """"occurredAt":"2026-10-12T10:00:00+09:00","source":"wms","data":{"principalId":"$principalId","warehouseIds":$warehouseIds}}"""
+
+    /** 평면 형식(envelope 이전). 이제 받지 않는다 */
+    private fun flat(
+        principalId: String,
+        warehouseIds: String,
+    ): String =
+        """{"eventType":"WAREHOUSE_ACCESS_CHANGED","eventId":"${UUID.randomUUID()}","occurredAt":"2026-10-12T10:00:00+09:00",""" +
+            """"principalId":"$principalId","warehouseIds":$warehouseIds}"""
 
     /** 사본이 [expected]가 될 때까지 최대 [timeoutSeconds]초 기다린다 */
     private suspend fun awaitWarehouses(
@@ -144,15 +153,21 @@ class WarehouseAccessEventListenerIntegrationTest {
                 send(principal, changed(principal, "[10]").replace("WAREHOUSE_ACCESS_CHANGED", "SOMETHING_ELSE"))
                 send("bad-3", changed("not-a-uuid", "[10]"))
                 send(principal, changed(principal, "[10, 10]"))
+                send(principal, flat(principal, "[10]"))
+                send(principal, changed(principal, "[10]").replace(""""eventVersion":1""", """"eventVersion":2"""))
+                send(principal, changed(principal, "[10]").replace(""""source":"wms"""", """"source":"oms""""))
                 send(principal, changed(principal, "[50]"))
 
                 assertThat(awaitWarehouses(principal, setOf(50L))).containsExactly(50L)
-                val dead: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("$TOPIC.dlt"), 4)
-                assertThat(dead.map { it.value() }).hasSize(4)
+                val dead: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("$TOPIC.dlt"), 7)
+                assertThat(dead.map { it.value() }).hasSize(7)
                 assertThat(dead.map { it.value() }).anyMatch { it == "not json" }
                 assertThat(dead.map { it.value() }).anyMatch { it.contains("SOMETHING_ELSE") }
                 assertThat(dead.map { it.value() }).anyMatch { it.contains("not-a-uuid") }
                 assertThat(dead.map { it.value() }).anyMatch { it.contains("[10, 10]") }
+                assertThat(dead.map { it.value() }).anyMatch { it.startsWith("""{"eventType":"WAREHOUSE_ACCESS_CHANGED","eventId":""") }
+                assertThat(dead.map { it.value() }).anyMatch { it.contains(""""eventVersion":2""") }
+                assertThat(dead.map { it.value() }).anyMatch { it.contains(""""source":"oms"""") }
             }
     }
 }
