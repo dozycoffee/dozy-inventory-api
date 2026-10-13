@@ -2,6 +2,7 @@ package com.dozycoffee.inventory.outbox.application.service
 
 import com.dozycoffee.inventory.global.domain.UuidV7
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
+import com.dozycoffee.inventory.global.trace.TraceContext
 import com.dozycoffee.inventory.outbox.application.port.`in`.RecordOutboxEventUseCase
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
 import com.dozycoffee.inventory.outbox.application.port.out.OutboxEventRepository
@@ -12,7 +13,8 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 
 /**
- * 호출한 서비스의 트랜잭션 안에서 이벤트를 저장한다. 트랜잭션을 직접 열지 않는다. 이벤트 ID(UUID v7)를 이때 만든다(ADR-0038).
+ * 호출한 서비스의 트랜잭션 안에서 이벤트를 저장한다. 트랜잭션을 직접 열지 않는다. 이벤트 ID(UUID v7)를 이때 만들고, 요청의 추적 컨텍스트가
+ * 있으면 함께 저장해 발행기가 다른 스레드에서 헤더로 싣게 한다(ADR-0038).
  */
 @Service
 class OutboxService(
@@ -32,6 +34,7 @@ class OutboxService(
                 command.payload,
                 UuidV7.generate(clock.millis()),
                 command.eventVersion,
+                TraceContext.current(),
             ),
         )
     }

@@ -1,5 +1,6 @@
 package com.dozycoffee.inventory.global.error
 
+import com.dozycoffee.inventory.global.trace.TraceContext
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.http.server.reactive.ServerHttpRequest
@@ -13,6 +14,7 @@ import java.util.UUID
 /**
  * 모든 응답에 `X-Trace-Id`를 싣고, 에러 응답의 `traceId`와 같은 값을 쓰게 한다 (dozy-auth api/conventions.md §4).
  * Security 필터 체인보다 먼저 실행되어야 스타터의 401/403 응답과 traceId가 일치한다.
+ * 같은 요청의 W3C `traceparent`도 만들어 Reactor Context에 싣는다. Outbox가 이벤트를 저장할 때 이 값을 함께 저장한다(ADR-0038).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -35,11 +37,13 @@ class TraceIdWebFilter : WebFilter {
         val tracedExchange: ServerWebExchange = exchange.mutate().request(request).build()
         tracedExchange.attributes[ATTRIBUTE] = traceId
         tracedExchange.response.headers.set(HEADER, traceId)
-        return chain.filter(tracedExchange)
+        val traceparent: String = TraceContext.create(exchange.request.headers.getFirst(TRACEPARENT_HEADER), traceId)
+        return chain.filter(tracedExchange).contextWrite { TraceContext.contextOf(it, traceparent) }
     }
 
     companion object {
         const val HEADER: String = "X-Trace-Id"
+        private const val TRACEPARENT_HEADER: String = "traceparent"
         private const val ATTRIBUTE: String = "com.dozycoffee.inventory.traceId"
 
         // 헤더 주입을 막기 위해 받아 쓰는 값의 형식을 제한한다 (dozy-auth 스타터와 같은 규칙)
