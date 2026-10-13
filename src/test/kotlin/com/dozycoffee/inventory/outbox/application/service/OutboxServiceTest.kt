@@ -82,23 +82,11 @@ class OutboxServiceTest {
                 assertEquals('7', id[14])
                 assertEquals(millis, id.replace("-", "").substring(0, 12).toLong(16))
             }
-            assertEquals(1, saved.firstValue.eventVersion)
+            ids.forEach { id -> assertEquals(id, jsonMapper.readTree(saved.allValues[ids.indexOf(id)].payload)["eventId"].asString()) }
         }
 
     @Test
-    fun `명령의 이벤트 버전을 그대로 저장한다`() =
-        runBlocking<Unit> {
-            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
-
-            service.record(command().copy(eventVersion = 3))
-
-            val saved = argumentCaptor<OutboxEvent>()
-            verifyBlocking(outboxEventRepository) { save(saved.capture()) }
-            assertEquals(3, saved.firstValue.eventVersion)
-        }
-
-    @Test
-    fun `요청 밖에서는 추적 컨텍스트 없이 저장하고 요청 안에서는 컨텍스트의 traceparent를 함께 저장한다`() =
+    fun `요청 밖에서는 traceparent 없이 저장하고 요청 안에서는 컨텍스트의 traceparent를 envelope 최상위에 담는다`() =
         runBlocking<Unit> {
             whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
             val traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
@@ -108,12 +96,14 @@ class OutboxServiceTest {
 
             val saved = argumentCaptor<OutboxEvent>()
             verifyBlocking(outboxEventRepository, org.mockito.kotlin.times(2)) { save(saved.capture()) }
-            assertEquals(null, saved.firstValue.traceparent)
-            assertEquals(traceparent, saved.secondValue.traceparent)
+            val outside: JsonNode = jsonMapper.readTree(saved.firstValue.payload)
+            val inside: JsonNode = jsonMapper.readTree(saved.secondValue.payload)
+            assertEquals(false, outside.has("traceparent"))
+            assertEquals(traceparent, inside["traceparent"].asString())
         }
 
     @Test
-    fun `payload는 공통 형식으로 감싸고 최상위 메타는 헤더와 같은 값이다`() =
+    fun `payload는 공통 형식으로 감싸고 메타데이터를 모두 값에 담는다`() =
         runBlocking<Unit> {
             whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
 

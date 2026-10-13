@@ -62,24 +62,15 @@ class OutboxEventTest {
     }
 
     @Nested
-    inner class `이벤트 ID와 추적 컨텍스트` {
-        private fun createWith(
-            eventId: String = newEventId(),
-            eventVersion: Int = 1,
-            traceparent: String? = null,
-        ): OutboxEvent = OutboxEvent.create(AggregateType.INVENTORY, 1L, "E", "10:100", "{}", eventId, eventVersion, traceparent)
+    inner class `이벤트 ID` {
+        private fun createWith(eventId: String = newEventId()): OutboxEvent =
+            OutboxEvent.create(AggregateType.INVENTORY, 1L, "E", "10:100", "{}", eventId)
 
         @Test
-        fun `이벤트 ID와 버전과 추적 컨텍스트를 그대로 가진다`() {
+        fun `이벤트 ID를 그대로 가진다`() {
             val id: String = newEventId()
-            val trace = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 
-            val event: OutboxEvent = createWith(id, 2, trace)
-
-            assertEquals(id, event.eventId)
-            assertEquals(2, event.eventVersion)
-            assertEquals(trace, event.traceparent)
-            assertEquals(null, createWith().traceparent)
+            assertEquals(id, createWith(id).eventId)
         }
 
         @Test
@@ -91,17 +82,6 @@ class OutboxEventTest {
                 "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b7",
                 "0199a3c28e5a7f308c4b9d1e2f6a0b73",
             ).forEach { assertRejected { createWith(eventId = it) } }
-        }
-
-        @Test
-        fun `버전은 1 이상이어야 한다`() {
-            assertRejected { createWith(eventVersion = 0) }
-        }
-
-        @Test
-        fun `W3C 형식이 아닌 traceparent는 거부한다`() {
-            listOf("", "abc", "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "00-4bf92f35-00f067aa0ba902b7-01")
-                .forEach { assertRejected { createWith(traceparent = it) } }
         }
     }
 

@@ -16,8 +16,6 @@ class OutboxEventEntity(
     @Column("outbox_event_id")
     var outboxEventId: Long? = null,
     var eventId: String,
-    var eventVersion: Int,
-    var traceparent: String? = null,
     var aggregateType: AggregateType,
     var aggregateId: Long,
     var eventType: String,
@@ -42,8 +40,6 @@ class OutboxEventEntity(
             payload = payload,
             status = status,
             attemptCount = attemptCount,
-            eventVersion = eventVersion,
-            traceparent = traceparent,
             createdAt = checkNotNull(createdAt) { "저장된 이벤트는 생성 시각이 있어야 한다" },
             publishedAt = publishedAt,
             lastError = lastError,
@@ -55,8 +51,6 @@ class OutboxEventEntity(
             OutboxEventEntity(
                 outboxEventId = event.outboxEventId,
                 eventId = event.eventId,
-                eventVersion = event.eventVersion,
-                traceparent = event.traceparent,
                 aggregateType = event.aggregateType,
                 aggregateId = event.aggregateId,
                 eventType = event.eventType,

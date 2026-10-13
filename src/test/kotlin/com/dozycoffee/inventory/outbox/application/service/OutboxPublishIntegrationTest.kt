@@ -109,7 +109,14 @@ class OutboxPublishIntegrationTest {
     private fun eventId(
         record: ConsumerRecord<String, String>,
         byEventId: Map<String, Long>,
-    ): Long = byEventId.getValue(String(record.headers().lastHeader("event-id").value(), Charsets.UTF_8))
+    ): Long =
+        byEventId.getValue(
+            JsonMapper
+                .builder()
+                .build()
+                .readTree(record.value())["eventId"]
+                .asString(),
+        )
 
     private suspend fun reservationLifecycle() {
         val productId: Long = fixture.seedProduct()
@@ -182,13 +189,18 @@ class OutboxPublishIntegrationTest {
             records.forEach { record ->
                 val envelope: JsonNode = JsonMapper.builder().build().readTree(record.value())
 
-                fun header(name: String): String = String(record.headers().lastHeader(name).value(), Charsets.UTF_8)
-                assertThat(envelope["data"].propertyNames().toList()).doesNotContain("eventType", "occurredAt")
-                assertThat(envelope.toString()).doesNotContain(":null")
-                assertThat(envelope["eventId"].asString()).isEqualTo(header("event-id"))
-                assertThat(envelope["eventType"].asString()).isEqualTo(header("event-type"))
-                assertThat(envelope["eventVersion"].asInt().toString()).isEqualTo(header("event-version"))
-                assertThat(envelope["source"].asString()).isEqualTo(header("source")).isEqualTo("inventory")
+                assertThat(envelope.propertyNames().toList()).doesNotContain("aggregateType", "aggregateId")
+                assertThat(
+                    record
+                        .headers()
+                        .toArray()
+                        .map { it.key() }
+                        .filterNot { it.startsWith("kafka_") },
+                ).isEmpty()
+                assertThat(envelope["eventId"].asString()).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+                assertThat(envelope["eventType"].asString()).isEqualTo(envelope["eventType"].asString().uppercase())
+                assertThat(envelope["eventVersion"].asInt()).isEqualTo(1)
+                assertThat(envelope["source"].asString()).isEqualTo("inventory")
                 assertThat(envelope["occurredAt"].asString()).matches(".+[+-]\\d{2}:\\d{2}|.+Z")
             }
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PUBLISHED' AND published_at IS NOT NULL")).isEqualTo("4")
