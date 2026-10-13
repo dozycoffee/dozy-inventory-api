@@ -3,7 +3,7 @@
 inventory 서비스가 Kafka로 발행하는 이벤트의 계약이다. 구독하는 서비스(OMS, WMS, Store)는 이 문서를 기준으로 한다.
 발행 방식의 배경은 [ADR-0025](adr/0025-outbox-event-publishing.md), 공통 형식(envelope)의 배경은 [ADR-0038](adr/0038-common-event-format.md)과 [ADR-0039](adr/0039-event-metadata-in-payload.md)에 있다. `data`의 필드 이름과 이벤트 유형은 계약이라 함부로 바꾸지 않는다.
 
-> **전환 중**: 아래는 ADR-0039에서 확정한 형식이다. 메타데이터는 값(JSON)에만 두고 Kafka 헤더는 쓰지 않는다. 코드 구현은 진행 중이며(`feature_list.json` F-024) 구현 전까지 실제 발행은 이전 형식(값의 `traceparent` 없음, Kafka 헤더 7종이 함께 나감)이다. 구독자는 헤더를 쓰지 말고 값의 필드만 읽어야 한다.
+> 이 문서의 형식(ADR-0038, ADR-0039)은 모두 적용되었다. 메타데이터는 값(JSON)에만 있고 Kafka 헤더는 쓰지 않는다. 구독자는 값의 `eventId`로 중복을 거른다.
 
 ## 전달 방식
 

@@ -163,8 +163,8 @@
   {
     "id": "F-024",
     "name": "이벤트 메타데이터를 값에만 두기",
-    "description": "Kafka 헤더를 없애고 이벤트 메타데이터를 값(JSON)에만 둔다. 결정은 ADR-0039, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0039, events.md) 완료, (2) OutboxService가 traceparent를 envelope 최상위(선택)에 넣고, 발행기는 헤더 없이 값과 키만 보내며, outbox_event의 traceparent·event_version 컬럼을 V1에서 제거하고 테스트·runbook을 갱신한다. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS의 같은 전환은 WMS 프로젝트와 협의한다.",
-    "status": "pending",
+    "description": "Kafka 헤더를 없애고 이벤트 메타데이터를 값(JSON)에만 둔다. 결정은 ADR-0039, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0039, events.md) 완료, (2) 완료: OutboxService가 traceparent를 envelope 최상위(선택)에 넣고, 발행기는 헤더 없이 값과 키만 보내며, outbox_event의 traceparent·event_version 컬럼을 V1에서 제거하고 테스트·runbook을 갱신한다. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS의 같은 전환은 WMS 프로젝트와 협의한다.",
+    "status": "completed",
     "dependencies": ["F-023"]
   }
 ]

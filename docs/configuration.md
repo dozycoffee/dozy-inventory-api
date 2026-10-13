@@ -69,7 +69,7 @@
 
 | 배치 | 주기 | 여러 인스턴스에서 안전한 이유 | 끄는 속성 |
 |------|------|------------------------------|-----------|
-| Outbox 발행 | 1초 간격 | MySQL `GET_LOCK`으로 한 인스턴스만 발행한다. 중복 전달은 구독자가 `event-id`로 거른다(at-least-once) | `inventory.outbox.publisher.enabled` |
+| Outbox 발행 | 1초 간격 | MySQL `GET_LOCK`으로 한 인스턴스만 발행한다. 중복 전달은 구독자가 값의 `eventId`로 거른다(at-least-once) | `inventory.outbox.publisher.enabled` |
 | Outbox 정리 | 1시간 간격 | 삭제가 멱등이고 데드락은 재시도한다 | `inventory.outbox.cleanup.enabled` |
 | 예약 만료 | 1분 간격 | 만료가 `RESERVED` 조건부 UPDATE라 같은 예약은 한 번만 처리된다 | `inventory.reservation.expiry-scan.enabled` |
 | 유통기한 스캔 | 매일 00:10 (`Asia/Seoul`) | 상태 전환이 조건부이고 이력 키가 `lot-expiration-{lotId}-{날짜}`다 | `inventory.lot-expiration-scan.enabled` |
