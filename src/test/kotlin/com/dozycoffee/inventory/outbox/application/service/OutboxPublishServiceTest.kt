@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.outbox.application.port.out.OutboxMessagePublish
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import com.dozycoffee.inventory.outbox.eventIdOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -52,6 +53,7 @@ class OutboxPublishServiceTest {
     private fun event(id: Long): OutboxEvent =
         OutboxEvent.reconstitute(
             id,
+            eventIdOf(id),
             AggregateType.INVENTORY,
             id,
             "INVENTORY_INCREASED",
@@ -145,7 +147,19 @@ class OutboxPublishServiceTest {
             type: AggregateType = AggregateType.INVENTORY,
             attempts: Int = 0,
         ): OutboxEvent =
-            OutboxEvent.reconstitute(id, type, id, "EVENT", key, "{}", OutboxStatus.PENDING, attempts, now.minusMinutes(1), null)
+            OutboxEvent.reconstitute(
+                id,
+                eventIdOf(id),
+                type,
+                id,
+                "EVENT",
+                key,
+                "{}",
+                OutboxStatus.PENDING,
+                attempts,
+                now.minusMinutes(1),
+                null,
+            )
 
         private suspend fun failFor(vararg ids: Long) {
             whenever(outboxMessagePublisher.publish(any())).thenAnswer { invocation ->

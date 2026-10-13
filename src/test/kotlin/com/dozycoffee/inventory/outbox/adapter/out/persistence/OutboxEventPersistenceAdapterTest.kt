@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.global.security.LocalActorProvider
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import com.dozycoffee.inventory.outbox.newEventId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -55,7 +56,7 @@ class OutboxEventPersistenceAdapterTest {
     private fun event(
         type: AggregateType = AggregateType.RESERVATION,
         payload: String = """{"eventType":"RESERVATION_CREATED","items":[{"productId":100,"quantity":10}]}""",
-    ): OutboxEvent = OutboxEvent.create(type, 7L, "RESERVATION_CREATED", "10:7", payload)
+    ): OutboxEvent = OutboxEvent.create(type, 7L, "RESERVATION_CREATED", "10:7", payload, newEventId())
 
     @Nested
     inner class `저장과 조회` {
@@ -76,6 +77,48 @@ class OutboxEventPersistenceAdapterTest {
                 assertThat(loaded.publishedAt).isNull()
                 assertThat(loaded.payload).contains("RESERVATION_CREATED").contains("\"quantity\"")
                 assertThat(saved).isEqualTo(loaded)
+            }
+
+        @Test
+        fun `이벤트 ID와 버전과 추적 컨텍스트를 저장하고 그대로 읽는다`() =
+            runBlocking<Unit> {
+                val id: String = newEventId()
+                val trace = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                val saved: OutboxEvent =
+                    adapter.save(OutboxEvent.create(AggregateType.PRODUCT, 3L, "PRODUCT_REGISTERED", "3", "{}", id, 2, trace))
+
+                val loaded: OutboxEvent = checkNotNull(adapter.findById(checkNotNull(saved.outboxEventId)))
+                val plain: OutboxEvent = checkNotNull(adapter.findById(checkNotNull(adapter.save(event()).outboxEventId)))
+
+                assertThat(loaded.eventId).isEqualTo(id)
+                assertThat(loaded.eventVersion).isEqualTo(2)
+                assertThat(loaded.traceparent).isEqualTo(trace)
+                assertThat(plain.eventVersion).isEqualTo(1)
+                assertThat(plain.traceparent).isNull()
+            }
+
+        @Test
+        fun `같은 이벤트 ID는 두 번 저장할 수 없다`() =
+            runBlocking<Unit> {
+                val id: String = newEventId()
+                adapter.save(OutboxEvent.create(AggregateType.PRODUCT, 3L, "PRODUCT_REGISTERED", "3", "{}", id))
+
+                assertThrows<Exception> { adapter.save(OutboxEvent.create(AggregateType.PRODUCT, 4L, "PRODUCT_REGISTERED", "4", "{}", id)) }
+            }
+
+        @Test
+        fun `재발행해도 이벤트 ID는 바뀌지 않는다`() =
+            runBlocking<Unit> {
+                val saved: OutboxEvent = adapter.save(event())
+                val id: Long = checkNotNull(saved.outboxEventId)
+                val dead: OutboxEvent = checkNotNull(adapter.findById(id))
+                dead.recordFailure("boom", 1, LocalDateTime.of(2026, 10, 13, 9, 0))
+                adapter.saveFailure(dead)
+                val again: OutboxEvent = checkNotNull(adapter.findById(id))
+                again.requeue()
+                adapter.saveRequeue(again)
+
+                assertThat(checkNotNull(adapter.findById(id)).eventId).isEqualTo(saved.eventId)
             }
 
         @Test

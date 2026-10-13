@@ -5,6 +5,8 @@ import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.exception.InvalidOutboxStateException
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxErrorCode
+import com.dozycoffee.inventory.outbox.eventIdOf
+import com.dozycoffee.inventory.outbox.newEventId
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Nested
@@ -18,7 +20,7 @@ class OutboxEventTest {
         eventType: String? = "INVENTORY_INCREASED",
         partitionKey: String? = "10:100",
         payload: String? = """{"a":1}""",
-    ): OutboxEvent = OutboxEvent.create(AggregateType.INVENTORY, aggregateId, eventType, partitionKey, payload)
+    ): OutboxEvent = OutboxEvent.create(AggregateType.INVENTORY, aggregateId, eventType, partitionKey, payload, newEventId())
 
     private fun assertRejected(build: () -> Any) {
         val e: InvalidDomainValueException = assertThrows { build() }
@@ -60,6 +62,50 @@ class OutboxEventTest {
     }
 
     @Nested
+    inner class `이벤트 ID와 추적 컨텍스트` {
+        private fun createWith(
+            eventId: String = newEventId(),
+            eventVersion: Int = 1,
+            traceparent: String? = null,
+        ): OutboxEvent = OutboxEvent.create(AggregateType.INVENTORY, 1L, "E", "10:100", "{}", eventId, eventVersion, traceparent)
+
+        @Test
+        fun `이벤트 ID와 버전과 추적 컨텍스트를 그대로 가진다`() {
+            val id: String = newEventId()
+            val trace = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+
+            val event: OutboxEvent = createWith(id, 2, trace)
+
+            assertEquals(id, event.eventId)
+            assertEquals(2, event.eventVersion)
+            assertEquals(trace, event.traceparent)
+            assertEquals(null, createWith().traceparent)
+        }
+
+        @Test
+        fun `UUID 형식이 아닌 이벤트 ID는 거부한다`() {
+            listOf(
+                "",
+                "1",
+                "0199A3C2-8E5A-7F30-8C4B-9D1E2F6A0B73",
+                "0199a3c2-8e5a-7f30-8c4b-9d1e2f6a0b7",
+                "0199a3c28e5a7f308c4b9d1e2f6a0b73",
+            ).forEach { assertRejected { createWith(eventId = it) } }
+        }
+
+        @Test
+        fun `버전은 1 이상이어야 한다`() {
+            assertRejected { createWith(eventVersion = 0) }
+        }
+
+        @Test
+        fun `W3C 형식이 아닌 traceparent는 거부한다`() {
+            listOf("", "abc", "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "00-4bf92f35-00f067aa0ba902b7-01")
+                .forEach { assertRejected { createWith(traceparent = it) } }
+        }
+    }
+
+    @Nested
     inner class `동등성` {
         @Test
         fun `저장 전에는 같은 객체만 같고 저장된 뒤에는 식별자가 같으면 같다`() {
@@ -71,6 +117,7 @@ class OutboxEventTest {
             fun restored(id: Long): OutboxEvent =
                 OutboxEvent.reconstitute(
                     id,
+                    eventIdOf(id),
                     AggregateType.INVENTORY,
                     1L,
                     "T",
@@ -91,7 +138,19 @@ class OutboxEventTest {
         private val now: LocalDateTime = LocalDateTime.of(2026, 10, 12, 12, 0)
 
         private fun pending(attempts: Int = 0): OutboxEvent =
-            OutboxEvent.reconstitute(1L, AggregateType.INVENTORY, 1L, "E", "10:100", "{}", OutboxStatus.PENDING, attempts, now, null)
+            OutboxEvent.reconstitute(
+                1L,
+                eventIdOf(1L),
+                AggregateType.INVENTORY,
+                1L,
+                "E",
+                "10:100",
+                "{}",
+                OutboxStatus.PENDING,
+                attempts,
+                now,
+                null,
+            )
 
         @Test
         fun `실패를 기록하면 시도 횟수가 늘고 마지막 오류가 남으며 임계치 전에는 발행 대기다`() {
@@ -142,7 +201,19 @@ class OutboxEventTest {
         fun `발행 대기가 아닌 이벤트는 실패를 기록할 수 없다`() {
             val dead: OutboxEvent = pending(attempts = 1).also { it.recordFailure("boom", 2, now) }
             val published: OutboxEvent =
-                OutboxEvent.reconstitute(1L, AggregateType.INVENTORY, 1L, "E", "10:100", "{}", OutboxStatus.PUBLISHED, 0, now, now)
+                OutboxEvent.reconstitute(
+                    1L,
+                    eventIdOf(1L),
+                    AggregateType.INVENTORY,
+                    1L,
+                    "E",
+                    "10:100",
+                    "{}",
+                    OutboxStatus.PUBLISHED,
+                    0,
+                    now,
+                    now,
+                )
 
             assertThrows<InvalidOutboxStateException> { dead.recordFailure("boom", 3, now) }
             assertThrows<InvalidOutboxStateException> { published.recordFailure("boom", 3, now) }
@@ -165,7 +236,19 @@ class OutboxEventTest {
         fun `격리되지 않은 이벤트는 재발행할 수 없다`() {
             assertThrows<InvalidOutboxStateException> { pending().requeue() }
             val published: OutboxEvent =
-                OutboxEvent.reconstitute(1L, AggregateType.INVENTORY, 1L, "E", "10:100", "{}", OutboxStatus.PUBLISHED, 0, now, now)
+                OutboxEvent.reconstitute(
+                    1L,
+                    eventIdOf(1L),
+                    AggregateType.INVENTORY,
+                    1L,
+                    "E",
+                    "10:100",
+                    "{}",
+                    OutboxStatus.PUBLISHED,
+                    0,
+                    now,
+                    now,
+                )
             assertThrows<InvalidOutboxStateException> { published.requeue() }
         }
     }

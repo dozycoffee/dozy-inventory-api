@@ -10,6 +10,7 @@ import com.dozycoffee.inventory.outbox.domain.exception.InvalidOutboxStateExcept
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxErrorCode
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxEventNotFoundException
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import com.dozycoffee.inventory.outbox.eventIdOf
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -46,6 +47,7 @@ class OutboxDeadLetterServiceTest {
     ): OutboxEvent =
         OutboxEvent.reconstitute(
             id,
+            eventIdOf(id),
             AggregateType.INVENTORY,
             id,
             "INVENTORY_INCREASED",

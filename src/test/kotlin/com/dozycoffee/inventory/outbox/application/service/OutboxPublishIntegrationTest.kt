@@ -96,8 +96,20 @@ class OutboxPublishIntegrationTest {
             .first()
             .toString()
 
-    private fun eventId(record: ConsumerRecord<String, String>): Long =
-        String(record.headers().lastHeader("event-id").value(), Charsets.UTF_8).toLong()
+    /** 헤더의 이벤트 ID(UUID)를 발행 순서 기준인 `outbox_event_id`로 바꾸는 표 */
+    private suspend fun outboxIdsByEventId(): Map<String, Long> =
+        databaseClient
+            .sql("SELECT event_id, outbox_event_id FROM outbox_event")
+            .fetch()
+            .all()
+            .collectList()
+            .awaitFirst()
+            .associate { it["event_id"].toString() to it["outbox_event_id"].toString().toLong() }
+
+    private fun eventId(
+        record: ConsumerRecord<String, String>,
+        byEventId: Map<String, Long>,
+    ): Long = byEventId.getValue(String(record.headers().lastHeader("event-id").value(), Charsets.UTF_8))
 
     private suspend fun reservationLifecycle() {
         val productId: Long = fixture.seedProduct()
@@ -156,9 +168,10 @@ class OutboxPublishIntegrationTest {
                 ),
             )
             val reservation: List<ConsumerRecord<String, String>> = records.filter { it.topic() == "e2e.reservation" }
-            assertThat(reservation.map { eventId(it) }).isEqualTo(reservation.map { eventId(it) }.sorted())
+            val byEventId: Map<String, Long> = outboxIdsByEventId()
+            assertThat(reservation.map { eventId(it, byEventId) }).isEqualTo(reservation.map { eventId(it, byEventId) }.sorted())
             assertThat(reservation.map { it.key() }.toSet()).hasSize(1)
-            assertThat(records.map { eventId(it) }.sorted()).isEqualTo(ids)
+            assertThat(records.map { eventId(it, byEventId) }.sorted()).isEqualTo(ids)
             assertThat(reservation.map { it.value() }).allMatch { it.contains("\"reservationId\"") }
             val allocations: List<JsonNode> =
                 reservation.map { JsonMapper.builder().build().readTree(it.value())["items"][0]["allocations"][0] }
@@ -204,7 +217,7 @@ class OutboxPublishIntegrationTest {
 
             assertThat(published.sum()).isEqualTo(30)
             val records: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("e2e.product"), 30)
-            assertThat(records.map { eventId(it) }.toSet()).hasSize(30)
+            assertThat(records.map { eventId(it, outboxIdsByEventId()) }.toSet()).hasSize(30)
             assertThat(scalar("SELECT COUNT(*) FROM outbox_event WHERE status = 'PENDING'")).isEqualTo("0")
         }
 
@@ -215,8 +228,8 @@ class OutboxPublishIntegrationTest {
         databaseClient
             .sql(
                 "INSERT INTO outbox_event " +
-                    "(aggregate_type, aggregate_id, event_type, partition_key, payload, status, attempt_count, created_at) " +
-                    "VALUES ('PRODUCT', 1, 'PRODUCT_REGISTERED', :key, :payload, 'PENDING', 0, NOW(6))",
+                    "(event_id, aggregate_type, aggregate_id, event_type, partition_key, payload, status, attempt_count, created_at) " +
+                    "VALUES (UUID(), 'PRODUCT', 1, 'PRODUCT_REGISTERED', :key, :payload, 'PENDING', 0, NOW(6))",
             ).bind("key", key)
             .bind("payload", payload)
             .fetch()
