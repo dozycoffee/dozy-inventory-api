@@ -156,7 +156,7 @@
   {
     "id": "F-023",
     "name": "공통 이벤트 형식(envelope)",
-    "description": "MSA 공통 이벤트 형식을 도입한다. 결정은 ADR-0038, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0038, events.md) 완료, (2) 완료: outbox_event에 event_id(UUID v7)·event_version·traceparent 컬럼 추가(V1 수정)와 헤더 확장(event-version, source, traceparent), (3) envelope 직렬화 공통화(4개 발행기의 중복 제거), (4) 발행기별 data 이전과 테스트 갱신(null 생략 포함). 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS WAREHOUSE_ACCESS_CHANGED의 envelope 전환은 WMS 프로젝트와 협의한다.",
+    "description": "MSA 공통 이벤트 형식을 도입한다. 결정은 ADR-0038, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0038, events.md) 완료, (2) 완료: outbox_event에 event_id(UUID v7)·event_version·traceparent 컬럼 추가(V1 수정)와 헤더 확장(event-version, source, traceparent), (3) 완료: envelope 직렬화 공통화(OutboxService가 도메인 본문을 envelope으로 감싼다), (4) 발행기별 data 이전과 테스트 갱신(null 생략 포함). 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS WAREHOUSE_ACCESS_CHANGED의 envelope 전환은 WMS 프로젝트와 협의한다.",
     "status": "in_progress",
     "dependencies": ["F-018"]
   }
