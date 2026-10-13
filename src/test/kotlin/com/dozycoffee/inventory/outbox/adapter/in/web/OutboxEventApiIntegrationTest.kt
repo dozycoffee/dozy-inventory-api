@@ -55,9 +55,10 @@ class OutboxEventApiIntegrationTest {
     ): Long {
         databaseClient
             .sql(
-                "INSERT INTO outbox_event (aggregate_type, aggregate_id, event_type, partition_key, payload, status, attempt_count, " +
+                "INSERT INTO outbox_event (event_id, aggregate_type, aggregate_id, event_type, partition_key, payload, status, " +
+                    "attempt_count, " +
                     "last_error, dead_at, created_at) " +
-                    "VALUES ('PRODUCT', 1, 'PRODUCT_REGISTERED', 'p:1', '{\"a\":1}', '$status', $attempts, " +
+                    "VALUES (UUID(), 'PRODUCT', 1, 'PRODUCT_REGISTERED', 'p:1', '{\"a\":1}', '$status', $attempts, " +
                     "$lastError, $deadAt, NOW(6))",
             ).fetch()
             .rowsUpdated()

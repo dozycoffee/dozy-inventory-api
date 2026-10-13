@@ -62,10 +62,11 @@
 ### 2026-10-12
 
 - F-023 1단계: MSA 공통 이벤트 형식을 확정했다(ADR-0038, 사용자 확인). 이벤트 ID는 Long(`outbox_event_id`)에서 UUID(v7 권장, 저장 시점 생성, 재발행해도 유지)로 바꾸고 헤더와 payload에 같은 값을 둔다. 값은 공통 메타(`eventId`, `eventType`, `eventVersion`, `occurredAt`, `source`)를 최상위에, 도메인 본문을 `data`에 두는 envelope이다. 헤더는 `event-version`, `source`, W3C `traceparent`를 더하고 `aggregate-id`·파티션 키는 문자열로 규정한다. `null` 필드는 생략한다. `eventType`·토픽 이름 규칙은 유지한다. 배포 전이라 호환 계층 없이 한 번에 전환한다. `docs/events.md`를 새 형식으로 고쳤다(실제 발행은 2~4단계 구현 전까지 이전 형식). 코드는 바꾸지 않았다.
+- F-023 2단계(ADR-0038): `outbox_event`에 `event_id`(CHAR(36), 유니크, UUID v7), `event_version`(기본 1), `traceparent`를 V1에 추가했다. 이벤트 ID는 `OutboxService`가 저장할 때 `Clock` 시각으로 만들고(`UuidV7`, 재발행해도 유지), 발행기는 헤더 `event-id`에 `outbox_event_id` 대신 이 UUID를 싣고 `event-version`·`source`(`inventory`)·`traceparent`(있을 때만)를 더한다. 추적 컨텍스트는 `TraceIdWebFilter`가 요청마다 만들어 Reactor Context에 싣는다(`TraceContext`): 요청의 올바른 `traceparent`가 있으면 trace-id를 이어받고, 없으면 32자리 16진수 `X-Trace-Id`, 그것도 아니면 새 값이며 span-id는 새로 만든다. 요청 밖(스케줄러)에서 저장한 이벤트는 `traceparent`가 없다. payload는 아직 이전 형식이다(3~4단계). **로컬 DB는 `docker compose down -v`로 다시 만든다.**
 
 ## 다음 세션에서 할 일
 
-0. F-023 2단계: `outbox_event`에 `event_id`(UUID v7)·추적 컨텍스트 컬럼을 V1에 추가하고 헤더(`event-version`, `source`, `traceparent`)를 확장한다. 3단계(envelope 직렬화 공통화), 4단계(발행기별 이전·테스트 갱신)가 이어진다. 시작 전에 OMS·WMS·Store가 운영 중이 아닌지, WMS `WAREHOUSE_ACCESS_CHANGED`의 envelope 전환 여부를 확인한다.
+0. F-023 3단계(envelope 직렬화 공통화), 4단계(발행기별 이전·테스트 갱신)가 이어진다. 시작 전에 OMS·WMS·Store가 운영 중이 아닌지, WMS `WAREHOUSE_ACCESS_CHANGED`의 envelope 전환 여부를 확인한다.
 1. 로드맵의 나머지 기능은 완료됐다. WMS 프로젝트에서 직원 창고 소속 변경 이벤트 발행(`docs/events.md`)과 창고 수량 조회 API(`docs/adr/0033-reconciliation.md`)를 구현해 연동한다. 변경 API는 `Idempotency-Key` 헤더를 쓴다. 테스트는 `@Nested`로 묶는다.
 2. 실제 서버 연동 확인·배포 전에 `dozy-auth`에 `inventory` audience, `inventory:service`·`inventory:warehouse_manager`·`inventory:admin` role, system client(`svc-wms`, `svc-oms`, `svc-store`)를 등록한다(사용자 작업).
 3. 운영 환경의 Kafka 클러스터 주소(`KAFKA_BOOTSTRAP_SERVERS`)와 토픽 파티션·복제 수를 정한다(🔶 미확정).

@@ -6,6 +6,7 @@ import com.dozycoffee.inventory.outbox.application.port.`in`.CleanUpOutboxEvents
 import com.dozycoffee.inventory.outbox.application.port.out.OutboxEventRepository
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import com.dozycoffee.inventory.outbox.newEventId
 import com.dozycoffee.inventory.support.InventoryIntegrationTest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -55,7 +56,10 @@ class OutboxCleanUpIntegrationTest {
     private suspend fun saved(publishedAt: LocalDateTime?): Long {
         val id: Long =
             checkNotNull(
-                outboxEventRepository.save(OutboxEvent.create(AggregateType.PRODUCT, 1L, "PRODUCT_REGISTERED", "1", "{}")).outboxEventId,
+                outboxEventRepository
+                    .save(
+                        OutboxEvent.create(AggregateType.PRODUCT, 1L, "PRODUCT_REGISTERED", "1", "{}", newEventId()),
+                    ).outboxEventId,
             )
         if (publishedAt != null) outboxEventRepository.markPublished(id, publishedAt)
         return id

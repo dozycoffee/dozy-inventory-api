@@ -3,6 +3,7 @@ package com.dozycoffee.inventory.outbox.adapter.out.messaging
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import com.dozycoffee.inventory.outbox.eventIdOf
 import com.dozycoffee.inventory.support.KafkaTestContainer
 import kotlinx.coroutines.runBlocking
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -56,6 +57,7 @@ class KafkaOutboxMessagePublisherTest {
     ): OutboxEvent =
         OutboxEvent.reconstitute(
             id,
+            eventIdOf(id),
             type,
             7L,
             "RESERVATION_CREATED",
@@ -85,10 +87,41 @@ class KafkaOutboxMessagePublisherTest {
                 assertThat(record.topic()).isEqualTo("$prefix.reservation")
                 assertThat(record.key()).isEqualTo("10:7")
                 assertThat(record.value()).isEqualTo("""{"eventType":"RESERVATION_CREATED","reservationId":7}""")
-                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_EVENT_ID)).isEqualTo("42")
+                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_EVENT_ID)).isEqualTo(eventIdOf(42L))
+                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_EVENT_VERSION)).isEqualTo("1")
+                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_SOURCE)).isEqualTo("inventory")
+                assertThat(record.headers().lastHeader(KafkaOutboxMessagePublisher.HEADER_TRACEPARENT)).isNull()
                 assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_EVENT_TYPE)).isEqualTo("RESERVATION_CREATED")
                 assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_AGGREGATE_TYPE)).isEqualTo("RESERVATION")
                 assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_AGGREGATE_ID)).isEqualTo("7")
+            }
+
+        @Test
+        fun `추적 컨텍스트와 이벤트 버전이 있으면 헤더로 싣는다`() =
+            runBlocking<Unit> {
+                val traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                val versioned: OutboxEvent =
+                    OutboxEvent.reconstitute(
+                        5L,
+                        eventIdOf(5L),
+                        AggregateType.PRODUCT,
+                        5L,
+                        "PRODUCT_REGISTERED",
+                        "5",
+                        """{"a":1}""",
+                        OutboxStatus.PENDING,
+                        0,
+                        LocalDateTime.of(2026, 10, 8, 9, 0),
+                        null,
+                        eventVersion = 2,
+                        traceparent = traceparent,
+                    )
+
+                publisher().publish(versioned)
+
+                val record: ConsumerRecord<String, String> = KafkaTestContainer.consume(listOf("$prefix.product"), 1).single()
+                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_TRACEPARENT)).isEqualTo(traceparent)
+                assertThat(header(record, KafkaOutboxMessagePublisher.HEADER_EVENT_VERSION)).isEqualTo("2")
             }
 
         @Test
@@ -110,7 +143,9 @@ class KafkaOutboxMessagePublisherTest {
                 (1L..20L).forEach { publisher.publish(event(it, payload = """{"seq":$it}""")) }
 
                 val records: List<ConsumerRecord<String, String>> = KafkaTestContainer.consume(listOf("$prefix.reservation"), 20)
-                assertThat(records.map { header(it, KafkaOutboxMessagePublisher.HEADER_EVENT_ID).toLong() }).isEqualTo((1L..20L).toList())
+                assertThat(
+                    records.map { header(it, KafkaOutboxMessagePublisher.HEADER_EVENT_ID) },
+                ).isEqualTo((1L..20L).map { eventIdOf(it) })
             }
     }
 

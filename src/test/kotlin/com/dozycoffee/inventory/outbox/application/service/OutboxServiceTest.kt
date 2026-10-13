@@ -1,13 +1,16 @@
 package com.dozycoffee.inventory.outbox.application.service
 
 import com.dozycoffee.inventory.global.error.InvalidDomainValueException
+import com.dozycoffee.inventory.global.trace.TraceContext
 import com.dozycoffee.inventory.outbox.application.port.`in`.command.RecordOutboxEventCommand
 import com.dozycoffee.inventory.outbox.application.port.out.OutboxEventRepository
 import com.dozycoffee.inventory.outbox.domain.enumeration.AggregateType
 import com.dozycoffee.inventory.outbox.domain.enumeration.OutboxStatus
 import com.dozycoffee.inventory.outbox.domain.exception.OutboxErrorCode
 import com.dozycoffee.inventory.outbox.domain.model.OutboxEvent
+import kotlinx.coroutines.reactor.ReactorContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -20,6 +23,10 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
+import reactor.util.context.Context
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @ExtendWith(MockitoExtension::class)
 class OutboxServiceTest {
@@ -30,7 +37,7 @@ class OutboxServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = OutboxService(outboxEventRepository)
+        service = OutboxService(outboxEventRepository, Clock.fixed(Instant.parse("2026-10-13T01:00:00Z"), ZoneOffset.UTC))
     }
 
     private fun command(aggregateType: String = "INVENTORY"): RecordOutboxEventCommand =
@@ -51,6 +58,53 @@ class OutboxServiceTest {
             assertEquals("10:100", saved.firstValue.partitionKey)
             assertEquals("""{"a":1}""", saved.firstValue.payload)
             assertEquals(OutboxStatus.PENDING, saved.firstValue.status)
+        }
+
+    @Test
+    fun `이벤트 ID는 저장 시각을 담은 UUID v7이고 이벤트마다 다르며 기본 버전은 1이다`() =
+        runBlocking<Unit> {
+            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
+
+            service.record(command())
+            service.record(command())
+
+            val saved = argumentCaptor<OutboxEvent>()
+            verifyBlocking(outboxEventRepository, org.mockito.kotlin.times(2)) { save(saved.capture()) }
+            val ids: List<String> = saved.allValues.map { it.eventId }
+            assertEquals(2, ids.toSet().size)
+            val millis: Long = Instant.parse("2026-10-13T01:00:00Z").toEpochMilli()
+            ids.forEach { id ->
+                assertEquals('7', id[14])
+                assertEquals(millis, id.replace("-", "").substring(0, 12).toLong(16))
+            }
+            assertEquals(1, saved.firstValue.eventVersion)
+        }
+
+    @Test
+    fun `명령의 이벤트 버전을 그대로 저장한다`() =
+        runBlocking<Unit> {
+            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
+
+            service.record(command().copy(eventVersion = 3))
+
+            val saved = argumentCaptor<OutboxEvent>()
+            verifyBlocking(outboxEventRepository) { save(saved.capture()) }
+            assertEquals(3, saved.firstValue.eventVersion)
+        }
+
+    @Test
+    fun `요청 밖에서는 추적 컨텍스트 없이 저장하고 요청 안에서는 컨텍스트의 traceparent를 함께 저장한다`() =
+        runBlocking<Unit> {
+            whenever(outboxEventRepository.save(any())).thenAnswer { it.getArgument<OutboxEvent>(0) }
+            val traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+
+            service.record(command())
+            withContext(ReactorContext(TraceContext.contextOf(Context.empty(), traceparent))) { service.record(command()) }
+
+            val saved = argumentCaptor<OutboxEvent>()
+            verifyBlocking(outboxEventRepository, org.mockito.kotlin.times(2)) { save(saved.capture()) }
+            assertEquals(null, saved.firstValue.traceparent)
+            assertEquals(traceparent, saved.secondValue.traceparent)
         }
 
     @Test

@@ -342,7 +342,9 @@ erDiagram
 
 | 컬럼 | 타입 | NULL | 설명 |
 |------|------|------|------|
-| outbox_event_id | BIGINT PK | N | 발행 순서의 기준 |
+| outbox_event_id | BIGINT PK | N | 내부 키이자 같은 파티션 키의 발행 순서 기준. 밖으로 내보내지 않는다 |
+| event_id | CHAR(36) | N | 구독자에게 보이는 이벤트 ID(UUID v7, 소문자). 유니크(`uq_outbox_event_id`)이고 저장 시점에 만들며 재발행해도 바뀌지 않는다(ADR-0038) |
+| event_version | INT | N | payload 스키마 버전. 기본 1, 호환되지 않는 변경에만 올린다 |
 | aggregate_type | VARCHAR(50) | N | `INVENTORY`, `RESERVATION`, `LOT`, `PRODUCT`, `ADJUSTMENT` |
 | aggregate_id | BIGINT | N | |
 | event_type | VARCHAR(100) | N | 이벤트 이름의 코드 값 |
@@ -351,6 +353,7 @@ erDiagram
 | status | VARCHAR(50) | N | `PENDING`, `PUBLISHED`, `DEAD`(발행에 계속 실패해 격리, ADR-0037) |
 | attempt_count | INT | N | 이벤트 고유의 발행 실패 횟수(공통 장애는 세지 않는다). 재발행하면 0 |
 | last_error | VARCHAR(500) | Y | 마지막 발행 오류 |
+| traceparent | VARCHAR(55) | Y | 저장 시점 요청의 W3C 추적 컨텍스트. 요청 밖(스케줄러)에서 만든 이벤트는 NULL. 발행할 때 `traceparent` 헤더로 싣는다 |
 | created_at, published_at, dead_at | DATETIME(6) | N, Y, Y | `dead_at`은 격리된 시각 |
 
 - 인덱스: `idx_outbox_pending (status, outbox_event_id)` — 발행 대기 조회. 같은 `partition_key`는 `outbox_event_id` 순서로 발행한다.
