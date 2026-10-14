@@ -109,6 +109,18 @@ docker compose --profile app up -d --build   # MySQL, Kafka와 함께 이미지�
 
 <br>
 
+### 이미지 릴리스
+
+main에 병합되면 CI가 테스트와 이미지 기동 확인을 통과한 뒤 `ghcr.io/dozycoffee/dozy-inventory-api:sha-{7자리}`(linux/amd64, linux/arm64)와 `main` 태그를 올린다. 버전 릴리스는 다시 빌드하지 않고 그 `sha-` 이미지에 `X.Y.Z` 태그만 붙인다(`.github/workflows/release.yml`).
+
+```bash
+git checkout main && git pull
+git tag v0.1.1          # 이미지가 올라온(CI가 끝난) main 커밋에 붙인다
+git push origin v0.1.1  # 이미지 dozy-inventory-api:0.1.1 과 GitHub Release 생성
+```
+
+같은 버전은 다른 이미지에 다시 붙이지 않는다. 잘못 릴리스했으면 다음 patch 버전으로 다시 릴리스한다.
+
 ## 7. 문서
 
 [docs/README.md](docs/README.md)에서 전체 문서를 확인할 수 있습니다.
