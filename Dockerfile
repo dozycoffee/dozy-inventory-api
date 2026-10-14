@@ -4,7 +4,8 @@
 # dozy-auth 스타터를 GitHub Packages에서 받아야 해서 빌드 때 read:packages 자격이 필요하다.
 # 자격은 BuildKit secret으로만 넘기고(이미지 레이어와 이력에 남지 않는다) 환경변수로 풀어 Gradle에 전달한다:
 #   docker build --secret id=gpr_user,env=GPR_USER --secret id=gpr_token,env=GPR_TOKEN -t dozy-inventory-api .
-FROM eclipse-temurin:21-jdk AS build
+# jar와 계층 폴더는 플랫폼과 관계없는 파일이라 빌드하는 머신의 플랫폼에서 한 번만 만든다 (multi-arch 빌드에서 에뮬레이션을 피함)
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
 COPY gradlew settings.gradle.kts build.gradle.kts ./
@@ -23,6 +24,10 @@ RUN java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --d
 
 # ---- 실행 ----
 FROM eclipse-temurin:21-jre AS runtime
+
+LABEL org.opencontainers.image.title="dozy-inventory-api" \
+      org.opencontainers.image.description="Dozy 재고 서비스" \
+      org.opencontainers.image.source="https://github.com/dozycoffee/dozy-inventory-api"
 
 # 비루트로 실행한다
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --no-create-home app
