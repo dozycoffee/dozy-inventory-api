@@ -166,5 +166,12 @@
     "description": "Kafka 헤더를 없애고 이벤트 메타데이터를 값(JSON)에만 둔다. 결정은 ADR-0039, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0039, events.md) 완료, (2) 완료: OutboxService가 traceparent를 envelope 최상위(선택)에 넣고, 발행기는 헤더 없이 값과 키만 보내며, outbox_event의 traceparent·event_version 컬럼을 V1에서 제거하고 테스트·runbook을 갱신한다. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS의 같은 전환은 WMS 프로젝트와 협의한다.",
     "status": "completed",
     "dependencies": ["F-023"]
+  },
+  {
+    "id": "F-026",
+    "name": "원자재 담당 role(material_manager)",
+    "description": "원자재(상품 마스터) 등록·상태 변경과 상품 조회만 하는 inventory:material_manager role을 추가한다. 상품 쓰기는 admin과 material_manager, 상품 조회는 기존 호출자에 material_manager를 더하고, 재고·가용 재고·대사·Outbox API는 막힌 채로 둔다. admin은 material_manager 권한을 모두 포함한다. 결정은 ADR-0041. dozy-auth에 inventory:material_manager 등록이 필요하다(사용자 작업).",
+    "status": "completed",
+    "dependencies": ["F-005", "F-020"]
   }
 ]
