@@ -58,6 +58,9 @@ dozy:
     issuer-base-uri: ${AUTH_ISSUER_BASE_URI:http://localhost:8081}
 
 inventory:
+  # 어드민 콘솔처럼 브라우저에서 직접 호출하는 origin. 쉼표로 구분하고 와일드카드는 쓰지 않는다
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
   # 하루 1회 WMS 수량과 대사해 보정안을 만드는 배치(ADR-0033). 테스트에서는 끈다. WMS 주소는 환경변수 WMS_BASE_URL로 주입한다
   reconciliation:
     enabled: true

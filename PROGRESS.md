@@ -69,6 +69,10 @@
 - F-024 1단계(설계, ADR-0039, 사용자 확인): 이벤트 메타데이터가 값과 Kafka 헤더에 중복되던 것을 값에만 두기로 했다. 헤더 7종(`event-id`, `event-type`, `event-version`, `source`, `aggregate-type`, `aggregate-id`, `traceparent`)을 모두 없앤다. 값의 최상위는 `eventId`, `eventType`, `eventVersion`, `occurredAt`, `source`, `data`에 선택 필드 `traceparent`를 더한 형식이다. `aggregate-type`(토픽·`eventType` 접두사로 알 수 있음)과 `aggregate-id`(`data`의 집계별 필드와 중복, 읽는 곳 없음)는 보내지 않는다. 메시지 키와 토픽은 그대로다. 구독자는 값의 `eventId`로 중복을 거른다. 구현(2단계)은 `OutboxService`가 `traceparent`를 envelope에 넣고 발행기가 헤더 없이 보내며 `outbox_event`의 `traceparent`·`event_version` 컬럼을 지운다. 코드는 바꾸지 않았다.
 - F-024 2단계(완료, ADR-0039): 발행기가 Kafka 헤더를 싣지 않는다(`KafkaOutboxMessagePublisher`는 토픽, 파티션 키, 값만 보낸다). `OutboxService`가 요청의 추적 컨텍스트를 envelope 최상위 `traceparent`(선택, 요청 밖 이벤트는 필드 없음)에 담는다. `outbox_event`에서 쓸 곳이 없어진 `traceparent`·`event_version` 컬럼과 CHECK를 V1에서 지웠고(도메인 `OutboxEvent`와 엔티티도 정리) `event_id`는 유니크 제약과 운영 조회용으로 남겼다. `eventVersion`은 발행기가 `RecordOutboxEventCommand`로 넘겨 envelope에만 담긴다. 통합 테스트로 실제 Kafka 메시지에 `kafka_` 외 헤더가 없고 값에 `aggregateType`·`aggregateId`가 없음을, 요청의 `traceparent`가 envelope에 이어짐을 확인한다. `docs/events.md`의 전환 안내를 지웠다. **로컬 DB는 `docker compose down -v`로 다시 만든다.**
 
+### 2026-10-14
+
+- F-025: 어드민 콘솔이 브라우저에서 직접 호출할 수 있도록 CORS를 추가했다(ADR-0040, ADR-0011 결정 6 대체). `SecurityConfig`가 두 체인(`local` 포함)에 CORS를 걸어 토큰 없는 preflight는 200, 허용 origin의 401·403에도 헤더가 붙는다. 허용 origin은 `inventory.cors.allowed-origins`(환경변수 `CORS_ALLOWED_ORIGINS`, 기본 `http://localhost:5173`)이고 와일드카드는 쓰지 않는다. `CorsTest` 6개를 추가했다.
+
 ## 다음 세션에서 할 일
 
 0. WMS·OMS·Store가 `docs/events.md`의 공통 형식(헤더 없이 값의 envelope, `eventId` UUID)으로 읽도록 맞추고(헤더를 읽던 코드가 있다면 값의 필드로 바꾼다), WMS 연동 시 `POST /api/warehouse-members/republish`로 전 직원 소속을 한 번 발행해 사본을 채운다(WMS 쪽 호출).

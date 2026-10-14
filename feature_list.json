@@ -166,5 +166,12 @@
     "description": "Kafka 헤더를 없애고 이벤트 메타데이터를 값(JSON)에만 둔다. 결정은 ADR-0039, 계약은 docs/events.md. 단계: (1) 설계 확정(ADR-0039, events.md) 완료, (2) 완료: OutboxService가 traceparent를 envelope 최상위(선택)에 넣고, 발행기는 헤더 없이 값과 키만 보내며, outbox_event의 traceparent·event_version 컬럼을 V1에서 제거하고 테스트·runbook을 갱신한다. 전환 전에 OMS·WMS·Store가 운영 중이 아닌지 확인한다. WMS의 같은 전환은 WMS 프로젝트와 협의한다.",
     "status": "completed",
     "dependencies": ["F-023"]
+  },
+  {
+    "id": "F-025",
+    "name": "어드민 콘솔용 CORS",
+    "description": "어드민 콘솔이 브라우저에서 직접 호출할 수 있도록 보안 필터 체인 안에서 CORS를 처리한다. 허용 origin은 inventory.cors.allowed-origins(환경변수 CORS_ALLOWED_ORIGINS)로 설정한다. 토큰 없는 preflight는 200, 허용 origin의 401·403 응답에도 CORS 헤더가 붙는다. 결정은 ADR-0040.",
+    "status": "completed",
+    "dependencies": ["F-020"]
   }
 ]
