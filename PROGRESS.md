@@ -72,6 +72,7 @@
 ### 2026-10-14
 
 - F-025: 어드민 콘솔이 브라우저에서 직접 호출할 수 있도록 CORS를 추가했다(ADR-0040, ADR-0011 결정 6 대체). `SecurityConfig`가 두 체인(`local` 포함)에 CORS를 걸어 토큰 없는 preflight는 200, 허용 origin의 401·403에도 헤더가 붙는다. 허용 origin은 `inventory.cors.allowed-origins`(환경변수 `CORS_ALLOWED_ORIGINS`, 기본 `http://localhost:5173`)이고 와일드카드는 쓰지 않는다. `CorsTest` 6개를 추가했다.
+- F-026: 원자재 담당 role `inventory:material_manager`를 추가했다(ADR-0041). 상품 등록·상태 변경은 `admin`과 `material_manager`(`InventoryAuthorize.PRODUCT_WRITE`), 상품 조회는 기존 호출자에 `material_manager`를 더한다(`PRODUCT_READ`). 재고 현황·가용 재고·대사·Outbox API는 `material_manager`에게 403이다. 콘솔의 원자재 관리 모드가 이 role로 구분된다. 컨트롤러 테스트 4개를 추가·수정했다. 🔶 `dozy-auth`에 `inventory:material_manager` 등록이 필요하다.
 
 ## 다음 세션에서 할 일
 

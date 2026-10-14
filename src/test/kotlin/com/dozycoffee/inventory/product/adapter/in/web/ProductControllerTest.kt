@@ -153,7 +153,17 @@ class ProductControllerTest {
         }
 
     @Test
-    fun `admin이 아니면 등록과 상태 변경은 403이고 토큰이 없으면 401`() {
+    fun `material_manager도 상품을 등록하고 상태를 바꿀 수 있다`() =
+        runBlocking<Unit> {
+            whenever(registerProductUseCase.register(any())).thenReturn(result)
+            whenever(changeProductStatusUseCase.changeStatus(any())).thenReturn(result)
+
+            post("material_manager", registerBody).expectStatus().isCreated
+            patchStatus("material_manager").expectStatus().isOk
+        }
+
+    @Test
+    fun `admin도 material_manager도 아니면 등록과 상태 변경은 403이고 토큰이 없으면 401`() {
         post("service", registerBody).expectStatus().isForbidden
         post("warehouse_manager", registerBody).expectStatus().isForbidden
         post(null, registerBody).expectStatus().isUnauthorized
@@ -201,11 +211,11 @@ class ProductControllerTest {
         }
 
     @Test
-    fun `세 role 모두 상품을 조회할 수 있다`() =
+    fun `네 role 모두 상품을 조회할 수 있다`() =
         runBlocking<Unit> {
             whenever(getProductUseCase.getById(7L)).thenReturn(result)
 
-            listOf("service", "warehouse_manager", "admin").forEach { role: String ->
+            listOf("service", "warehouse_manager", "admin", "material_manager").forEach { role: String ->
                 webTestClient
                     .get()
                     .uri("/api/v1/products/7")

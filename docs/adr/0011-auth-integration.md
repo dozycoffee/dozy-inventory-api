@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-06). 결정 6(CORS 없음)은 [ADR-0040](0040-cors-for-admin-console.md)이 대체했다. audience·role 이름 `ims`는 [ADR-0018](0018-rename-ims-to-inventory.md)에서 `inventory`로 바꿨다
+Accepted (2026-10-06). 결정 6(CORS 없음)은 [ADR-0040](0040-cors-for-admin-console.md)이 대체했고, 결정 1의 role 구성에 [ADR-0041](0041-material-manager-role.md)이 `material_manager`를 더했다. audience·role 이름 `ims`는 [ADR-0018](0018-rename-ims-to-inventory.md)에서 `inventory`로 바꿨다
 
 ## 배경 (Context)
 
