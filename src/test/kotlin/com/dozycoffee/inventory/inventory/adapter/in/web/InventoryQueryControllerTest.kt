@@ -295,6 +295,14 @@ class InventoryQueryControllerTest {
             }
 
         @Test
+        fun `원자재 담당(material_manager)은 재고 현황을 볼 수 없어 403이고 조회하지 않는다`() =
+            runBlocking<Unit> {
+                get("material_manager", "/api/v1/inventories").expectStatus().isForbidden
+
+                verifyBlocking(searchInventoriesUseCase, never()) { search(any()) }
+            }
+
+        @Test
         fun `소속 사본이 없는 창고 관리자는 범위를 구하는 단계에서 403이고 조회하지 않는다`() =
             runBlocking<Unit> {
                 whenever(resolveWarehouseScopeUseCase.resolve(any())).thenThrow(WarehouseAccessDeniedException())
