@@ -28,6 +28,7 @@
 |------|--------|------|
 | `SPRING_PROFILES_ACTIVE` | 없음 | 운영은 `prod` |
 | `SERVER_PORT` | `8082` | HTTP 포트 |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 브라우저에서 직접 호출하는 origin(어드민 콘솔). 쉼표로 구분하고 와일드카드는 쓰지 않는다. 속성 `inventory.cors.allowed-origins`(ADR-0040) |
 | `WMS_BASE_URL` | 비어 있음 | 대사 배치가 호출할 WMS 주소. 비어 있으면 대사 실행이 `FAILED`로 기록된다(ADR-0033) |
 | `AUTH_CLIENT_ENABLED` | `false` | WMS를 `dozy-auth` system client 토큰으로 호출하려면 `true` |
 | `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET` | 비어 있음 | system client 자격. `AUTH_CLIENT_ENABLED=true`일 때 필요하다. **비밀** |
@@ -89,5 +90,4 @@
 
 ## 아직 정하지 않은 것
 - DB 연결의 TLS 사용 여부(현재 URL은 `useSSL=false`). 인프라 정책이 정해지면 정한다.
-- CORS: 어드민 콘솔이 브라우저에서 직접 호출하게 되면 추가한다(ADR-0011).
 - 메트릭, 구조화 로그, 알림 기준: 서비스 간 규약과 부하 테스트 시점에 정한다.

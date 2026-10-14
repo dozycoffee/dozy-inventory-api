@@ -43,6 +43,7 @@
 | [0037](0037-outbox-dead-letter.md) | Outbox 데드 레터(영구 실패 이벤트 격리) | Accepted |
 | [0038](0038-common-event-format.md) | 공통 이벤트 형식(envelope) | Accepted |
 | [0039](0039-event-metadata-in-payload.md) | 이벤트 메타데이터를 값(payload)에만 둔다 | Accepted |
+| [0040](0040-cors-for-admin-console.md) | 어드민 콘솔을 위한 CORS | Accepted |
 | [0041](0041-material-manager-role.md) | 원자재 담당 role(`material_manager`) | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
