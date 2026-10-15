@@ -44,6 +44,7 @@ class ProductPersistenceAdapter(
 
     override suspend fun findAll(
         productCode: String?,
+        keyword: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
         offset: Long,
@@ -51,7 +52,7 @@ class ProductPersistenceAdapter(
     ): List<Product> {
         val query: Query =
             Query
-                .query(criteria(productCode, category, productStatus))
+                .query(criteria(productCode, keyword, category, productStatus))
                 .sort(Sort.by("productId").ascending())
                 .limit(limit)
                 .offset(offset)
@@ -65,22 +66,34 @@ class ProductPersistenceAdapter(
 
     override suspend fun count(
         productCode: String?,
+        keyword: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
     ): Long =
         r2dbcEntityTemplate
             .select(ProductEntity::class.java)
-            .matching(Query.query(criteria(productCode, category, productStatus)))
+            .matching(Query.query(criteria(productCode, keyword, category, productStatus)))
             .awaitCount()
 
     private fun criteria(
         productCode: String?,
+        keyword: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
     ): Criteria =
         listOfNotNull(
             productCode?.let { Criteria.where("productCode").`is`(it) },
+            keyword?.let { containing(it) },
             category?.let { Criteria.where("category").`is`(it) },
             productStatus?.let { Criteria.where("productStatus").`is`(it) },
         ).fold(Criteria.empty()) { acc: Criteria, next: Criteria -> acc.and(next) }
+
+    /** 코드나 이름에 [keyword]가 들어 있는 상품(대소문자·악센트는 컬럼 정렬 규칙대로 무시). 다른 조건과는 하나의 묶음으로 AND한다 */
+    private fun containing(keyword: String): Criteria {
+        val pattern = "%${escapeLike(keyword)}%"
+        return Criteria.where("productCode").like(pattern).or(Criteria.where("productName").like(pattern))
+    }
+
+    // 사용자가 입력한 %, _, \가 와일드카드나 이스케이프로 해석되지 않고 글자 그대로 일치하도록 앞에 \를 붙인다
+    private fun escapeLike(keyword: String): String = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 }

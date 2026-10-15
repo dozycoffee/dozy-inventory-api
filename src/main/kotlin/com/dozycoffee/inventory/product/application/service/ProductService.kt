@@ -78,11 +78,12 @@ class ProductService(
     @Transactional(readOnly = true)
     override suspend fun list(query: ListProductsQuery): ProductPageResult {
         val productCode: String? = query.productCode?.let { Product.normalizeProductCode(it) }
+        val keyword: String? = query.keyword?.trim()?.takeIf { it.isNotEmpty() }
         val items: List<ProductResult> =
             productRepository
-                .findAll(productCode, query.category, query.productStatus, query.offset, query.size)
+                .findAll(productCode, keyword, query.category, query.productStatus, query.offset, query.size)
                 .map { ProductResult.from(it) }
-        val totalElements: Long = productRepository.count(productCode, query.category, query.productStatus)
+        val totalElements: Long = productRepository.count(productCode, keyword, query.category, query.productStatus)
         return ProductPageResult(items, query.page, query.size, totalElements)
     }
 }

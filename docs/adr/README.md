@@ -47,6 +47,7 @@
 | [0041](0041-material-manager-role.md) | 원자재 담당 role(`material_manager`) | Superseded by 0042 |
 | [0042](0042-remove-material-manager-role.md) | 원자재 담당 role(`material_manager`) 폐지 | Accepted |
 | [0043](0043-inventory-query-product-info-and-summary.md) | 관리자 재고 조회의 상품 정보와 상품별 요약 | Accepted |
+| [0044](0044-product-keyword-search.md) | 상품 목록 키워드 검색 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 

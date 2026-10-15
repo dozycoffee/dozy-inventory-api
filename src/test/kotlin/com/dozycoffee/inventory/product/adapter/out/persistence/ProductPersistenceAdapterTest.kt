@@ -129,15 +129,90 @@ class ProductPersistenceAdapterTest {
             bean2.changeStatus(ProductStatus.INACTIVE)
             adapter.save(bean2)
 
-            val all: List<Product> = adapter.findAll(null, null, null, 0L, 10)
-            val beans: List<Product> = adapter.findAll(null, ProductCategory.BEAN, null, 0L, 10)
-            val activeBeans: List<Product> = adapter.findAll(null, ProductCategory.BEAN, ProductStatus.ACTIVE, 0L, 10)
-            val byCode: List<Product> = adapter.findAll("BEAN-002", null, null, 0L, 10)
+            val all: List<Product> = adapter.findAll(null, null, null, null, 0L, 10)
+            val beans: List<Product> = adapter.findAll(null, null, ProductCategory.BEAN, null, 0L, 10)
+            val activeBeans: List<Product> = adapter.findAll(null, null, ProductCategory.BEAN, ProductStatus.ACTIVE, 0L, 10)
+            val byCode: List<Product> = adapter.findAll("BEAN-002", null, null, null, 0L, 10)
 
             assertThat(all.map { it.productCode }).containsExactly("BEAN-001", "SYRUP-001", "BEAN-002")
             assertThat(beans.map { it.productCode }).containsExactly("BEAN-001", "BEAN-002")
             assertThat(activeBeans).containsExactly(bean1)
             assertThat(byCode.map { it.productCode }).containsExactly("BEAN-002")
+        }
+
+    private fun named(
+        code: String,
+        name: String,
+        category: ProductCategory = ProductCategory.BEAN,
+    ): Product = Product.create(code, name, category, "KG", null)
+
+    @Test
+    fun `검색어는 코드나 이름의 일부와 대소문자 무시로 일치하고 상품 ID 순서를 지킨다`() =
+        runBlocking<Unit> {
+            adapter.save(named("BEAN-ETH", "에티오피아 예가체프 원두"))
+            adapter.save(named("SYR-VAN", "바닐라 시럽", ProductCategory.SYRUP))
+            adapter.save(named("DAIRY-MLK", "흰 우유 1L", ProductCategory.DAIRY))
+
+            assertThat(adapter.findAll(null, "원두", null, null, 0L, 10).map { it.productCode }).containsExactly("BEAN-ETH")
+            assertThat(adapter.findAll(null, "시럽", null, null, 0L, 10).map { it.productCode }).containsExactly("SYR-VAN")
+            assertThat(adapter.findAll(null, "eth", null, null, 0L, 10).map { it.productCode }).containsExactly("BEAN-ETH")
+            assertThat(adapter.findAll(null, "Mlk", null, null, 0L, 10).map { it.productCode }).containsExactly("DAIRY-MLK")
+            assertThat(
+                adapter.findAll(null, "-", null, null, 0L, 10).map { it.productCode },
+            ).containsExactly("BEAN-ETH", "SYR-VAN", "DAIRY-MLK")
+            assertThat(adapter.findAll(null, "없는말", null, null, 0L, 10)).isEmpty()
+            assertThat(adapter.count(null, "-", null, null)).isEqualTo(3L)
+            assertThat(adapter.count(null, "원두", null, null)).isEqualTo(1L)
+            assertThat(adapter.count(null, "없는말", null, null)).isEqualTo(0L)
+        }
+
+    @Test
+    fun `검색어는 다른 조건과 AND로 묶이고 코드 또는 이름 어느 쪽이든 일치하면 찾는다`() =
+        runBlocking<Unit> {
+            adapter.save(named("BEAN-ETH", "에티오피아 원두"))
+            adapter.save(named("BEAN-BRA", "브라질 원두"))
+            adapter.save(named("SYR-BEAN", "원두 시럽", ProductCategory.SYRUP))
+            val inactive: Product = adapter.save(named("BEAN-OLD", "오래된 원두"))
+            inactive.changeStatus(ProductStatus.INACTIVE)
+            adapter.save(inactive)
+
+            val beanCategory = adapter.findAll(null, "원두", ProductCategory.BEAN, null, 0L, 10).map { it.productCode }
+            val byCodeOrName = adapter.findAll(null, "bean", null, null, 0L, 10).map { it.productCode }
+            val activeOnly = adapter.findAll(null, "원두", ProductCategory.BEAN, ProductStatus.ACTIVE, 0L, 10).map { it.productCode }
+            val withExactCode = adapter.findAll("BEAN-BRA", "원두", null, null, 0L, 10).map { it.productCode }
+
+            assertThat(beanCategory).containsExactly("BEAN-ETH", "BEAN-BRA", "BEAN-OLD")
+            assertThat(byCodeOrName).containsExactly("BEAN-ETH", "BEAN-BRA", "SYR-BEAN", "BEAN-OLD")
+            assertThat(activeOnly).containsExactly("BEAN-ETH", "BEAN-BRA")
+            assertThat(withExactCode).containsExactly("BEAN-BRA")
+            assertThat(adapter.count(null, "원두", ProductCategory.BEAN, ProductStatus.ACTIVE)).isEqualTo(2L)
+        }
+
+    @Test
+    fun `검색어의 퍼센트와 밑줄과 역슬래시는 와일드카드가 아니라 글자 그대로 일치한다`() =
+        runBlocking<Unit> {
+            adapter.save(named("A-100", "할인 100% 원두"))
+            adapter.save(named("A_101", "밑줄_원두"))
+            adapter.save(named("A-102", "역슬래시\\원두"))
+            adapter.save(named("PLAIN-1", "일반 원두"))
+
+            assertThat(adapter.findAll(null, "%", null, null, 0L, 10).map { it.productCode }).containsExactly("A-100")
+            assertThat(adapter.findAll(null, "_", null, null, 0L, 10).map { it.productCode }).containsExactly("A_101")
+            assertThat(adapter.findAll(null, "\\", null, null, 0L, 10).map { it.productCode }).containsExactly("A-102")
+            assertThat(adapter.count(null, "%", null, null)).isEqualTo(1L)
+            assertThat(adapter.findAll(null, "100%", null, null, 0L, 10).map { it.productCode }).containsExactly("A-100")
+        }
+
+    @Test
+    fun `검색어로 좁힌 목록도 오프셋과 크기로 자른다`() =
+        runBlocking<Unit> {
+            (1..5).forEach { adapter.save(named("BEAN-00$it", "원두 $it")) }
+            adapter.save(named("SYR-001", "시럽", ProductCategory.SYRUP))
+
+            val page = adapter.findAll(null, "원두", null, null, 1L, 2).map { it.productCode }
+
+            assertThat(page).containsExactly("BEAN-002", "BEAN-003")
+            assertThat(adapter.count(null, "원두", null, null)).isEqualTo(5L)
         }
 
     @Test
@@ -146,12 +221,12 @@ class ProductPersistenceAdapterTest {
             (1..5).forEach { adapter.save(newProduct("BEAN-00$it")) }
             adapter.save(newProduct("SYRUP-001", ProductCategory.SYRUP))
 
-            val page: List<Product> = adapter.findAll(null, ProductCategory.BEAN, null, 2L, 2)
+            val page: List<Product> = adapter.findAll(null, null, ProductCategory.BEAN, null, 2L, 2)
 
             assertThat(page.map { it.productCode }).containsExactly("BEAN-003", "BEAN-004")
-            assertThat(adapter.count(null, ProductCategory.BEAN, null)).isEqualTo(5L)
-            assertThat(adapter.count(null, null, null)).isEqualTo(6L)
-            assertThat(adapter.count("NONE", null, null)).isEqualTo(0L)
+            assertThat(adapter.count(null, null, ProductCategory.BEAN, null)).isEqualTo(5L)
+            assertThat(adapter.count(null, null, null, null)).isEqualTo(6L)
+            assertThat(adapter.count("NONE", null, null, null)).isEqualTo(0L)
         }
 
     @Test
@@ -175,7 +250,7 @@ class ProductPersistenceAdapterTest {
                 adapter.save(saved)
             }
 
-            assertThat(adapter.count(null, null, ProductStatus.INACTIVE)).isEqualTo(ProductCategory.entries.size.toLong())
+            assertThat(adapter.count(null, null, null, ProductStatus.INACTIVE)).isEqualTo(ProductCategory.entries.size.toLong())
         }
 
     private suspend fun auditColumns(productId: Long): Map<String, Any?> =

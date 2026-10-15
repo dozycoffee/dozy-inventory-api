@@ -7,6 +7,7 @@ import com.dozycoffee.inventory.product.domain.exception.ProductErrorCode
 
 data class ListProductsQuery(
     val productCode: String?,
+    val keyword: String?,
     val category: ProductCategory?,
     val productStatus: ProductStatus?,
     val page: Int,
@@ -16,6 +17,9 @@ data class ListProductsQuery(
         if (page < 0 || size !in 1..MAX_SIZE) {
             throw InvalidDomainValueException(ProductErrorCode.INVALID_PAGE_REQUEST)
         }
+        if ((keyword?.trim()?.length ?: 0) > MAX_KEYWORD_LENGTH) {
+            throw InvalidDomainValueException(ProductErrorCode.INVALID_KEYWORD)
+        }
     }
 
     val offset: Long
@@ -23,5 +27,6 @@ data class ListProductsQuery(
 
     companion object {
         const val MAX_SIZE: Int = 100
+        const val MAX_KEYWORD_LENGTH: Int = 100
     }
 }

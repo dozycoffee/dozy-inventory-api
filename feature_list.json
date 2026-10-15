@@ -194,5 +194,12 @@
     "description": "재고 현황·상세 응답에 productCode·productName·unit을 더하고(상품 도메인 GetProductsUseCase.getByIds로 채운다, JOIN 없음), 조건에 맞는 재고 행을 상품 단위로 합쳐 상품 ID 순서로 페이지를 나누는 GET /api/v1/inventories/summary를 추가한다. 요약은 창고 수, 행 수, 총·예약·가용 수량과 불량·보류·만료·임박 수량을 준다. 권한과 창고 범위는 현황과 같다. 결정은 ADR-0043(ADR-0030 결정 2 대체).",
     "status": "completed",
     "dependencies": ["F-009", "F-021"]
+  },
+  {
+    "id": "F-029",
+    "name": "상품 목록 키워드 검색",
+    "description": "GET /api/v1/products에 선택 조건 keyword를 더한다. 앞뒤 공백을 없앤 글자가 상품 코드나 이름에 들어 있는 상품을 찾고(부분 일치, 대소문자 무시, %·_·\\는 글자 그대로), 다른 조건과 AND로 묶으며 정렬·페이지는 그대로다. 100자를 넘으면 400(INV_INVALID_PRODUCT_KEYWORD). 결정은 ADR-0044.",
+    "status": "completed",
+    "dependencies": ["F-005"]
   }
 ]

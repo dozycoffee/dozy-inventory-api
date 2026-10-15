@@ -125,12 +125,14 @@ object ProductApiDocs {
             "product-list",
             "Product",
             "상품 목록 조회",
-            "상품을 `product_id` 오름차순으로 조회한다. 모든 조건은 선택이고 함께 쓰면 AND로 적용한다. 코드는 앞뒤 공백을 없애고 대문자로 통일해 비교한다.",
+            "상품을 `product_id` 오름차순으로 조회한다. 모든 조건은 선택이고 함께 쓰면 AND로 적용한다. 코드는 앞뒤 공백을 없애고 대문자로 통일해 정확히 일치하는 상품을 찾고, " +
+                "검색어(`keyword`)는 앞뒤 공백을 없앤 글자가 상품 코드나 이름에 들어 있는 상품을 찾는다(부분 일치, 대소문자 무시, 100자 이하). `%`, `_` 같은 글자도 그대로 일치한다.",
             null,
             "ProductPageResponse",
             ApiDoc.authorization,
             queryParameters(
-                parameterWithName("code").optional().description("상품 코드"),
+                parameterWithName("code").optional().description("상품 코드(정확히 일치)"),
+                parameterWithName("keyword").optional().description("검색어. 상품 코드나 이름에 들어 있는 글자(부분 일치, 대소문자 무시). 100자 이하"),
                 parameterWithName("category").optional().description("분류: BEAN, SYRUP, POWDER, DAIRY, SUPPLY, MD"),
                 parameterWithName("status").optional().description("상태: ACTIVE, INACTIVE"),
                 parameterWithName("page").optional().description("페이지 번호. 0부터 시작, 기본 0"),
