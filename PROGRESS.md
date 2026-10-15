@@ -79,6 +79,8 @@
 - F-027: 원자재 담당 role `inventory:material_manager`를 폐지했다(ADR-0042, ADR-0041 대체). 콘솔에서 재고가 곧 원자재 재고라 원자재 마스터와 재고를 한 모드(`inventory:admin`)에서 다루기로 했고, 마스터만 맡는 담당자가 없다. `InventoryRole.MATERIAL_MANAGER`와 `PRODUCT_WRITE`·`PRODUCT_READ`를 없애고 상품 쓰기는 `ADMIN`, 조회는 `ANY`로 되돌렸다. `material_manager` 전용 테스트 3개를 지우고 상품 컨트롤러 테스트·API 문서 문구를 맞췄다. 🔶 `dozy-auth`에 `inventory:material_manager`를 등록했다면 정리가 필요하다.
 - F-028: 관리자 재고 조회에 상품 정보와 상품별 요약을 더했다(ADR-0043, ADR-0030 결정 2 대체). 콘솔이 상품 마스터를 전부 받아 이름을 채우던 부담(500건 한계)과 클라이언트 집계의 한계를 없애려는 변경이다. 재고 행 응답(현황·상세)에 `productCode`·`productName`·`unit`을 더하고 상품은 `GetProductsUseCase.getByIds`로 페이지당 한 번 읽어 채운다(JOIN 없음).
   `GET /api/v1/inventories/summary`는 같은 조건으로 거른 행을 상품 단위로 합쳐 상품 ID 순서로 페이지를 나눈다(창고 수·행 수, 총·예약·가용, 불량·보류·만료·임박 수량). 권한·창고 범위는 현황과 같다. 서비스·컨트롤러·영속성(실제 MySQL)·상품 배치 조회 테스트와 API 문서(REST Docs)를 추가했다.
+- F-029: 상품 목록에 키워드 검색을 더했다(ADR-0044). `GET /api/v1/products?keyword=`는 앞뒤 공백을 없앤 글자가 상품 코드나 이름에 들어 있는 상품을 찾는다(부분 일치, 대소문자 무시, `%`·`_`·`\`는 글자 그대로 일치). 다른 조건(`code` 정확 일치, `category`, `status`)과 AND로 묶고 정렬·페이지는 그대로이며 100자를 넘으면 400(`INV_INVALID_PRODUCT_KEYWORD`)이다.
+  어드민 콘솔이 상품 마스터를 처음 500건까지 모두 받아 콘솔에서 거르던 상품 선택·검색을 서버 검색으로 바꾸기 위한 변경이다. 서비스·컨트롤러·영속성(실제 MySQL: 부분 일치, 대소문자, 와일드카드 이스케이프, AND 묶음, 페이지) 테스트와 API 문서를 추가했다.
 
 ## 다음 세션에서 할 일
 
