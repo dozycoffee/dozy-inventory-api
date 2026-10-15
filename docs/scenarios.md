@@ -72,12 +72,13 @@ OMS·가맹점 서비스가 주문 가능 여부를 판단하도록 상품별 �
 
 ### 관리자 재고 현황·상세·이력 (4.2)
 
-본사 관리자가 재고를 살펴보고 변동을 추적한다. 결정 배경은 [ADR-0030](adr/0030-admin-inventory-query.md)이다.
+본사 관리자가 재고를 살펴보고 변동을 추적한다. 결정 배경은 [ADR-0030](adr/0030-admin-inventory-query.md), [ADR-0043](adr/0043-inventory-query-product-info-and-summary.md)(상품 정보와 상품별 요약)이다.
 
 - **현황**: `GET /api/v1/inventories`. 한 줄은 재고 행(창고 × Lot × 품질 상태)이고 총·예약·가용 수량, 품질 상태, 할당 보류(사유·시각), Lot 번호·제조일자·유통기한·Lot 상태를 준다. 조건(`warehouseId`, `productId`, `qualityStatus`, `lotStatus`, `allocationHold`)은 모두 선택이고 조건 없이 부르면 전체를 준다. 정렬은 `창고, 상품, 유통기한(없는 Lot은 마지막), ID`, 페이지는 `page`(0부터)와 `size`(1~100, 기본 20)다.
+- **상품별 요약**: `GET /api/v1/inventories/summary`. 현황과 같은 조건으로 거른 행을 상품 단위로 합쳐 상품 ID 순서로 페이지를 나눈다(ADR-0043). 한 줄에 창고 수·행 수, 총·예약·가용 수량, 불량·할당 보류·유통기한 만료·임박 행의 총 수량을 준다. 상품별 재고 행은 `GET /api/v1/inventories?productId=`로 이어서 본다.
 - **상세**: `GET /api/v1/inventories/{inventoryId}`. 없으면 404(`INV_INVENTORY_NOT_FOUND`).
 - **이력**: `GET /api/v1/inventories/{inventoryId}/histories`. 수량 변동 이력을 최신순 페이지로 준다(유형, 변동량, 변경 후 총 수량, 원인 문서, 멱등 키, 요청 주체, 생성 시각).
-- **권한**: `inventory:admin`과 `inventory:warehouse_manager`. 창고 관리자는 배정된 창고의 행만 보며 창고 조건을 생략하면 배정된 창고로 자동 제한되고, 배정되지 않은 창고를 지정하거나 그 창고의 재고 행 상세·이력을 보려 하면 403(`INV_WAREHOUSE_ACCESS_DENIED`)이다(ADR-0032). 상품 이름은 주지 않고 `productId`만 준다.
+- **권한**: `inventory:admin`과 `inventory:warehouse_manager`. 창고 관리자는 배정된 창고의 행만 보며 창고 조건을 생략하면 배정된 창고로 자동 제한되고, 배정되지 않은 창고를 지정하거나 그 창고의 재고 행 상세·이력을 보려 하면 403(`INV_WAREHOUSE_ACCESS_DENIED`)이다(ADR-0032). 재고 행에는 `productId`와 함께 상품 마스터의 `productCode`·`productName`·`unit`을 담는다(ADR-0043).
 
 ### 예약 생성 (5.1)
 

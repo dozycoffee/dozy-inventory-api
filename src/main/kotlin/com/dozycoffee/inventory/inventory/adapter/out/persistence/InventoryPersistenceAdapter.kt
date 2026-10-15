@@ -9,6 +9,7 @@ import com.dozycoffee.inventory.inventory.application.port.out.InventoryLotInfo
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRepository
 import com.dozycoffee.inventory.inventory.application.port.out.InventoryRow
 import com.dozycoffee.inventory.inventory.application.port.out.InventorySearchCondition
+import com.dozycoffee.inventory.inventory.application.port.out.InventorySummaryRow
 import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientAvailableQuantityException
 import com.dozycoffee.inventory.inventory.domain.exception.InsufficientReservedQuantityException
@@ -65,6 +66,30 @@ class InventoryPersistenceAdapter(
         val filter: Filter = filterOf(condition)
         return filter
             .bindAll(databaseClient.sql(COUNT_HEAD + filter.where))
+            .map { row, _ -> checkNotNull(row.get("c", Long::class.javaObjectType)) }
+            .one()
+            .awaitSingle()
+    }
+
+    override suspend fun searchSummaries(
+        condition: InventorySearchCondition,
+        offset: Long,
+        limit: Int,
+    ): List<InventorySummaryRow> {
+        val filter: Filter = filterOf(condition)
+        return filter
+            .bindAll(databaseClient.sql(SUMMARY_HEAD + filter.where + SUMMARY_ORDER))
+            .bind("limit", limit)
+            .bind("offset", offset)
+            .map { row, _ -> toSummaryRow(row) }
+            .flow()
+            .toList()
+    }
+
+    override suspend fun countSummaries(condition: InventorySearchCondition): Long {
+        val filter: Filter = filterOf(condition)
+        return filter
+            .bindAll(databaseClient.sql(SUMMARY_COUNT_HEAD + filter.where))
             .map { row, _ -> checkNotNull(row.get("c", Long::class.javaObjectType)) }
             .one()
             .awaitSingle()
@@ -141,6 +166,19 @@ class InventoryPersistenceAdapter(
             heldAt = row.get("held_at", LocalDateTime::class.java),
             createdAt = checkNotNull(row.get("created_at", LocalDateTime::class.java)),
             updatedAt = checkNotNull(row.get("updated_at", LocalDateTime::class.java)),
+        )
+
+    private fun toSummaryRow(row: Readable): InventorySummaryRow =
+        InventorySummaryRow(
+            productId = checkNotNull(row.get("product_id", Long::class.javaObjectType)),
+            warehouseCount = checkNotNull(row.get("warehouse_count", Long::class.javaObjectType)).toInt(),
+            rowCount = checkNotNull(row.get("row_count", Long::class.javaObjectType)).toInt(),
+            quantity = checkNotNull(row.get("quantity", Long::class.javaObjectType)),
+            reservedQuantity = checkNotNull(row.get("reserved_quantity", Long::class.javaObjectType)),
+            defectiveQuantity = checkNotNull(row.get("defective_quantity", Long::class.javaObjectType)),
+            heldQuantity = checkNotNull(row.get("held_quantity", Long::class.javaObjectType)),
+            expiredQuantity = checkNotNull(row.get("expired_quantity", Long::class.javaObjectType)),
+            expiringSoonQuantity = checkNotNull(row.get("expiring_soon_quantity", Long::class.javaObjectType)),
         )
 
     /** 값이 있는 조건만 담은 WHERE 절과 바인딩할 값. 값은 이름 붙은 파라미터로만 넣어 SQL에 직접 이어 붙이지 않는다 */
@@ -358,6 +396,35 @@ class InventoryPersistenceAdapter(
             """
              ORDER BY i.warehouse_id, i.product_id, l.expiration_date IS NULL, l.expiration_date, i.inventory_id
              LIMIT :limit OFFSET :offset
+            """
+
+        const val SUMMARY_HEAD: String =
+            """
+            SELECT i.product_id,
+                   COUNT(DISTINCT i.warehouse_id) AS warehouse_count,
+                   COUNT(*) AS row_count,
+                   CAST(SUM(i.quantity) AS SIGNED) AS quantity,
+                   CAST(SUM(i.reserved_quantity) AS SIGNED) AS reserved_quantity,
+                   CAST(SUM(CASE WHEN i.quality_status = 'DEFECTIVE' THEN i.quantity ELSE 0 END) AS SIGNED) AS defective_quantity,
+                   CAST(SUM(CASE WHEN i.allocation_hold = 1 THEN i.quantity ELSE 0 END) AS SIGNED) AS held_quantity,
+                   CAST(SUM(CASE WHEN l.lot_status = 'EXPIRED' THEN i.quantity ELSE 0 END) AS SIGNED) AS expired_quantity,
+                   CAST(SUM(CASE WHEN l.lot_status = 'EXPIRING_SOON' THEN i.quantity ELSE 0 END) AS SIGNED) AS expiring_soon_quantity
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
+            """
+
+        const val SUMMARY_ORDER: String =
+            """
+             GROUP BY i.product_id
+             ORDER BY i.product_id
+             LIMIT :limit OFFSET :offset
+            """
+
+        const val SUMMARY_COUNT_HEAD: String =
+            """
+            SELECT COUNT(DISTINCT i.product_id) AS c
+              FROM inventory i
+              JOIN lot l ON l.lot_id = i.lot_id
             """
 
         const val COUNT_HEAD: String =

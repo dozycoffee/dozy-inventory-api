@@ -34,6 +34,9 @@ class ProductPersistenceAdapter(
 
     override suspend fun findById(productId: Long): Product? = productR2dbcRepository.findById(productId)?.toDomain()
 
+    override suspend fun findAllByIds(productIds: Set<Long>): List<Product> =
+        if (productIds.isEmpty()) emptyList() else productR2dbcRepository.findAllById(productIds).toList().map { it.toDomain() }
+
     override suspend fun findByProductCode(productCode: String): Product? =
         productR2dbcRepository.findByProductCode(productCode)?.toDomain()
 

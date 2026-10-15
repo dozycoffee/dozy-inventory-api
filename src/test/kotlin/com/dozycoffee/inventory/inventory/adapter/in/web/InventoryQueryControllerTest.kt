@@ -13,9 +13,12 @@ import com.dozycoffee.inventory.global.security.UserActor
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryHistoriesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.GetInventoryUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.SearchInventoriesUseCase
+import com.dozycoffee.inventory.inventory.application.port.`in`.SearchInventorySummariesUseCase
 import com.dozycoffee.inventory.inventory.application.port.`in`.command.SearchInventoriesQuery
+import com.dozycoffee.inventory.inventory.application.port.`in`.command.SearchInventorySummariesQuery
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventoryHistoryResult
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventoryResult
+import com.dozycoffee.inventory.inventory.application.port.`in`.result.InventorySummaryResult
 import com.dozycoffee.inventory.inventory.application.port.`in`.result.PageResult
 import com.dozycoffee.inventory.inventory.domain.enumeration.HistoryType
 import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
@@ -59,6 +62,9 @@ class InventoryQueryControllerTest {
     private lateinit var searchInventoriesUseCase: SearchInventoriesUseCase
 
     @MockitoBean
+    private lateinit var searchInventorySummariesUseCase: SearchInventorySummariesUseCase
+
+    @MockitoBean
     private lateinit var getInventoryUseCase: GetInventoryUseCase
 
     @MockitoBean
@@ -76,6 +82,9 @@ class InventoryQueryControllerTest {
             500L,
             10L,
             100L,
+            "BEAN-001",
+            "에티오피아 원두",
+            "KG",
             7L,
             "LOT-A",
             LocalDate.of(2026, 9, 1),
@@ -91,6 +100,9 @@ class InventoryQueryControllerTest {
             at,
             at,
         )
+
+    private val summary: InventorySummaryResult =
+        InventorySummaryResult(100L, "BEAN-001", "에티오피아 원두", "KG", 2, 3, 30L, 8L, 22L, 4L, 5L, 6L, 7L)
 
     private val history: InventoryHistoryResult =
         InventoryHistoryResult(9000L, HistoryType.INBOUND, 5, 15, ReferenceType.INBOUND_ITEM, 77L, "wms-inbound-77", "svc-wms", at)
@@ -129,6 +141,12 @@ class InventoryQueryControllerTest {
                     .isEqualTo(6)
                     .jsonPath("$.items[0].lotNumber")
                     .isEqualTo("LOT-A")
+                    .jsonPath("$.items[0].productName")
+                    .isEqualTo("에티오피아 원두")
+                    .jsonPath("$.items[0].productCode")
+                    .isEqualTo("BEAN-001")
+                    .jsonPath("$.items[0].unit")
+                    .isEqualTo("KG")
                     .jsonPath("$.items[0].allocationHold")
                     .isEqualTo(true)
                     .jsonPath("$.totalElements")
@@ -175,6 +193,106 @@ class InventoryQueryControllerTest {
                     .consumeWith(InventoryQueryApiDocs.invalid())
                 get("admin", "/api/v1/inventories?qualityStatus=UNKNOWN").expectStatus().isBadRequest
                 get("admin", "/api/v1/inventories?warehouseId=abc").expectStatus().isBadRequest
+            }
+    }
+
+    @Nested
+    inner class `상품별 요약` {
+        @Test
+        fun `admin이 조회하면 상품 단위 합계를 페이지로 응답한다`() =
+            runBlocking<Unit> {
+                whenever(searchInventorySummariesUseCase.searchSummaries(any())).thenReturn(PageResult(listOf(summary), 0, 20, 1L))
+
+                get("admin", "/api/v1/inventories/summary?warehouseId=10&lotStatus=EXPIRED&page=0&size=20")
+                    .expectStatus()
+                    .isOk
+                    .expectBody()
+                    .jsonPath("$.items[0].productId")
+                    .isEqualTo(100)
+                    .jsonPath("$.items[0].productName")
+                    .isEqualTo("에티오피아 원두")
+                    .jsonPath("$.items[0].warehouseCount")
+                    .isEqualTo(2)
+                    .jsonPath("$.items[0].quantity")
+                    .isEqualTo(30)
+                    .jsonPath("$.items[0].availableQuantity")
+                    .isEqualTo(22)
+                    .jsonPath("$.items[0].expiredQuantity")
+                    .isEqualTo(6)
+                    .jsonPath("$.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.totalPages")
+                    .isEqualTo(1)
+                    .consumeWith(InventoryQueryApiDocs.summary())
+            }
+
+        @Test
+        fun `조건과 페이지를 Query로 넘기고 생략하면 기본값을 쓴다`() =
+            runBlocking<Unit> {
+                whenever(searchInventorySummariesUseCase.searchSummaries(any())).thenReturn(PageResult(emptyList(), 2, 5, 0L))
+
+                get(
+                    "admin",
+                    "/api/v1/inventories/summary?warehouseId=10&productId=100&qualityStatus=DEFECTIVE&lotStatus=EXPIRED&allocationHold=false&page=2&size=5",
+                ).expectStatus()
+                    .isOk
+                get("admin", "/api/v1/inventories/summary").expectStatus().isOk
+
+                val query = argumentCaptor<SearchInventorySummariesQuery>()
+                verifyBlocking(searchInventorySummariesUseCase, org.mockito.kotlin.times(2)) { searchSummaries(query.capture()) }
+                assertEquals(
+                    SearchInventorySummariesQuery(10L, 100L, QualityStatus.DEFECTIVE, LotStatus.EXPIRED, false, 2, 5, WarehouseScope.All),
+                    query.firstValue,
+                )
+                assertEquals(SearchInventorySummariesQuery(null, null, null, null, null, 0, 20, WarehouseScope.All), query.secondValue)
+            }
+
+        @Test
+        fun `상세 경로와 겹치지 않아 summary는 재고 행 ID로 해석되지 않는다`() =
+            runBlocking<Unit> {
+                whenever(searchInventorySummariesUseCase.searchSummaries(any())).thenReturn(PageResult(emptyList(), 0, 20, 0L))
+
+                get("admin", "/api/v1/inventories/summary").expectStatus().isOk
+
+                verifyBlocking(getInventoryUseCase, never()) { getById(any(), any()) }
+            }
+
+        @Test
+        fun `조건이 올바르지 않으면 400`() =
+            runBlocking<Unit> {
+                whenever(
+                    searchInventorySummariesUseCase.searchSummaries(any()),
+                ).thenThrow(InvalidDomainValueException(InventoryErrorCode.INVALID_INVENTORY_QUERY))
+
+                get("admin", "/api/v1/inventories/summary?size=101")
+                    .expectStatus()
+                    .isBadRequest
+                    .expectBody()
+                    .jsonPath("$.code")
+                    .isEqualTo("INV_INVALID_INVENTORY_QUERY")
+                get("admin", "/api/v1/inventories/summary?qualityStatus=UNKNOWN").expectStatus().isBadRequest
+            }
+
+        @Test
+        fun `창고 관리자는 배정된 범위로 조회하고 배정되지 않은 창고이면 403이다`() =
+            runBlocking<Unit> {
+                val scope = WarehouseScope.Only(setOf(10L, 30L))
+                whenever(resolveWarehouseScopeUseCase.resolve(any())).thenReturn(scope)
+                whenever(searchInventorySummariesUseCase.searchSummaries(any())).thenReturn(PageResult(listOf(summary), 0, 20, 1L))
+
+                get("warehouse_manager", "/api/v1/inventories/summary").expectStatus().isOk
+
+                val query = argumentCaptor<SearchInventorySummariesQuery>()
+                verifyBlocking(searchInventorySummariesUseCase) { searchSummaries(query.capture()) }
+                assertEquals(scope, query.firstValue.scope)
+
+                whenever(searchInventorySummariesUseCase.searchSummaries(any())).thenThrow(WarehouseAccessDeniedException())
+                get("warehouse_manager", "/api/v1/inventories/summary?warehouseId=20")
+                    .expectStatus()
+                    .isForbidden
+                    .expectBody()
+                    .jsonPath("$.code")
+                    .isEqualTo("INV_WAREHOUSE_ACCESS_DENIED")
             }
     }
 
@@ -248,12 +366,18 @@ class InventoryQueryControllerTest {
         @Test
         fun `service role과 토큰이 없는 요청은 403과 401이며 UseCase를 호출하지 않는다`() =
             runBlocking<Unit> {
-                listOf("/api/v1/inventories", "/api/v1/inventories/500", "/api/v1/inventories/500/histories").forEach { uri ->
+                listOf(
+                    "/api/v1/inventories",
+                    "/api/v1/inventories/summary",
+                    "/api/v1/inventories/500",
+                    "/api/v1/inventories/500/histories",
+                ).forEach { uri ->
                     get("service", uri).expectStatus().isForbidden
                     get(null, uri).expectStatus().isUnauthorized
                 }
 
                 verifyBlocking(searchInventoriesUseCase, never()) { search(any()) }
+                verifyBlocking(searchInventorySummariesUseCase, never()) { searchSummaries(any()) }
                 verifyBlocking(getInventoryUseCase, never()) { getById(any(), any()) }
                 verifyBlocking(getInventoryHistoriesUseCase, never()) { getHistories(any(), any(), any(), any()) }
                 verifyBlocking(resolveWarehouseScopeUseCase, never()) { resolve(any()) }

@@ -726,6 +726,124 @@ class InventoryPersistenceAdapterTest {
     }
 
     @Nested
+    inner class `상품별 요약 조회` {
+        private val all = InventorySearchCondition(null, null, null, null, null)
+
+        private suspend fun lotOf(
+            product: Long,
+            number: String,
+            status: String = "NORMAL",
+        ): Long {
+            val id: Long = checkNotNull(fixture.seedLot(product, number, LocalDate.of(2027, 1, 1)).lotId)
+            databaseClient
+                .sql("UPDATE lot SET lot_status = :status WHERE lot_id = :id")
+                .bind("status", status)
+                .bind("id", id)
+                .fetch()
+                .rowsUpdated()
+                .awaitFirst()
+            return id
+        }
+
+        @Test
+        fun `조건에 맞는 재고 행을 상품 단위로 합치고 구분별 수량을 센다`() =
+            runBlocking<Unit> {
+                val other: Long = fixture.seedProduct("BEAN-002")
+                val normal: Long = lotOf(productId, "N")
+                val expired: Long = lotOf(productId, "E", "EXPIRED")
+                val soon: Long = lotOf(productId, "S", "EXPIRING_SOON")
+                val otherLot: Long = lotOf(other, "O")
+                fixture.insertInventory(10L, productId, normal, quantity = 10, reservedQuantity = 4)
+                fixture.insertInventory(10L, productId, expired, "DEFECTIVE", quantity = 5)
+                fixture.insertInventory(20L, productId, soon, quantity = 7, hold = true)
+                fixture.insertInventory(10L, other, otherLot, quantity = 3)
+
+                val rows = adapter.searchSummaries(all, 0L, 100)
+
+                assertThat(rows.map { it.productId }).containsExactly(productId, other)
+                val summary = rows.first()
+                assertThat(summary.warehouseCount).isEqualTo(2)
+                assertThat(summary.rowCount).isEqualTo(3)
+                assertThat(summary.quantity).isEqualTo(22L)
+                assertThat(summary.reservedQuantity).isEqualTo(4L)
+                assertThat(summary.availableQuantity).isEqualTo(18L)
+                assertThat(summary.defectiveQuantity).isEqualTo(5L)
+                assertThat(summary.heldQuantity).isEqualTo(7L)
+                assertThat(summary.expiredQuantity).isEqualTo(5L)
+                assertThat(summary.expiringSoonQuantity).isEqualTo(7L)
+                val single = rows.last()
+                assertThat(single.warehouseCount).isEqualTo(1)
+                assertThat(single.rowCount).isEqualTo(1)
+                assertThat(single.quantity).isEqualTo(3L)
+                assertThat(single.defectiveQuantity).isEqualTo(0L)
+                assertThat(adapter.countSummaries(all)).isEqualTo(2L)
+            }
+
+        @Test
+        fun `조건을 모두 만족하는 행만 합치고 맞는 행이 없는 상품은 결과에 없다`() =
+            runBlocking<Unit> {
+                val other: Long = fixture.seedProduct("BEAN-002")
+                val soon: Long = lotOf(productId, "S", "EXPIRING_SOON")
+                val otherLot: Long = lotOf(other, "O")
+                fixture.insertInventory(10L, productId, lotId, quantity = 10)
+                fixture.insertInventory(10L, productId, soon, quantity = 6)
+                fixture.insertInventory(20L, productId, soon, quantity = 9)
+                fixture.insertInventory(20L, other, otherLot, quantity = 4)
+
+                val inWarehouse10 = InventorySearchCondition(setOf(10L), null, null, null, null)
+                val soonOnly = InventorySearchCondition(null, null, null, LotStatus.EXPIRING_SOON, null)
+                val otherProduct = InventorySearchCondition(null, other, null, null, null)
+
+                val first = adapter.searchSummaries(inWarehouse10, 0L, 100)
+                assertThat(first.map { it.productId }).containsExactly(productId)
+                assertThat(first.single().quantity).isEqualTo(16L)
+                assertThat(first.single().warehouseCount).isEqualTo(1)
+                assertThat(adapter.countSummaries(inWarehouse10)).isEqualTo(1L)
+
+                val second = adapter.searchSummaries(soonOnly, 0L, 100)
+                assertThat(second.map { it.productId }).containsExactly(productId)
+                assertThat(second.single().quantity).isEqualTo(15L)
+                assertThat(second.single().rowCount).isEqualTo(2)
+
+                assertThat(adapter.searchSummaries(otherProduct, 0L, 100).map { it.productId }).containsExactly(other)
+                assertThat(adapter.searchSummaries(InventorySearchCondition(setOf(99L), null, null, null, null), 0L, 100)).isEmpty()
+                assertThat(adapter.countSummaries(InventorySearchCondition(setOf(99L), null, null, null, null))).isEqualTo(0L)
+            }
+
+        @Test
+        fun `상품 ID 순서로 페이지를 나누고 전체 상품 수를 센다`() =
+            runBlocking<Unit> {
+                val second: Long = fixture.seedProduct("BEAN-002")
+                val third: Long = fixture.seedProduct("BEAN-003")
+                fixture.insertInventory(10L, productId, lotId, quantity = 1)
+                fixture.insertInventory(20L, productId, lotId, quantity = 1)
+                fixture.insertInventory(10L, second, lotOf(second, "B"), quantity = 2)
+                fixture.insertInventory(10L, third, lotOf(third, "C"), quantity = 3)
+
+                assertThat(adapter.searchSummaries(all, 0L, 2).map { it.productId }).containsExactly(productId, second)
+                assertThat(adapter.searchSummaries(all, 2L, 2).map { it.productId }).containsExactly(third)
+                // 상품 하나에 행이 여러 개여도 상품 수로 센다
+                assertThat(adapter.countSummaries(all)).isEqualTo(3L)
+            }
+
+        @Test
+        fun `수량 0인 행만 있는 상품도 요약에 나오고 합계가 Int 범위를 넘어도 정확하다`() =
+            runBlocking<Unit> {
+                val zero: Long = fixture.seedProduct("BEAN-002")
+                fixture.insertInventory(10L, zero, lotOf(zero, "Z"), quantity = 0)
+                fixture.insertInventory(10L, productId, lotId, quantity = 2_000_000_000)
+                fixture.insertInventory(20L, productId, lotId, quantity = 2_000_000_000, reservedQuantity = 1_000_000_000)
+
+                val rows = adapter.searchSummaries(all, 0L, 100)
+
+                assertThat(rows.first { it.productId == zero }.quantity).isEqualTo(0L)
+                val big = rows.first { it.productId == productId }
+                assertThat(big.quantity).isEqualTo(4_000_000_000L)
+                assertThat(big.availableQuantity).isEqualTo(3_000_000_000L)
+            }
+    }
+
+    @Nested
     inner class `관리자 재고 현황 조회` {
         private val all = InventorySearchCondition(null, null, null, null, null)
 

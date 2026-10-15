@@ -2,6 +2,7 @@ package com.dozycoffee.inventory.product.application.service
 
 import com.dozycoffee.inventory.product.application.port.`in`.ChangeProductStatusUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.GetProductUseCase
+import com.dozycoffee.inventory.product.application.port.`in`.GetProductsUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.ListProductsUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.RegisterProductUseCase
 import com.dozycoffee.inventory.product.application.port.`in`.command.ChangeProductStatusCommand
@@ -26,6 +27,7 @@ class ProductService(
 ) : RegisterProductUseCase,
     ChangeProductStatusUseCase,
     GetProductUseCase,
+    GetProductsUseCase,
     ListProductsUseCase {
     @Transactional
     override suspend fun register(command: RegisterProductCommand): ProductResult {
@@ -62,6 +64,10 @@ class ProductService(
     @Transactional(readOnly = true)
     override suspend fun getById(productId: Long): ProductResult =
         ProductResult.from(productRepository.findById(productId) ?: throw ProductNotFoundException())
+
+    @Transactional(readOnly = true)
+    override suspend fun getByIds(productIds: Set<Long>): Map<Long, ProductResult> =
+        productRepository.findAllByIds(productIds).map { ProductResult.from(it) }.associateBy { it.productId }
 
     @Transactional(readOnly = true)
     override suspend fun getByCode(productCode: String): ProductResult =

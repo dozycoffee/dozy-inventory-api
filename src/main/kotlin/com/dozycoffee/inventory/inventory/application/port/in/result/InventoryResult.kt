@@ -5,11 +5,14 @@ import com.dozycoffee.inventory.inventory.domain.enumeration.LotStatus
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** 관리자가 보는 재고 행. [availableQuantity]는 총 수량에서 예약 수량을 뺀 값이며 품질 상태와 보류는 반영하지 않은 행 자체의 값이다 */
+/** 관리자가 보는 재고 행. [productCode], [productName], [unit]은 상품 마스터에서 채운 값이다. [availableQuantity]는 총 수량에서 예약 수량을 뺀 값이며 품질 상태와 보류는 반영하지 않은 행 자체의 값이다 */
 data class InventoryResult(
     val inventoryId: Long,
     val warehouseId: Long,
     val productId: Long,
+    val productCode: String,
+    val productName: String,
+    val unit: String,
     val lotId: Long,
     val lotNumber: String,
     val manufactureDate: LocalDate?,
