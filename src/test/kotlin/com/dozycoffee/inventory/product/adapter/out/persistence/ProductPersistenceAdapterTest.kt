@@ -48,6 +48,20 @@ class ProductPersistenceAdapterTest {
     ): Product = Product.create(code, "원두 $code", category, "KG", shelfLifeDays)
 
     @Test
+    fun `상품 ID 여러 개를 한 번에 조회하고 없는 ID는 결과에 없으며 빈 집합은 조회하지 않는다`() =
+        runBlocking<Unit> {
+            val a: Long = checkNotNull(adapter.save(newProduct("BEAN-001")).productId)
+            val b: Long = checkNotNull(adapter.save(newProduct("BEAN-002")).productId)
+            adapter.save(newProduct("BEAN-003"))
+
+            val found: List<Product> = adapter.findAllByIds(setOf(a, b, b + 1000))
+
+            assertThat(found.map { it.productId }).containsExactlyInAnyOrder(a, b)
+            assertThat(found.map { it.productCode }).containsExactlyInAnyOrder("BEAN-001", "BEAN-002")
+            assertThat(adapter.findAllByIds(emptySet())).isEmpty()
+        }
+
+    @Test
     fun `저장하면 식별자가 부여되고 같은 값으로 조회된다`() =
         runBlocking<Unit> {
             val saved: Product = adapter.save(newProduct())

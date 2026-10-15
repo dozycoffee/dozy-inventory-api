@@ -155,4 +155,16 @@ class ProductServiceTest {
             assertEquals(2, result.page)
             assertEquals(10, result.size)
         }
+
+    @Test
+    fun `상품 ID 여러 개를 한 번에 조회해 ID별로 돌려주고 없는 ID는 결과에 없다`() =
+        runBlocking<Unit> {
+            val products: List<Product> = listOf(ProductTestBuilder().build(), ProductTestBuilder().productId(2L).build())
+            whenever(productRepository.findAllByIds(setOf(1L, 2L, 9L))).thenReturn(products)
+
+            val result: Map<Long, ProductResult> = service.getByIds(setOf(1L, 2L, 9L))
+
+            assertEquals(setOf(1L, 2L), result.keys)
+            assertEquals("BEAN-001", result.getValue(1L).productCode)
+        }
 }

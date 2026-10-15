@@ -11,6 +11,9 @@ interface ProductRepository {
 
     suspend fun findByProductCode(productCode: String): Product?
 
+    /** 주어진 ID의 상품을 모두 반환한다. 없는 ID는 결과에 없고 [productIds]가 비어 있으면 조회하지 않는다 */
+    suspend fun findAllByIds(productIds: Set<Long>): List<Product>
+
     suspend fun existsByProductCode(productCode: String): Boolean
 
     /** `product_id` 오름차순으로 정렬해 반환한다. 필터가 null이면 해당 조건을 적용하지 않는다. [productCode]는 정규화된 값이다 */
