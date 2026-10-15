@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted (2026-10-14). ADR-0011 결정 1의 role 구성(3개)에 `material_manager`를 더한다. 어드민 콘솔에 원자재 관리 모드를 따로 두기로 하면서 정했다.
+Superseded by [ADR-0042](0042-remove-material-manager-role.md) (2026-10-15). 원래 상태: Accepted (2026-10-14). ADR-0011 결정 1의 role 구성(3개)에 `material_manager`를 더한다. 어드민 콘솔에 원자재 관리 모드를 따로 두기로 하면서 정했다.
 
 ## 배경 (Context)
 

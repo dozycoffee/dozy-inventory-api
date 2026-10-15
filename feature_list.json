@@ -180,5 +180,12 @@
     "description": "원자재(상품 마스터) 등록·상태 변경과 상품 조회만 하는 inventory:material_manager role을 추가한다. 상품 쓰기는 admin과 material_manager, 상품 조회는 기존 호출자에 material_manager를 더하고, 재고·가용 재고·대사·Outbox API는 막힌 채로 둔다. admin은 material_manager 권한을 모두 포함한다. 결정은 ADR-0041. dozy-auth에 inventory:material_manager 등록이 필요하다(사용자 작업).",
     "status": "completed",
     "dependencies": ["F-005", "F-020"]
+  },
+  {
+    "id": "F-027",
+    "name": "원자재 담당 role(material_manager) 폐지",
+    "description": "F-026의 inventory:material_manager role을 폐지한다. InventoryRole.MATERIAL_MANAGER와 InventoryAuthorize.PRODUCT_WRITE·PRODUCT_READ를 없애고, 상품 쓰기는 admin(ADMIN), 상품 조회는 ANY로 되돌린다. 결정은 ADR-0042(ADR-0041 대체). dozy-auth에 등록했다면 정리가 필요하다(사용자 작업).",
+    "status": "completed",
+    "dependencies": ["F-026"]
   }
 ]

@@ -169,14 +169,6 @@ class InventoryAvailabilityControllerTest {
             }
 
         @Test
-        fun `원자재 담당(material_manager)은 재고를 볼 수 없어 403이며 UseCase를 호출하지 않는다`() =
-            runBlocking<Unit> {
-                get("material_manager", "/api/v1/inventories/availability?productIds=1").expectStatus().isForbidden
-
-                verifyBlocking(getAvailabilityUseCase, never()) { getAvailability(any()) }
-            }
-
-        @Test
         fun `창고 관리자도 호출할 수 있고 요청자의 범위를 Query에 담아 넘긴다`() =
             runBlocking<Unit> {
                 val scope = WarehouseScope.Only(setOf(10L, 30L))

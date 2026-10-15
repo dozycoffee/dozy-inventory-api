@@ -74,6 +74,10 @@
 - F-025: 어드민 콘솔이 브라우저에서 직접 호출할 수 있도록 CORS를 추가했다(ADR-0040, ADR-0011 결정 6 대체). `SecurityConfig`가 두 체인(`local` 포함)에 CORS를 걸어 토큰 없는 preflight는 200, 허용 origin의 401·403에도 헤더가 붙는다. 허용 origin은 `inventory.cors.allowed-origins`(환경변수 `CORS_ALLOWED_ORIGINS`, 기본 `http://localhost:5173`)이고 와일드카드는 쓰지 않는다. `CorsTest` 6개를 추가했다.
 - F-026: 원자재 담당 role `inventory:material_manager`를 추가했다(ADR-0041). 상품 등록·상태 변경은 `admin`과 `material_manager`(`InventoryAuthorize.PRODUCT_WRITE`), 상품 조회는 기존 호출자에 `material_manager`를 더한다(`PRODUCT_READ`). 재고 현황·가용 재고·대사·Outbox API는 `material_manager`에게 403이다. 콘솔의 원자재 관리 모드가 이 role로 구분된다. 컨트롤러 테스트 4개를 추가·수정했다. 🔶 `dozy-auth`에 `inventory:material_manager` 등록이 필요하다.
 
+### 2026-10-15
+
+- F-027: 원자재 담당 role `inventory:material_manager`를 폐지했다(ADR-0042, ADR-0041 대체). 콘솔에서 재고가 곧 원자재 재고라 원자재 마스터와 재고를 한 모드(`inventory:admin`)에서 다루기로 했고, 마스터만 맡는 담당자가 없다. `InventoryRole.MATERIAL_MANAGER`와 `PRODUCT_WRITE`·`PRODUCT_READ`를 없애고 상품 쓰기는 `ADMIN`, 조회는 `ANY`로 되돌렸다. `material_manager` 전용 테스트 3개를 지우고 상품 컨트롤러 테스트·API 문서 문구를 맞췄다. 🔶 `dozy-auth`에 `inventory:material_manager`를 등록했다면 정리가 필요하다.
+
 ## 다음 세션에서 할 일
 
 0. WMS·OMS·Store가 `docs/events.md`의 공통 형식(헤더 없이 값의 envelope, `eventId` UUID)으로 읽도록 맞추고(헤더를 읽던 코드가 있다면 값의 필드로 바꾼다), WMS 연동 시 `POST /api/warehouse-members/republish`로 전 직원 소속을 한 번 발행해 사본을 채운다(WMS 쪽 호출).

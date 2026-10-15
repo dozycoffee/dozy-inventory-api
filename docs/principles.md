@@ -55,4 +55,4 @@ inventory 서비스는 DOZY COFFEE 원부자재 재고의 단일 진실 공급�
 
 - 🔶 캐시 도입 시점(가용 재고 조회 부하를 실측한 뒤 결정)
 - `reservation.channel`은 값을 확정하지 않고 자유 문자열로 받는다. 채널별 TTL 상한은 설정 맵과 `default`로 둔다(ADR-0022). 서비스명이 확정되면 설정만 바꾼다
-- 🔶 `dozy-auth` 프로젝트 작업: `inventory` audience 추가, `inventory:service`·`inventory:warehouse_manager`·`inventory:admin` role 등록(ADR-0011)과 `inventory:material_manager` role 등록(ADR-0041), system client(`svc-wms`, `svc-oms`, `svc-store`) 등록
+- 🔶 `dozy-auth` 프로젝트 작업: `inventory` audience 추가, `inventory:service`·`inventory:warehouse_manager`·`inventory:admin` role 등록(ADR-0011), system client(`svc-wms`, `svc-oms`, `svc-store`) 등록
