@@ -16,9 +16,13 @@ interface ProductRepository {
 
     suspend fun existsByProductCode(productCode: String): Boolean
 
-    /** `product_id` 오름차순으로 정렬해 반환한다. 필터가 null이면 해당 조건을 적용하지 않는다. [productCode]는 정규화된 값이다 */
+    /**
+     * `product_id` 오름차순으로 정렬해 반환한다. 필터가 null이면 해당 조건을 적용하지 않는다. [productCode]는 정규화된 값이다.
+     * [keyword]는 상품 코드나 이름에 들어 있는 글자(부분 일치, 대소문자 무시)이고 앞뒤 공백을 없앤 값이다
+     */
     suspend fun findAll(
         productCode: String?,
+        keyword: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
         offset: Long,
@@ -27,6 +31,7 @@ interface ProductRepository {
 
     suspend fun count(
         productCode: String?,
+        keyword: String?,
         category: ProductCategory?,
         productStatus: ProductStatus?,
     ): Long

@@ -144,11 +144,11 @@ class ProductServiceTest {
     fun `목록 조회는 정규화한 코드와 필터, 오프셋을 전달하고 전체 건수를 함께 반환한다`() =
         runBlocking<Unit> {
             val products: List<Product> = listOf(ProductTestBuilder().build(), ProductTestBuilder().productId(2L).build())
-            whenever(productRepository.findAll("BEAN-001", ProductCategory.BEAN, ProductStatus.ACTIVE, 20L, 10)).thenReturn(products)
-            whenever(productRepository.count("BEAN-001", ProductCategory.BEAN, ProductStatus.ACTIVE)).thenReturn(25L)
+            whenever(productRepository.findAll("BEAN-001", null, ProductCategory.BEAN, ProductStatus.ACTIVE, 20L, 10)).thenReturn(products)
+            whenever(productRepository.count("BEAN-001", null, ProductCategory.BEAN, ProductStatus.ACTIVE)).thenReturn(25L)
 
             val result: ProductPageResult =
-                service.list(ListProductsQuery(" bean-001 ", ProductCategory.BEAN, ProductStatus.ACTIVE, page = 2, size = 10))
+                service.list(ListProductsQuery(" bean-001 ", null, ProductCategory.BEAN, ProductStatus.ACTIVE, page = 2, size = 10))
 
             assertEquals(listOf(1L, 2L), result.items.map { it.productId })
             assertEquals(25L, result.totalElements)
@@ -166,5 +166,17 @@ class ProductServiceTest {
 
             assertEquals(setOf(1L, 2L), result.keys)
             assertEquals("BEAN-001", result.getValue(1L).productCode)
+        }
+
+    @Test
+    fun `목록 조회는 검색어의 앞뒤 공백을 없애 저장소에 넘기고 공백뿐이면 조건을 적용하지 않는다`() =
+        runBlocking<Unit> {
+            whenever(productRepository.findAll(null, "원두", null, null, 0L, 20)).thenReturn(listOf(ProductTestBuilder().build()))
+            whenever(productRepository.count(null, "원두", null, null)).thenReturn(1L)
+            whenever(productRepository.findAll(null, null, null, null, 0L, 20)).thenReturn(emptyList())
+            whenever(productRepository.count(null, null, null, null)).thenReturn(0L)
+
+            assertEquals(1L, service.list(ListProductsQuery(null, "  원두 ", null, null, page = 0, size = 20)).totalElements)
+            assertEquals(0L, service.list(ListProductsQuery(null, "   ", null, null, page = 0, size = 20)).totalElements)
         }
 }

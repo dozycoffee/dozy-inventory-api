@@ -265,7 +265,9 @@ class ProductControllerTest {
                 .jsonPath("$.totalElements")
                 .isEqualTo(11)
                 .consumeWith(ProductApiDocs.list())
-            verifyBlocking(listProductsUseCase) { list(ListProductsQuery("bean-001", ProductCategory.BEAN, ProductStatus.ACTIVE, 1, 10)) }
+            verifyBlocking(
+                listProductsUseCase,
+            ) { list(ListProductsQuery("bean-001", null, ProductCategory.BEAN, ProductStatus.ACTIVE, 1, 10)) }
         }
 
     @Test
@@ -280,5 +282,43 @@ class ProductControllerTest {
             .expectBody()
             .jsonPath("$.code")
             .isEqualTo("INV_INVALID_PAGE_REQUEST")
+    }
+
+    @Test
+    fun `목록 조회는 검색어를 Query로 넘기고 생략하면 null이다`() =
+        runBlocking<Unit> {
+            whenever(listProductsUseCase.list(any())).thenReturn(ProductPageResult(listOf(result), 0, 20, 1L))
+
+            webTestClient
+                .get()
+                .uri { it.path("/api/v1/products").queryParam("keyword", "원두").build() }
+                .headers { it.setBearerAuth(bearer("service")) }
+                .exchange()
+                .expectStatus()
+                .isOk
+            webTestClient
+                .get()
+                .uri("/api/v1/products")
+                .headers { it.setBearerAuth(bearer("service")) }
+                .exchange()
+                .expectStatus()
+                .isOk
+
+            verifyBlocking(listProductsUseCase) { list(ListProductsQuery(null, "원두", null, null, 0, 20)) }
+            verifyBlocking(listProductsUseCase) { list(ListProductsQuery(null, null, null, null, 0, 20)) }
+        }
+
+    @Test
+    fun `검색어가 100자를 넘으면 400 INV_INVALID_PRODUCT_KEYWORD`() {
+        webTestClient
+            .get()
+            .uri { it.path("/api/v1/products").queryParam("keyword", "a".repeat(101)).build() }
+            .headers { it.setBearerAuth(bearer("admin")) }
+            .exchange()
+            .expectStatus()
+            .isBadRequest
+            .expectBody()
+            .jsonPath("$.code")
+            .isEqualTo("INV_INVALID_PRODUCT_KEYWORD")
     }
 }

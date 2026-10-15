@@ -60,9 +60,11 @@ class ProductController(
     @GetMapping
     suspend fun list(
         @RequestParam(required = false) code: String?,
+        @RequestParam(required = false) keyword: String?,
         @RequestParam(required = false) category: ProductCategory?,
         @RequestParam(required = false) status: ProductStatus?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
-    ): ProductPageResponse = ProductPageResponse.from(listProductsUseCase.list(ListProductsQuery(code, category, status, page, size)))
+    ): ProductPageResponse =
+        ProductPageResponse.from(listProductsUseCase.list(ListProductsQuery(code, keyword, category, status, page, size)))
 }
