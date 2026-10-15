@@ -33,7 +33,7 @@
 | [0027](0027-lot-expiration-scan.md) | 유통기한 스캔 규칙 | Accepted |
 | [0028](0028-disposal-confirmation.md) | 폐기 확정 반영 규칙 | Accepted |
 | [0029](0029-return-restoration.md) | 반품 복귀 반영 규칙 | Accepted |
-| [0030](0030-admin-inventory-query.md) | 관리자 재고 현황·상세·이력 조회 규칙 | Accepted |
+| [0030](0030-admin-inventory-query.md) | 관리자 재고 현황·상세·이력 조회 규칙 | Accepted (결정 2는 0043이 대체) |
 | [0031](0031-lot-reallocation.md) | Lot 재할당과 할당 보류 규칙 | Accepted |
 | [0032](0032-warehouse-access-control.md) | 창고 접근 제어 규칙 | Accepted |
 | [0033](0033-reconciliation.md) | 대사 보정 규칙 | Accepted |
@@ -46,6 +46,7 @@
 | [0040](0040-cors-for-admin-console.md) | 어드민 콘솔을 위한 CORS | Accepted |
 | [0041](0041-material-manager-role.md) | 원자재 담당 role(`material_manager`) | Superseded by 0042 |
 | [0042](0042-remove-material-manager-role.md) | 원자재 담당 role(`material_manager`) 폐지 | Accepted |
+| [0043](0043-inventory-query-product-info-and-summary.md) | 관리자 재고 조회의 상품 정보와 상품별 요약 | Accepted |
 
 ERD 설계 결정(ERD-01~06)은 [erd.md](../erd.md)에, 업무 시나리오 결정은 [scenarios.md](../scenarios.md)에 있다.
 

@@ -187,5 +187,12 @@
     "description": "F-026의 inventory:material_manager role을 폐지한다. InventoryRole.MATERIAL_MANAGER와 InventoryAuthorize.PRODUCT_WRITE·PRODUCT_READ를 없애고, 상품 쓰기는 admin(ADMIN), 상품 조회는 ANY로 되돌린다. 결정은 ADR-0042(ADR-0041 대체). dozy-auth에 등록했다면 정리가 필요하다(사용자 작업).",
     "status": "completed",
     "dependencies": ["F-026"]
+  },
+  {
+    "id": "F-028",
+    "name": "관리자 재고 조회의 상품 정보와 상품별 요약",
+    "description": "재고 현황·상세 응답에 productCode·productName·unit을 더하고(상품 도메인 GetProductsUseCase.getByIds로 채운다, JOIN 없음), 조건에 맞는 재고 행을 상품 단위로 합쳐 상품 ID 순서로 페이지를 나누는 GET /api/v1/inventories/summary를 추가한다. 요약은 창고 수, 행 수, 총·예약·가용 수량과 불량·보류·만료·임박 수량을 준다. 권한과 창고 범위는 현황과 같다. 결정은 ADR-0043(ADR-0030 결정 2 대체).",
+    "status": "completed",
+    "dependencies": ["F-009", "F-021"]
   }
 ]
