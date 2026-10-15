@@ -22,6 +22,9 @@ object InventoryQueryApiDocs {
             fieldWithPath("inventoryId").type(JsonFieldType.NUMBER).description("재고 행 ID"),
             fieldWithPath("warehouseId").type(JsonFieldType.NUMBER).description("창고 ID"),
             fieldWithPath("productId").type(JsonFieldType.NUMBER).description("상품 ID"),
+            fieldWithPath("productCode").type(JsonFieldType.STRING).description("상품 코드(상품 마스터)"),
+            fieldWithPath("productName").type(JsonFieldType.STRING).description("상품 이름(상품 마스터)"),
+            fieldWithPath("unit").type(JsonFieldType.STRING).description("상품 단위(상품 마스터). 예: KG, L, EA"),
             fieldWithPath("lotId").type(JsonFieldType.NUMBER).description("Lot ID"),
             fieldWithPath("lotNumber").type(JsonFieldType.STRING).description("공급사가 부여한 Lot 번호"),
             fieldWithPath("manufactureDate").type(JsonFieldType.STRING).optional().description("제조일자(yyyy-MM-dd). 없을 수 있다"),
@@ -66,6 +69,54 @@ object InventoryQueryApiDocs {
                 fieldWithPath("totalElements").type(JsonFieldType.NUMBER).description("조건에 맞는 전체 재고 행 수"),
                 fieldWithPath("totalPages").type(JsonFieldType.NUMBER).description("전체 페이지 수"),
             ).andWithPrefix("items[].", inventoryFields),
+        )
+
+    fun summary(): Consumer<EntityExchangeResult<ByteArray>> =
+        ApiDoc.operation(
+            "inventory-summary",
+            TAG,
+            "관리자 상품별 재고 요약 조회",
+            "재고 현황과 같은 조건으로 거른 재고 행을 상품 단위로 합쳐 페이지로 나눠 조회한다. 한 줄이 상품 하나이고 상품 ID 순서이다. " +
+                "`inventory:admin`과 `inventory:warehouse_manager`가 호출할 수 있고, 창고 관리자는 배정된 창고의 행만 합친다" +
+                "(창고 조건을 생략하면 배정된 창고로 자동 제한되고 배정되지 않은 창고를 지정하면 403). " +
+                "수량은 조건에 맞는 재고 행의 합이며 `availableQuantity`는 총 수량 − 예약 수량이다(품질 상태와 보류는 반영하지 않는다). " +
+                "`defectiveQuantity`, `heldQuantity`, `expiredQuantity`, `expiringSoonQuantity`는 각각 품질 상태가 불량인 행, " +
+                "할당 보류 중인 행, Lot이 유통기한 만료·임박인 행의 총 수량이고 서로 겹칠 수 있다. " +
+                "상품별 재고 행은 `GET /api/v1/inventories?productId=`로 이어서 본다.",
+            null,
+            "InventorySummaryPageResponse",
+            ApiDoc.authorization,
+            queryParameters(
+                parameterWithName("warehouseId").optional().description("창고 ID"),
+                parameterWithName("productId").optional().description("상품 ID"),
+                parameterWithName("qualityStatus").optional().description("품질 상태: NORMAL, DEFECTIVE, DISPOSAL_SCHEDULED"),
+                parameterWithName("lotStatus").optional().description("Lot 상태: NORMAL, EXPIRING_SOON, EXPIRED"),
+                parameterWithName("allocationHold").optional().description("신규 할당 보류 여부(true, false)"),
+                parameterWithName("page").optional().description("페이지 번호. 0부터 시작하며 기본 0"),
+                parameterWithName("size").optional().description("페이지 크기. 1~100이며 기본 20"),
+            ),
+            responseFields(
+                fieldWithPath("items").type(JsonFieldType.ARRAY).description("상품별 요약 목록. 상품 ID 순서"),
+                fieldWithPath("page").type(JsonFieldType.NUMBER).description("페이지 번호"),
+                fieldWithPath("size").type(JsonFieldType.NUMBER).description("페이지 크기"),
+                fieldWithPath("totalElements").type(JsonFieldType.NUMBER).description("조건에 맞는 재고 행이 있는 전체 상품 수"),
+                fieldWithPath("totalPages").type(JsonFieldType.NUMBER).description("전체 페이지 수"),
+                fieldWithPath("items[].productId").type(JsonFieldType.NUMBER).description("상품 ID"),
+                fieldWithPath("items[].productCode").type(JsonFieldType.STRING).description("상품 코드(상품 마스터)"),
+                fieldWithPath("items[].productName").type(JsonFieldType.STRING).description("상품 이름(상품 마스터)"),
+                fieldWithPath("items[].unit").type(JsonFieldType.STRING).description("상품 단위(상품 마스터)"),
+                fieldWithPath("items[].warehouseCount").type(JsonFieldType.NUMBER).description("조건에 맞는 재고 행이 있는 창고 수"),
+                fieldWithPath("items[].rowCount").type(JsonFieldType.NUMBER).description("조건에 맞는 재고 행(창고 × Lot × 품질 상태) 수"),
+                fieldWithPath("items[].quantity").type(JsonFieldType.NUMBER).description("총 수량 합(예약 수량 포함)"),
+                fieldWithPath("items[].reservedQuantity").type(JsonFieldType.NUMBER).description("예약 수량 합"),
+                fieldWithPath("items[].availableQuantity").type(JsonFieldType.NUMBER).description("총 수량 − 예약 수량. 품질 상태와 보류는 반영하지 않는다"),
+                fieldWithPath("items[].defectiveQuantity").type(JsonFieldType.NUMBER).description("품질 상태가 불량(DEFECTIVE)인 행의 총 수량"),
+                fieldWithPath("items[].heldQuantity").type(JsonFieldType.NUMBER).description("신규 할당이 보류된 행의 총 수량"),
+                fieldWithPath("items[].expiredQuantity").type(JsonFieldType.NUMBER).description("Lot 상태가 유통기한 만료(EXPIRED)인 행의 총 수량"),
+                fieldWithPath(
+                    "items[].expiringSoonQuantity",
+                ).type(JsonFieldType.NUMBER).description("Lot 상태가 유통기한 임박(EXPIRING_SOON)인 행의 총 수량"),
+            ),
         )
 
     fun detail(): Consumer<EntityExchangeResult<ByteArray>> =

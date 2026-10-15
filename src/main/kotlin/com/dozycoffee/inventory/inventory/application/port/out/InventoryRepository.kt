@@ -51,6 +51,19 @@ interface InventoryRepository {
     suspend fun count(condition: InventorySearchCondition): Long
 
     /**
+     * [condition]을 만족하는 재고 행을 상품 단위로 합쳐 `상품 ID` 순서로 [offset]부터 최대 [limit]개 반환한다.
+     * 조건을 만족하는 행이 없는 상품은 결과에 없다. 읽기 전용이며 락을 걸지 않는다.
+     */
+    suspend fun searchSummaries(
+        condition: InventorySearchCondition,
+        offset: Long,
+        limit: Int,
+    ): List<InventorySummaryRow>
+
+    /** [condition]을 만족하는 재고 행이 하나라도 있는 상품의 개수 */
+    suspend fun countSummaries(condition: InventorySearchCondition): Long
+
+    /**
      * 창고의 재고 행과 그 Lot을 `inventory_id` 순서로 모두 반환한다(수량 0인 행 포함). [productId]와 [lotNumber]를 주면 그 조건의 행만 준다.
      * 대사가 WMS 수량과 비교하려고 쓰며 락을 걸지 않는다.
      */
