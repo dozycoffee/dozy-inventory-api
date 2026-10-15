@@ -34,7 +34,7 @@ class ProductController(
     private val getProductUseCase: GetProductUseCase,
     private val listProductsUseCase: ListProductsUseCase,
 ) {
-    @PreAuthorize(InventoryAuthorize.PRODUCT_WRITE)
+    @PreAuthorize(InventoryAuthorize.ADMIN)
     @PostMapping
     suspend fun register(
         @Valid @RequestBody request: RegisterProductRequest,
@@ -43,20 +43,20 @@ class ProductController(
         return ResponseEntity.created(URI.create("/api/v1/products/${result.productId}")).body(ProductResponse.from(result))
     }
 
-    @PreAuthorize(InventoryAuthorize.PRODUCT_WRITE)
+    @PreAuthorize(InventoryAuthorize.ADMIN)
     @PatchMapping("/{productId}/status")
     suspend fun changeStatus(
         @PathVariable productId: Long,
         @Valid @RequestBody request: ChangeProductStatusRequest,
     ): ProductResponse = ProductResponse.from(changeProductStatusUseCase.changeStatus(request.toCommand(productId)))
 
-    @PreAuthorize(InventoryAuthorize.PRODUCT_READ)
+    @PreAuthorize(InventoryAuthorize.ANY)
     @GetMapping("/{productId}")
     suspend fun get(
         @PathVariable productId: Long,
     ): ProductResponse = ProductResponse.from(getProductUseCase.getById(productId))
 
-    @PreAuthorize(InventoryAuthorize.PRODUCT_READ)
+    @PreAuthorize(InventoryAuthorize.ANY)
     @GetMapping
     suspend fun list(
         @RequestParam(required = false) code: String?,
