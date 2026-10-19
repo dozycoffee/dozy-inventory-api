@@ -6,7 +6,7 @@ plugins {
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "8.10.4"
-    id("com.epages.restdocs-api-spec") version "0.20.1"
+    id("com.epages.restdocs-api-spec") version "0.20.2"
 }
 
 group = "com.dozycoffee"
