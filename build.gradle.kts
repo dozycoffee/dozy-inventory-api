@@ -3,10 +3,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.3.21"
     id("org.jetbrains.kotlin.plugin.spring") version "2.3.21"
-    id("org.springframework.boot") version "4.1.1"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
-    id("com.diffplug.spotless") version "8.10.4"
-    id("com.epages.restdocs-api-spec") version "0.20.1"
+    id("com.diffplug.spotless") version "8.11.0"
+    id("com.epages.restdocs-api-spec") version "0.20.2"
 }
 
 group = "com.dozycoffee"
